@@ -1,0 +1,209 @@
+⚽ Saha Rezervasyon Platformu – Detaylı Metin Akışı
+1. Kullanıcı (Oyuncu / Müşteri) Akışı
+
+Ana Sayfa Açılış
+
+Kullanıcı siteye veya uygulamaya girer.
+
+“Kullanıcı Tipi Seçimi” ekranında Oyuncu/Müşteri, Saha Sahibi veya Admin seçeneği çıkar.
+
+Saha Arama Süreci
+
+Kullanıcıdan konum izni istenir.
+
+Google Maps API ile GPS konumu algılanır.
+
+Sistemdeki en yakın sahalar listelenir.
+
+Kullanıcı sahaları filtreleyebilir: semt, fiyat aralığı, saha tipi (halı, çim), çim türü, kapalı/açık gibi.
+
+Saha Detay Sayfası
+
+Fotoğraf galerisi.
+
+Haftalık takvim (dolu/boş saatler).
+
+Fiyat bilgisi (hafta içi / hafta sonu farklı olabilir).
+
+Tesis imkanları (soyunma odası, duş, kafeterya).
+
+Kullanıcı yorumları ve puanlamalar.
+
+“Rezervasyon Yap” butonu.
+
+Rezervasyon Adımları
+
+Tarih ve saat seçimi.
+
+Maç türü (ör. 5v5, 6v6, 7v7).
+
+Eksik oyuncu var mı sorusu.
+
+Ödeme tipi seçimi:
+
+Online Ödeme (Iyzico API)
+
+Sahada Ödeme
+
+Online Ödeme (Iyzico)
+
+Kullanıcı isterse “split payment” yapabilir.
+
+Yani 10 kişi oynuyorsa, sistem her birine link gönderir, herkes kendi payını öder.
+
+Tek ödeyen varsa, direkt ödeme alınır.
+
+Rezervasyon Onayı ve Bildirimler
+
+Başarılı rezervasyon sonrası:
+
+WhatsApp mesajı (rezervasyon bilgileri).
+
+Email onayı (SendGrid).
+
+Opsiyonel SMS bildirimi (NetGSM).
+
+Kullanıcı Paneli
+
+Geçmiş rezervasyonlar.
+
+Yaklaşan maçlar.
+
+Oynadığı oyuncular listesi.
+
+Fatura geçmişi.
+
+Opsiyonel: performans istatistikleri (katıldığı maç sayısı, kazandığı puanlar).
+
+2. Saha Sahibi Paneli
+
+Dashboard (Ana Sayfa)
+
+Günlük ve haftalık rezervasyon listesi.
+
+Doluluk oranı grafiği.
+
+Gelir özeti.
+
+İptal edilen rezervasyonlar.
+
+Rezervasyon Yönetimi
+
+Manuel rezervasyon ekleme.
+
+Rezervasyon iptali.
+
+Blok saat ekleme (bakım/kapalı günler için).
+
+Fiyat güncelleme (ör. happy hour indirimleri).
+
+Müşteri Yönetimi
+
+Müşteri listesi.
+
+Ziyaret sıklığı.
+
+Blacklist (istenmeyen kullanıcıları engelleme).
+
+Finansal Modül
+
+Fatura kesme.
+
+Gelir raporlarını export etme.
+
+Platform komisyon özetini görüntüleme.
+
+3. Admin Paneli
+
+Sistem Yönetimi
+
+Tüm sahaların listesi.
+
+Kullanıcı yönetimi.
+
+Rezervasyon görüntüleme.
+
+Platform komisyon ayarları.
+
+Şikayet yönetimi.
+
+Sistem logları.
+
+4. Oyuncu Bulma Sistemi
+
+“Adam Eksik” İlanı Açma
+
+Kullanıcı maç için ilan açar.
+
+Seviye belirtir (amatör/iyi).
+
+Mevki belirtir (kaleci, forvet, defans).
+
+İlan yayınlanır.
+
+Diğer Oyuncuların Görmesi
+
+Yakındaki oyuncular bu ilanı görür.
+
+Katılmak için “istek” gönderir.
+
+Maçı açan kullanıcı isteği onaylar.
+
+Oyun Arıyorum Akışı
+
+Kullanıcı, sistemdeki açık ilanlara bakabilir.
+
+Seviye ve konuma göre öneriler alır.
+
+“Katıl” butonuyla başvuru yapar.
+
+5. Entegrasyonlar
+
+Iyzico API → Online ödeme ve split payment desteği.
+
+WhatsApp Entegrasyonu → Rezervasyon onayı, hatırlatma mesajı, saha sahibine bildirim.
+
+SendGrid → Email bildirimleri.
+
+NetGSM → SMS bildirimleri.
+
+Google Maps API → Konum tabanlı saha arama.
+
+Redis Cache → Rezervasyon saatlerinde müsaitlik kontrolü için hızlandırma.
+
+6. Fazlar (MVP → Gelişmiş)
+
+MVP (Minimum Viable Product)
+
+Saha listeleme
+
+Saha detayları
+
+Rezervasyon yapma
+
+Online ödeme (Iyzico)
+
+Basit saha sahibi paneli
+
+İkinci Faz
+
+Oyuncu bulma (adam eksik ilanları)
+
+Mobil uygulama (React Native)
+
+Kullanıcı istatistikleri ve sosyal özellikler
+
+Turnuva modülü
+
+Hakem rezervasyonu
+
+📌 Özetle:
+Bu platform 4 temel rol üzerine kuruluyor:
+
+Oyuncu (müşteri) → saha arar, rezervasyon yapar, ödeme yapar.
+
+Saha sahibi → rezervasyon ve müşteri yönetir, gelirini takip eder.
+
+Admin → sistemi kontrol eder, şikayetleri yönetir.
+
+Oyuncu bulma sistemi → maçları tamamlar, oyuncular arası sosyal ağ oluşturur.

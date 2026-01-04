@@ -1,0 +1,60 @@
+- oyuncu olarak kayıt olurken telefon bilgisi zorunlu olacak
+
+
+
+
+
+- Rezervasyon kısmında fiyatlar aynı değil tarih seçme de sorun var saat aralıgına göre fiyat belirleme
+
+
+
+- Oyuncu bul kısmında liste ve harita görünümü eklenecek whatsappta,
+
+
+-oyuncu profil de her şey zorunlu olacak canlı konum görüntülenecek
+
+-rezervasyon da kullanıcı telefonu vs. görünmeyecek oyuncu profilde de görünmeyecek
+
+
+-oyuncular kısmında değerlendirme vs. yapabilecek oyuncu kısmında
+
+-giriş yap kısmında saha sahibi ve oyuncu butonları belirgin olacak
+
+-onboardda fotoğraf yüklenin üstündeki butona tıklayınca da yapsın onboardda pdf desteklemesi lazım vergi dairesi zorunlu kapak resmi seçilebilecek saha fotoğraflarından işletme ruhsatı bireysel mi kurumsal mı onu da belirtmesi gerek, bireysel ise tc/vergi no şeklinde olacak aşağıda yetkili isim soy isim telefon numarası olacak güvenlik uyarısı da kaldırılacak ibana regex eklenecek otomatik formatlasın
+geri gelince vergi fotoğrafı vs. saha fotoğrfaları siliniyor silinmesin ve en son bunlar özete eklensin. saha fotoğrafları bir sonraki adım da görünebilecek spor türleri için de ayrı ayrı seçenek çıkacak futbolda ayrı basketbolda ayrı vs. vs. varyantlar ve admin panelinden bu varyantlar yönetilebilecek fiyat aralığı da seçilebilecek ve saat aralığına göre fiyat belirlenebilecek son da özet daha estetik olması gerek panele giti kaldır sertifikaları kaldır istatistikleri kaldır checkboxları onaylayınca buton aktif olacak hatta firmadan sonra saha ile ilgili her şeyi iptal ediyoruz onlar saha sahibi panelinde olacak dashboardda ipucu verilecek onay bekleniyor onaylandıktan sonra halısha ekleyebilirsiniz diye
+
+
+-admin tesisler kımı doğru çalışmıyor saha sahipleri düşmüyor
+
+-admine yapılacaklar olarak düşebilir
+
+-saha sahibinde saha eklerken saatlik ücreti saatlere göre vs. ayarlayabilecek telefonun yanına bir de isim yazabilir çalışma saatleri seçmeli olsun harita yanlış yerde açılıyor haritadan arama da işletme vs. de araabilsin resim yükleniyor belirgenleştirilsin kapak seçme de olsun
+
+-yeni saha eklerken saha adı kısaltma da hata veriyor
+
+-saha sahibi marketing kaldırılacak admine eklenecek müşteri doğum gününe özel hediye kuponu vs. eklenebilecek kampanya vs.
+
+-saha sahibinde crm kalacak premium olarak başka biişi yok
+
+-ödeme çalışmıyor
+
+-PREMİUM ÜYELİK HATA var ödemede çalışmıyor
+
+-üye olurken bilgiler ayarlara düşmüyor saha sahibi* kısmı bu oyuncu da da olabilir saha sahibinde işletme iptal edilsin o tab profile eklensin estetik şekilde profil resmi vs. yok sidebarda düzeltilecek
+
+
+- anasayfa footerda ki her şey olacak anasayfaya iletişim eklenecek admin panelinde de kontrolu olacak
+
+-anasayfa heroya tarih estetik olacak tarih bugün dün vs.
+
+-hero mehdi abiye attıgım gibi düzenlenecek
+
+-header da saha sahibi kaldırılcak
+
+-logine footer eklenecek
+
+-facebook üye ol giriş yap eklenecek
+
+- giriş kayıttan saha sahibiyim kalksın oranın üye ve girişi ayrı olacak
+
+-adminden logine registere duyuru eklenebilecek kampanya vs. eklenebilecek
