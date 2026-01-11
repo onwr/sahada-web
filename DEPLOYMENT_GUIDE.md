@@ -1,136 +1,94 @@
-# Sahada & Ödeme Sistemi - Ubuntu 24 VPS Kurulum ve Yayınlama Rehberi
+# Sahada & Ödeme Sistemi & Kapıda Express - Ubuntu 24 VPS Kurulum ve Yayınlama Rehberi
 
-Bu döküman, **Sahada (React Frontend)** uygulamasını `sahamerkezi.com` adresine ve **Ödeme API (PHP)** servisini `odeme.sahamerkezi.com` adresine kurmak için gerekli tüm adımları içerir.
+Bu döküman, aşağıdaki sistemlerin kurulumu için gerekli adımları içerir:
+1.  **Sahada (React Frontend)** -> `sahamerkezi.com`
+2.  **Ödeme API (PHP)** -> `odeme.sahamerkezi.com`
+3.  **Kapıda Express (Next.js)** -> `kapidaexpress.com`
 
 ## 📋 Ön Gereksinimler
 
 1.  **Ubuntu 24.04 VPS**: Root erişimine sahip bir sunucu.
-2.  **Domain Yönetimi**: `sahamerkezi.com` ve `odeme.sahamerkezi.com` domainlerinin DNS panelinden VPS IP adresine (A Kaydı) yönlendirilmiş olması gerekir.
+2.  **Domain Yönetimi**: Tüm domainlerin DNS panelinden VPS IP adresine (A Kaydı) yönlendirilmiş olması gerekir.
 
 ---
 
-## 🚀 Adım 1: Sunucu Hazırlığı ve Gerekli Paketlerin Kurulumu
+## 🌐 Adım 0: DNS Yönlendirmesi
 
-Sunucuya SSH ile bağlandıktan sonra sistem güncellemelerini yapın ve gerekli yazılımları (Nginx, Node.js, PHP) kurun.
+| Site | Tip | Host / Ad | Değer / Hedef | Açıklama |
+| :--- | :--- | :--- | :--- | :--- |
+| **Sahada** | A | `@` | `VPS_IP_ADRESINIZ` | Ana domain (sahamerkezi.com) için |
+| **Sahada** | A | `www` | `VPS_IP_ADRESINIZ` | www.sahamerkezi.com için |
+| **Ödeme** | A | `odeme` | `VPS_IP_ADRESINIZ` | Ödeme sistemi (odeme.sahamerkezi.com) için |
+| **Kapıda** | A | `@` | `VPS_IP_ADRESINIZ` | kapidaexpress.com için |
+| **Kapıda** | A | `www` | `VPS_IP_ADRESINIZ` | www.kapidaexpress.com için |
+
+---
+
+## 🚀 Adım 1: Sunucu Hazırlığı
 
 ```bash
-# 1. Sistemi Güncelle
+# Sistemi Güncelle ve Temel Araçları Kur
 sudo apt update && sudo apt upgrade -y
-
-# 2. Temel Araçları Kur (Git, Curl, Unzip, Nginx)
 sudo apt install git curl unzip nginx -y
 
-# 3. Node.js (v20) Kurulumu (Frontend Build İçin)
+# Node.js (v20) Kurulumu
 curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
 sudo apt install -y nodejs
 
-# 4. PHP ve Gerekli Eklentilerin Kurulumu (Ödeme API İçin)
-# Ubuntu 24 üzerinde PHP 8.3 varsayılan olarak gelebilir.
+# PM2 Kurulumu (Next.js uygulamasını yönetmek için)
+sudo npm install -g pm2
+
+# PHP ve Eklentilerinin Kurulumu (Ödeme API İçin)
 sudo apt install php-fpm php-mysql php-curl php-xml php-mbstring php-zip -y
 
-# 5. Composer Kurulumu (PHP Bağımlılıkları İçin)
+# Composer Kurulumu
 curl -sS https://getcomposer.org/installer | php
 sudo mv composer.phar /usr/local/bin/composer
 ```
 
 ---
 
-## 📦 Adım 2: Dosyaların Sunucuya Aktarılması
+## 📦 Adım 2: React Frontend (Sahada) Kurulumu
 
-Projeyi sunucuda `/var/www` dizini altında tutacağız.
+React uygulaması statik dosya olarak sunulacaktır.
 
-```bash
-# Ana dizine git
-cd /var/www
-
-# Proje klasörünü oluştur (Github kullanmıyorsanız SFTP/FileZilla ile dosyaları buraya atın)
-# Eğer Git kullanıyorsanız:
-# git clone <REPO_ADRESI> sahada
-
-# Manuel dosya yükleme yapacaksanız:
-sudo mkdir -p /var/www/sahada
-sudo chown -R $USER:$USER /var/www/sahada
-```
-
-**Dosya Yapısı Şöyle Olmalı:**
-*   `/var/www/sahada/` (Ana React Projesi - package.json, vite.config.js burada olmalı)
-*   `/var/www/sahada/payment-api/` (PHP Ödeme Servisi)
-
----
-
-## 💻 Adım 3: Frontend (Sahada) Kurulumu - `sahamerkezi.com`
-
-Bu adımda React uygulamasını "build" alıp statik dosya haline getireceğiz ve Nginx ile sunacağız.
-
-### 3.1. Build İşlemi
-
+### 2.1. Build
 ```bash
 cd /var/www/sahada
-
-# Bağımlılıkları yükle
 npm install
-
-# Build al (Bu işlem 'dist' klasörünü oluşturur)
 npm run build
 ```
 
-### 3.2. Nginx Konfigürasyonu (Frontend)
-
-`/etc/nginx/sites-available/sahamerkezi` dosyasını oluşturun:
-
-```bash
-sudo nano /etc/nginx/sites-available/sahamerkezi
-```
-
-**İçeriğine şunları yapıştırın:**
-
+### 2.2. Nginx Konfigürasyonu
+`/etc/nginx/sites-available/sahamerkezi` dosyası:
 ```nginx
 server {
     listen 80;
     server_name sahamerkezi.com www.sahamerkezi.com;
 
-    root /var/www/sahada/dist; # Build alınan klasör
+    root /var/www/sahada/dist;
     index index.html;
 
     location / {
         try_files $uri $uri/ /index.html;
     }
-
-    # Statik dosyalar için cache ayarları (Opsiyonel)
-    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg)$ {
-        expires 1y;
-        add_header Cache-Control "public, no-transform";
-    }
 }
 ```
 
-**Kaydetmek için:** `CTRL + X` -> `Y` -> `Enter`
-
 ---
 
-## 💳 Adım 4: Ödeme API Kurulumu - `odeme.sahamerkezi.com`
+## 💳 Adım 3: PHP Ödeme API (Sahada) Kurulumu
 
-PHP tabanlı ödeme sistemini kuracağız.
+Ödeme sistemi PHP ile çalışır.
 
-### 4.1. Bağımlılıkların Yüklenmesi
-
+### 3.1. Kurulum
 ```bash
 cd /var/www/sahada/payment-api
-
-# PHP bağımlılıklarını yükle
 composer install
 ```
 
-### 4.2. Nginx Konfigürasyonu (Ödeme API)
-
-`/etc/nginx/sites-available/odeme` dosyasını oluşturun:
-
-```bash
-sudo nano /etc/nginx/sites-available/odeme
-```
-
-**İçeriğine şunları yapıştırın:**
-
+### 3.2. Nginx Konfigürasyonu
+`/etc/nginx/sites-available/odeme` dosyası:
 ```nginx
 server {
     listen 80;
@@ -145,73 +103,105 @@ server {
 
     location ~ \.php$ {
         include snippets/fastcgi-php.conf;
-        fastcgi_pass unix:/var/run/php/php8.3-fpm.sock; # PHP versiyonunuza göre burayı kontrol edin (örn: php8.1-fpm.sock)
+        fastcgi_pass unix:/var/run/php/php8.3-fpm.sock; # PHP versiyonunuza göre düzenleyin
         fastcgi_param SCRIPT_FILENAME $realpath_root$fastcgi_script_name;
         include fastcgi_params;
-    }
-
-    # Güvenlik: Gizli dosyalara erişimi engelle
-    location ~ /\.(?!well-known).* {
-        deny all;
     }
 }
 ```
 
-> **Not:** PHP versiyonunuzu kontrol etmek için `php -v` komutunu, FPM soketini kontrol etmek için `ls /var/run/php/` komutunu kullanabilirsiniz. Ubuntu 24 genellikle PHP 8.3 kullanır.
+---
+
+## ⚡ Adım 4: Next.js (Kapıda Express) Kurulumu
+
+Next.js uygulaması bir sunucu (Node process) olarak çalıştırılacak ve Nginx bu porta "Reverse Proxy" yapacaktır.
+
+### 4.1. Klasör ve Kurulum
+```bash
+# Klasör oluştur ve yetki ver
+sudo mkdir -p /var/www/kapidaexpress
+sudo chown -R $USER:$USER /var/www/kapidaexpress
+
+# Dosyaları atın...
+
+# Build Al
+cd /var/www/kapidaexpress
+npm install
+npm run build
+```
+
+### 4.2. Uygulamayı PM2 ile Başlatma
+Next.js uygulamasını 3000 portunda başlatacağız.
+
+```bash
+# PM2 ile uygulamayı başlat (name: kapida-app, port: 3000)
+pm2 start npm --name "kapida-app" -- start -- -p 3000
+
+# PM2 listesini kaydet (Sunucu resetlenirse otomatik başlasın)
+pm2 save
+pm2 startup
+```
+
+### 4.3. Nginx Reverse Proxy Konfigürasyonu
+`/etc/nginx/sites-available/kapidaexpress` dosyasını oluşturun:
+
+```bash
+sudo nano /etc/nginx/sites-available/kapidaexpress
+```
+
+**İçerik:**
+```nginx
+server {
+    listen 80;
+    server_name kapidaexpress.com www.kapidaexpress.com;
+
+    location / {
+        proxy_pass http://localhost:3000; # Next.js'in çalıştığı port
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+        
+        # Gerçek IP'leri iletmek için
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
 
 ---
 
-## 🔗 Adım 5: Siteleri Aktifleştirme ve DNS
-
-### 5.1. Nginx Sitelerini Etkinleştir
+## 🔗 Adım 5: Siteleri Aktifleştirme
 
 ```bash
-# Sembolik linkleri oluştur
+# Linkleri oluştur
 sudo ln -s /etc/nginx/sites-available/sahamerkezi /etc/nginx/sites-enabled/
 sudo ln -s /etc/nginx/sites-available/odeme /etc/nginx/sites-enabled/
+sudo ln -s /etc/nginx/sites-available/kapidaexpress /etc/nginx/sites-enabled/
 
-# Varsayılan nginx sayfasını kaldır (Çakışma olmaması için)
+# Varsayılanı sil ve restart et
 sudo rm /etc/nginx/sites-enabled/default
-
-# Konfigürasyonu test et
 sudo nginx -t
-
-# Hata yoksa Nginx'i yeniden başlat
 sudo systemctl restart nginx
 ```
 
-### 5.2. İzinleri Ayarlama
-
-Nginx'in dosyaları okuyabilmesi için izinleri düzeltin:
-
-```bash
-sudo chown -R www-data:www-data /var/www/sahada
-sudo chmod -R 755 /var/www/sahada
-```
-
 ---
 
-## 🔒 Adım 6: SSL Sertifikası Kurulumu (HTTPS)
-
-Certbot kullanarak her iki domain için de ücretsiz SSL sertifikası alın.
+## 🔒 Adım 6: SSL Sertifikası (HTTPS)
 
 ```bash
-# Certbot ve Nginx eklentisini kur
 sudo apt install certbot python3-certbot-nginx -y
 
-# Sertifikaları al ve Nginx'i otomatik yapılandır
+# Tüm siteler için SSL al
 sudo certbot --nginx -d sahamerkezi.com -d www.sahamerkezi.com
 sudo certbot --nginx -d odeme.sahamerkezi.com
+sudo certbot --nginx -d kapidaexpress.com -d www.kapidaexpress.com
 ```
 
-Kurulum sırasında yönlendirme (redirect) sorulursa **2** (Redirect - Make all requests redirect to secure HTTPS access) seçeneğini seçin.
-
----
-
-## ✅ Kontrol Listesi
-
-1.  [ ] `sahamerkezi.com` adresine gidin. React uygulamanızın açıldığını, sayfalar arası geçişlerin (Client-side routing) çalıştığını doğrulayın.
-2.  [ ] `odeme.sahamerkezi.com` adresini test edin (veya bir test.php dosyası çağırın). PHP'nin çalıştığından emin olun.
-3.  [ ] SSL (Kilit ikonu) her iki sitede de görünüyor mu kontrol edin.
-
-**Tebrikler! Kurulum tamamlandı.**
+**Tebrikler!** 
+- `sahamerkezi.com` -> React (Statik/Dist)
+- `odeme.sahamerkezi.com` -> PHP (FPM)
+- `kapidaexpress.com` -> Next.js (PM2/Node - Port 3000)
+olarak çalışmaktadır.

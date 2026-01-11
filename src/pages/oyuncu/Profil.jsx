@@ -19,6 +19,7 @@ import { updatePassword, reauthenticateWithCredential, EmailAuthProvider } from 
 import { doc, onSnapshot, collection, query, where, getDoc } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import OyuncuSidebar from '../../components/OyuncuSidebar';
+import DashboardHeader from '../../components/DashboardHeader';
 import { 
   User, 
   CreditCard, 
@@ -46,7 +47,7 @@ import toast from '../../utils/toast';
 
 const Profil = () => {
   const { id } = useParams();
-  const { user, userData } = useAuth();
+  const { user, userData, setUserData } = useAuth();
   const [viewingUserId, setViewingUserId] = useState(null);
   const [viewingUserData, setViewingUserData] = useState(null);
   const isViewingOwnProfile = !id || id === user?.uid;
@@ -494,6 +495,12 @@ const Profil = () => {
             displayName: profileData.displayName
           });
         }
+        
+        // Global state güncelle (Sidebar'ın anında güncellenmesi için)
+        setUserData(prev => ({
+          ...prev,
+          ...profileData
+        }));
       } else {
         toast.error(result.error || 'Profil güncellenirken hata oluştu');
       }
@@ -857,6 +864,7 @@ const Profil = () => {
       <OyuncuSidebar />
       
       <div className="flex-1 flex flex-col overflow-hidden">
+        <DashboardHeader title="Profil Ayarları" />
         <div className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8">
           {/* Header */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6">
@@ -953,20 +961,39 @@ const Profil = () => {
                     />
                   </div>
                   <div className="flex-1">
-                    <h3 className="text-xl font-semibold text-gray-900 mb-1">
-                      {userData?.fullName || userData?.displayName || user?.email}
+                    <h3 className="text-xl font-bold text-gray-900 mb-0.5">
+                      {userData?.fullName || userData?.displayName || 'Oyuncu'}
                     </h3>
-                    <p className="text-gray-600 mb-3">{user?.email}</p>
-                    <div className="flex items-center gap-4 text-sm text-gray-500">
-                      <div className="flex items-center gap-1">
-                        <Calendar className="w-4 h-4" />
-                        <span>{stats.totalMatches || 0} Maç</span>
+                    <p className="text-gray-500 text-sm mb-3 font-medium">{userData?.email || user?.email}</p>
+                    
+                    <div className="flex flex-wrap items-center gap-3 text-sm text-gray-500 mb-4">
+                      <div className="flex items-center gap-1.5 bg-gray-50 px-2 py-1 rounded-md">
+                        <Calendar className="w-3.5 h-3.5 text-gray-400" />
+                        <span className="font-semibold text-gray-700">{stats.totalMatches || 0}</span>
+                        <span className="text-xs">Maç</span>
                       </div>
-                      <div className="flex items-center gap-1">
-                        <Star className="w-4 h-4" />
-                        <span>{userData?.city || 'İstanbul'}</span>
+                      <div className="flex items-center gap-1.5 bg-gray-50 px-2 py-1 rounded-md">
+                        <MapPin className="w-3.5 h-3.5 text-gray-400" />
+                        <span className="font-medium text-gray-700">{userData?.city || 'İstanbul'}</span>
                       </div>
                     </div>
+
+                     {/* Rozetler Alanı */}
+                     <div className="flex flex-wrap gap-2">
+                        {getAchievements(displayUserData).filter(a => a.earned).length > 0 ? (
+                           getAchievements(displayUserData).filter(a => a.earned).map(badge => {
+                               const Icon = badge.icon;
+                               return (
+                                   <div key={badge.id} className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-bold border ${badge.color.replace('text-', 'border-').replace('bg-', 'bg-opacity-10 ')}`} title={badge.title}>
+                                       <Icon size={12} className="flex-shrink-0" />
+                                       <span>{badge.title}</span>
+                                   </div>
+                               )
+                           })
+                        ) : (
+                           <span className="text-xs text-gray-400 italic">Henüz rozet kazanılmadı</span>
+                        )}
+                     </div>
                   </div>
                 </div>
               </div>

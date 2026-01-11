@@ -1,15 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
+import citiesData from '../../utils/iller.json';
+import districtsData from '../../utils/ilceler.json';
 import {
   User,
   Calendar,
   Phone,
   Camera,
-  ChevronRight,
-  ChevronLeft,
-  Check,
-  X,
   Star,
   Clock,
   Target,
@@ -42,6 +40,8 @@ const SahaSahibiOnboard = () => {
     authorizedPerson: '',
     businessEmail: '',
     businessPhone: '',
+    city: '',
+    district: '',
     businessAddress: '',
     businessLocation: { lat: null, lng: null },
 
@@ -89,7 +89,8 @@ const SahaSahibiOnboard = () => {
     terms: false,
     kvkk: false,
     campaigns: false,
-    whatsapp: false
+    whatsapp: false,
+    membershipAgreement: false
   });
   const [showMap, setShowMap] = useState(false);
   const [mapSearchQuery, setMapSearchQuery] = useState('');
@@ -101,6 +102,26 @@ const SahaSahibiOnboard = () => {
   const [mapCenter, setMapCenter] = useState({ lat: 41.0082, lng: 28.9784 });
   const [isDragging, setIsDragging] = useState(false);
   const [pinPosition, setPinPosition] = useState({ x: 50, y: 50 });
+  const [districts, setDistricts] = useState([]);
+
+  // Effect to update districts when city changes
+  useEffect(() => {
+    if (formData.city) {
+      // Find city ID from name
+      const cityEntry = Object.entries(citiesData).find(([id, name]) => name === formData.city);
+      if (cityEntry) {
+        const cityId = cityEntry[0];
+        // Filter districts - ilceler.json structure: [header, db, table_data]
+        // We need index 2 for the data
+        const cityDistricts = districtsData[2]?.data?.filter(d => d.il_id === cityId) || [];
+        setDistricts(cityDistricts);
+      } else {
+        setDistricts([]);
+      }
+    } else {
+      setDistricts([]);
+    }
+  }, [formData.city]);
 
   // localStorage key'i
   const storageKey = user ? `sahaSahibiOnboarding_${user.uid}` : null;
@@ -159,6 +180,8 @@ const SahaSahibiOnboard = () => {
           authorizedPerson: userData.authorizedPerson || userData.fullName || savedData?.authorizedPerson || prev.authorizedPerson || '',
           businessEmail: userData.businessEmail || userData.email || savedData?.businessEmail || prev.businessEmail || '',
           businessPhone: userData.businessPhone || userData.phone || savedData?.businessPhone || prev.businessPhone || '',
+          city: userData.city || savedData?.city || prev.city || '',
+          district: userData.district || savedData?.district || prev.district || '',
           businessAddress: userData.businessAddress || savedData?.businessAddress || prev.businessAddress || '',
           businessLocation: userData.businessLocation || savedData?.businessLocation || prev.businessLocation || { lat: null, lng: null },
           taxNumber: userData.taxNumber || savedData?.taxNumber || prev.taxNumber || '',
@@ -230,7 +253,7 @@ const SahaSahibiOnboard = () => {
     localStorage.setItem(`${storageKey}_step`, currentStep.toString());
   }, [currentStep, storageKey]);
 
-const steps = [
+  const steps = [
     { id: 1, title: 'İşletme Bilgileri', description: 'İşletme bilgilerinizi girin' },
     { id: 2, title: 'Doğrulama Belgeleri', description: 'Gerekli belgeleri yükleyin' },
     { id: 3, title: 'Tamamlandı', description: 'Kaydınız hazır!' },
@@ -281,8 +304,9 @@ const steps = [
     let formattedValue = value;
 
     if (field === 'taxNumber') {
-      // Sadece rakamlar, max 10 karakter
-      formattedValue = value.replace(/\D/g, '').slice(0, 10);
+      // Şahıs şirketi ise 11, değilse 10 karakter
+      const limit = formData.companyType === 'individual' ? 11 : 10;
+      formattedValue = value.replace(/\D/g, '').slice(0, limit);
     } else if (field === 'authorizedPersonId') {
       // Sadece rakamlar, max 11 karakter
       formattedValue = value.replace(/\D/g, '').slice(0, 11);
@@ -313,6 +337,7 @@ const steps = [
     setFormData((prev) => ({
       ...prev,
       [field]: formattedValue,
+      ...(field === 'city' ? { district: '' } : {})
     }));
 
     // Hata mesajını temizle
@@ -367,11 +392,6 @@ const steps = [
     completion = Math.min(completion, 100);
 
     setProfileCompletion(completion);
-
-    // Ödül gösterimi
-    if (completion >= 100 && !showReward) {
-      setShowReward(true);
-    }
   };
 
   const validateStep = (step) => {
@@ -398,6 +418,14 @@ const steps = [
         newErrors.businessPhone = 'Geçerli bir telefon numarası girin';
       }
 
+      if (!formData.city) {
+        newErrors.city = 'Şehir seçimi gereklidir';
+      }
+
+      if (!formData.district) {
+        newErrors.district = 'İlçe seçimi gereklidir';
+      }
+
       if (!formData.businessAddress) {
         newErrors.businessAddress = 'İşletme adresi gereklidir';
       }
@@ -411,9 +439,12 @@ const steps = [
       }
 
       if (!formData.taxNumber) {
-        newErrors.taxNumber = 'Vergi numarası gereklidir';
-      } else if (formData.taxNumber.length !== 10) {
-        newErrors.taxNumber = 'Vergi numarası 10 haneli olmalıdır';
+        newErrors.taxNumber = formData.companyType === 'individual' ? 'TC Kimlik numarası gereklidir' : 'Vergi numarası gereklidir';
+      } else {
+        const requiredLength = formData.companyType === 'individual' ? 11 : 10;
+        if (formData.taxNumber.length !== requiredLength) {
+          newErrors.taxNumber = `${formData.companyType === 'individual' ? 'TC Kimlik' : 'Vergi'} numarası ${requiredLength} haneli olmalıdır`;
+        }
       }
 
       if (!formData.taxOffice) {
@@ -427,10 +458,12 @@ const steps = [
         newErrors.iban = 'Geçerli bir IBAN giriniz (TR ile başlamalı ve 26 karakter olmalı)';
       }
 
-      if (!formData.authorizedPersonId) {
-        newErrors.authorizedPersonId = 'TC Kimlik No gereklidir';
-      } else if (formData.authorizedPersonId.length !== 11) {
-        newErrors.authorizedPersonId = 'TC Kimlik numarası 11 haneli olmalıdır';
+      if (formData.companyType !== 'individual') {
+        if (!formData.authorizedPersonId) {
+          newErrors.authorizedPersonId = 'TC Kimlik No gereklidir';
+        } else if (formData.authorizedPersonId.length !== 11) {
+          newErrors.authorizedPersonId = 'TC Kimlik numarası 11 haneli olmalıdır';
+        }
       }
     }
 
@@ -623,6 +656,12 @@ const steps = [
     }));
   };
 
+  const handleCompanyTypeChange = (type) => {
+    handleInputChange('companyType', type);
+    handleInputChange('taxNumber', '');
+    setErrors(prev => ({ ...prev, taxNumber: '' }));
+  };
+
   const handleSubmit = async () => {
     if (!user) {
       console.error('Kullanıcı giriş yapmamış');
@@ -630,6 +669,12 @@ const steps = [
     }
 
 
+
+    // Zorunlu anlaşmaları kontrol et
+    if (!agreements.terms || !agreements.kvkk || !agreements.membershipAgreement) {
+      setErrors({ submit: 'Lütfen tüm zorunlu sözleşmeleri onaylayın' });
+      return;
+    }
 
     // Saha fotoğrafları kontrolü
     if (!formData.facilityPhotos || formData.facilityPhotos.length < 3) {
@@ -761,39 +806,7 @@ const steps = [
                 />
               </div>
 
-              {/* Ödül Sistemi */}
-              <div className='mt-3 flex items-center justify-center gap-2'>
-                {profileCompletion >= 50 && (
-                  <motion.div
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    className='flex items-center gap-1 text-xs text-green-600'
-                  >
-                    <span>🏆</span>
-                    <span>%50 - İlk 10 rezervasyon için %0 komisyon!</span>
-                  </motion.div>
-                )}
-                {profileCompletion >= 75 && (
-                  <motion.div
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    className='flex items-center gap-1 text-xs text-green-600'
-                  >
-                    <span>🎁</span>
-                    <span>%75 - 1 ay premium üyelik!</span>
-                  </motion.div>
-                )}
-                {profileCompletion >= 100 && (
-                  <motion.div
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    className='flex items-center gap-1 text-xs font-bold text-orange-600'
-                  >
-                    <span>⭐</span>
-                    <span>%100 - Öncelikli doğrulama + rozetler!</span>
-                  </motion.div>
-                )}
-              </div>
+
             </div>
           </div>
         </div>
@@ -824,7 +837,7 @@ const steps = [
                 <div className="flex gap-4 mb-6">
                   <button
                     type="button"
-                    onClick={() => handleInputChange('companyType', 'individual')}
+                    onClick={() => handleCompanyTypeChange('individual')}
                     className={`flex-1 py-3 px-4 rounded-xl border-2 transition-all ${
                       formData.companyType === 'individual'
                         ? 'border-green-500 bg-green-50 text-green-700 font-medium'
@@ -835,7 +848,7 @@ const steps = [
                   </button>
                   <button
                     type="button"
-                    onClick={() => handleInputChange('companyType', 'corporate')}
+                    onClick={() => handleCompanyTypeChange('corporate')}
                     className={`flex-1 py-3 px-4 rounded-xl border-2 transition-all ${
                       formData.companyType === 'corporate'
                         ? 'border-green-500 bg-green-50 text-green-700 font-medium'
@@ -987,6 +1000,83 @@ const steps = [
                     </motion.p>
                   )}
                 </div>
+                
+                {/* Şehir ve İlçe */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className='mb-2 block text-sm font-medium text-gray-700'>
+                      Şehir *
+                    </label>
+                    <div className='relative'>
+                      <Target
+                        className='absolute top-1/2 left-3 -translate-y-1/2 transform text-gray-400'
+                        size={20}
+                      />
+                      <select
+                        value={formData.city || ''}
+                        onChange={(e) => handleInputChange('city', e.target.value)}
+                        className={`w-full rounded-lg border py-3 pr-4 pl-10 transition-all duration-200 focus:border-transparent focus:ring-2 focus:ring-green-500 focus:outline-none appearance-none bg-white ${
+                          errors.city ? 'border-red-500' : 'border-gray-300'
+                        }`}
+                      >
+                        <option value="">Seçiniz</option>
+                        {Object.values(citiesData).sort().map(city => (
+                          <option key={city} value={city}>{city}</option>
+                        ))}
+                      </select>
+                      <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                        <ChevronRight className="h-4 w-4 text-gray-400 transform rotate-90" />
+                      </div>
+                    </div>
+                    {errors.city && (
+                      <motion.p
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className='mt-1 text-sm text-red-500'
+                      >
+                        {errors.city}
+                      </motion.p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className='mb-2 block text-sm font-medium text-gray-700'>
+                      İlçe *
+                    </label>
+                    <div className='relative'>
+                      <Target
+                        className='absolute top-1/2 left-3 -translate-y-1/2 transform text-gray-400'
+                        size={20}
+                      />
+                      <select
+                        value={formData.district || ''}
+                        onChange={(e) => handleInputChange('district', e.target.value)}
+                        disabled={!formData.city}
+                        className={`w-full rounded-lg border py-3 pr-4 pl-10 transition-all duration-200 focus:border-transparent focus:ring-2 focus:ring-green-500 focus:outline-none appearance-none bg-white ${
+                          errors.district ? 'border-red-500' : 'border-gray-300'
+                        } ${!formData.city ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                      >
+                        <option value="">Seçiniz</option>
+                        {districts.map(d => (
+                          <option key={d.id} value={d.name}>{d.name}</option>
+                        ))}
+                      </select>
+                      <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                        <ChevronRight className="h-4 w-4 text-gray-400 transform rotate-90" />
+                      </div>
+                    </div>
+                    {errors.district && (
+                      <motion.p
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className='mt-1 text-sm text-red-500'
+                      >
+                        {errors.district}
+                      </motion.p>
+                    )}
+                  </div>
+                </div>
+
 
                 {/* İşletme Adresi */}
                 <div>
@@ -1253,7 +1343,7 @@ const steps = [
                     initialImages={formData.businessLicense ? (Array.isArray(formData.businessLicense) ? formData.businessLicense : [formData.businessLicense]) : []}
                     onImagesChange={(images) => handleInputChange('businessLicense', images[0] || null)}
                     maxFiles={1}
-                    acceptedTypes={['image/jpeg', 'image/png', 'application/pdf']}
+                    acceptedTypes={['image/jpeg', 'image/png', 'application/pdf', '.pdf']}
                     placeholder="Belge yükleyin (PDF, JPG, PNG)"
                   />
                   {errors.businessLicense && (
@@ -1297,14 +1387,40 @@ const steps = [
                 <div className='grid grid-cols-1 gap-4 sm:grid-cols-2'>
                   <div>
                     <label className='mb-2 block text-sm font-medium text-gray-700'>
-                      TC / Vergi Numarası *
+                      Numara Tipi
+                    </label>
+                    <div className="flex gap-4 mb-2">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                            <input 
+                                type="radio" 
+                                name="taxType"
+                                checked={formData.companyType === 'individual'}
+                                onChange={() => handleCompanyTypeChange('individual')}
+                                className="w-4 h-4 text-green-600 focus:ring-green-500 border-gray-300"
+                            />
+                            <span className="text-sm text-gray-700">TC Kimlik No</span>
+                        </label>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                            <input 
+                                type="radio" 
+                                name="taxType"
+                                checked={formData.companyType === 'corporate'}
+                                onChange={() => handleCompanyTypeChange('corporate')}
+                                className="w-4 h-4 text-green-600 focus:ring-green-500 border-gray-300"
+                            />
+                            <span className="text-sm text-gray-700">Vergi Numarası</span>
+                        </label>
+                    </div>
+
+                    <label className='mb-2 block text-sm font-medium text-gray-700'>
+                      {formData.companyType === 'individual' ? 'TC Kimlik Numarası' : 'Vergi Numarası *'}
                     </label>
                     <input
                       type='text'
                       value={formData.taxNumber}
                       onChange={(e) => handleInputChange('taxNumber', e.target.value)}
-                      placeholder='1234567890'
-                      maxLength={10}
+                      placeholder={formData.companyType === 'individual' ? '12345678901' : '1234567890'}
+                      maxLength={formData.companyType === 'individual' ? 11 : 10}
                       className={`w-full rounded-lg border py-3 px-4 transition-all duration-200 focus:border-transparent focus:ring-2 focus:ring-green-500 focus:outline-none ${
                         errors.taxNumber ? 'border-red-500' : 'border-gray-300'
                       }`}
@@ -1370,10 +1486,11 @@ const steps = [
                   )}
                 </div>
 
-                {/* TC Kimlik */}
+                {/* Yetkili TC Kimlik (Sadece Kurumsal İçin - Şahıs şirketinde zaten vergi no olarak alınıyor) */}
+                {formData.companyType !== 'individual' && (
                 <div>
                   <label className='mb-2 block text-sm font-medium text-gray-700'>
-                    {formData.companyType === 'individual' ? 'TC Kimlik No *' : 'Yetkili TC Kimlik No *'}
+                    Yetkili TC Kimlik No *
                   </label>
                   <input
                     type='text'
@@ -1394,6 +1511,87 @@ const steps = [
                       {errors.authorizedPersonId}
                     </motion.p>
                   )}
+                </div>
+                )}
+
+                {/* KVKK ve Sözleşmeler */}
+                <div className='mt-8 rounded-lg bg-green-50 p-6'>
+                  <h4 className='mb-4 flex items-center gap-2 font-semibold text-green-900'>
+                    <Check size={20} />
+                    Güvenlik ve Gizlilik
+                  </h4>
+                  <div className='space-y-3'>
+                    <label className='flex items-start gap-3'>
+                      <input
+                        type='checkbox'
+                        checked={agreements.terms}
+                        onChange={(e) => handleAgreementChange('terms', e.target.checked)}
+                        className={`mt-1 h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500 ${
+                          errors.submit && !agreements.terms ? 'border-red-500' : ''
+                        }`}
+                        required
+                      />
+                      <span className='text-sm text-gray-700'>
+                        <span className='font-medium'>Kullanım Koşulları</span> ve{' '}
+                        <span className='font-medium'>Gizlilik Politikası</span>'nı okudum, kabul
+                        ediyorum.
+                      </span>
+                    </label>
+
+                    <label className='flex items-start gap-3'>
+                      <input
+                        type='checkbox'
+                        checked={agreements.kvkk}
+                        onChange={(e) => handleAgreementChange('kvkk', e.target.checked)}
+                        className={`mt-1 h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500 ${
+                          errors.submit && !agreements.kvkk ? 'border-red-500' : ''
+                        }`}
+                        required
+                      />
+                      <span className='text-sm text-gray-700'>
+                        Kişisel verilerimin işlenmesine izin veriyorum (KVKK).
+                      </span>
+                    </label>
+
+                    <label className='flex items-start gap-3'>
+                      <input
+                        type='checkbox'
+                        checked={agreements.membershipAgreement}
+                        onChange={(e) => handleAgreementChange('membershipAgreement', e.target.checked)}
+                        className={`mt-1 h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500 ${
+                          errors.submit && !agreements.membershipAgreement ? 'border-red-500' : ''
+                        }`}
+                        required
+                      />
+                      <span className='text-sm text-gray-700'>
+                        <span className='font-medium'>Üyelik Sözleşmesi</span>'ni okudum, onaylıyorum.
+                      </span>
+                    </label>
+
+                    <label className='flex items-start gap-3'>
+                      <input
+                        type='checkbox'
+                        checked={agreements.campaigns}
+                        onChange={(e) => handleAgreementChange('campaigns', e.target.checked)}
+                        className='mt-1 h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500'
+                      />
+                      <span className='text-sm text-gray-700'>
+                        Kampanyalar ve özel teklifler hakkında bilgi almak istiyorum.
+                      </span>
+                    </label>
+
+                    <label className='flex items-start gap-3'>
+                      <input
+                        type='checkbox'
+                        checked={agreements.whatsapp}
+                        onChange={(e) => handleAgreementChange('whatsapp', e.target.checked)}
+                        className='mt-1 h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500'
+                      />
+                      <span className='text-sm text-gray-700'>
+                        WhatsApp'tan bildirimler almak istiyorum.
+                      </span>
+                    </label>
+                  </div>
                 </div>
               </motion.div>
             )}

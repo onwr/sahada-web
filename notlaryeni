@@ -1,0 +1,22 @@
+giriş kayıt sayfalarına metin düzenleme eklenecek sol tarafta ki,
+oyuncu onboardda sözleşme kontrolu eklenecek, adım tamamlama da yüzdeye göre kupon vs. veriyor kaldıralım bunu tesislerde de 
+facebook ile giriş eklenecek,
+oyuncu panelinde profil ad soyad değiştiriyorum ama değişmiyor sidebara yansımıyor
+saha sahibi üyeliğinde  Doğrulama Belgelerinizi Yükleyin kısmı pdf desteklemelidir. TC / Vergi Numarası *  kısmı TC  veya vergi no ayrı ayrı seçenek olmalıdır. Eğer Şahıs firmasıysa TC no lazım. Eğerli limited ve aş ise Vergi numarası lazım. Şuanda Karakter sayısı TC noyu desteklemiyor.
+premium ve crm sistemi şimdilik gizlenecek
+pazarlama ile ilgili tüm verilerin her şeyin admin marketing içerisinde olacak özel kampanya, promosyon vs.
+ayarlar kısmında facebook meta vs. olacak google tag 
+header fiyatlandırma da gizlenecek
+saha sahibi ve oyuncu panelinde sağ üstte ki bildirim iconu çalışacak
+saha sahibi onboard yönlendirme çalışmıyor yenileyince geliyor
+saha sahibi onboard regex eklenecek adımlara formatlama falan
+marketing kısmı tamamen dinamik olacak kampanyalar çalışacak.
+yazı fontu aynı olacak şablondakiyle ve hepsi bir olacak saha
+yakin sahalar harita iframe oyuncu profiilleri çok kötü görünüyor aynısı yapılacak
+panel yazı fontu saha merkeziyle aynı şekilde düzeltilecek
+marketing tüm butonlar çalışacak gelişmiş ayarlar, tümünü gör falan da çalışacak
+turnuvalar kısmı da çalışmıyor kontrol edilecek
+
+admin panelinde aylık zorunlu ayarlaması ödeme eklenecek mesela aylık ödeme satın almadan panele erişememek gibi ayarı olacak kullanıcıya özel teklif verme, kullnaıcıya özel komisyon ayarlama sistemi kullanıcı seçip yapılabilecek kategoriye göre yapılabilecekk
+
+yakın sahalar kısmı mobiline bakılacak oyuncular listelenmiyor sıkışma var galiba

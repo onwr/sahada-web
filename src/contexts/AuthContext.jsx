@@ -16,6 +16,9 @@ export const useAuth = () => {
   return context;
 };
 
+import { doc, onSnapshot } from 'firebase/firestore';
+import { db } from '../config/firebase';
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [userData, setUserData] = useState(null);
@@ -24,56 +27,62 @@ export const AuthProvider = ({ children }) => {
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChange(async (firebaseUser) => {
-      setIsLoading(true);
-      
+    let unsubscribeFirestore = null;
+
+    const unsubscribeAuth = onAuthStateChange((firebaseUser) => {
       if (firebaseUser) {
         // Kullanıcı giriş yapmış
         setUser(firebaseUser);
         setIsAuthenticated(true);
+        setIsLoading(true); // Veri gelene kadar loading
         
-        // Firestore'dan kullanıcı verilerini al
-        let userDataResult = await getUserData(firebaseUser.uid);
+        // Real-time listener başlat
+        if (unsubscribeFirestore) {
+           unsubscribeFirestore();
+        }
         
-        // Eğer veri bulunamadıysa, kayıt işlemi yeni tamamlanmış olabilir
-        // Birkaç kez tekrar dene (Firestore yazma işlemi gecikebilir)
-        if (!userDataResult.success && userDataResult.error === 'Kullanıcı bulunamadı') {
-          for (let i = 0; i < 3; i++) {
-            await new Promise(resolve => setTimeout(resolve, 500));
-            userDataResult = await getUserData(firebaseUser.uid);
-            if (userDataResult.success) {
-              break;
-            }
+        const userRef = doc(db, 'users', firebaseUser.uid);
+        unsubscribeFirestore = onSnapshot(userRef, (docSnap) => {
+          if (docSnap.exists()) {
+            const data = docSnap.data();
+            setUserData(data);
+            setNeedsOnboarding(!data.onboardingCompleted);
+          } else {
+             // Veri yoksa (yeni kayıt vb gecikme durumunda)
+             // Varsayılan veri ile devam et veya bekle
+             console.warn('Kullanıcı dökümanı bulunamadı, varsayılan oluşturuluyor...');
+             setUserData({
+                uid: firebaseUser.uid,
+                email: firebaseUser.email,
+                userType: 'player', 
+                onboardingCompleted: false
+             });
+             setNeedsOnboarding(true);
           }
-        }
-        
-        if (userDataResult.success) {
-          setUserData(userDataResult.data);
-          // Onboarding durumunu kontrol et
-          setNeedsOnboarding(!userDataResult.data.onboardingCompleted);
-        } else {
-          console.error('Kullanıcı verileri alınamadı:', userDataResult.error);
-          // Kullanıcı verileri alınamadıysa varsayılan veriler oluştur
-          setUserData({
-            uid: firebaseUser.uid,
-            email: firebaseUser.email,
-            userType: 'player', // Varsayılan olarak player
-            onboardingCompleted: false
-          });
-          setNeedsOnboarding(true);
-        }
+          setIsLoading(false);
+        }, (error) => {
+          console.error('Kullanıcı verisi dinleme hatası:', error);
+          setIsLoading(false);
+        });
+
       } else {
         // Kullanıcı çıkış yapmış
+        if (unsubscribeFirestore) {
+            unsubscribeFirestore();
+            unsubscribeFirestore = null;
+        }
         setUser(null);
         setUserData(null);
         setIsAuthenticated(false);
         setNeedsOnboarding(false);
+        setIsLoading(false);
       }
-      
-      setIsLoading(false);
     });
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribeAuth();
+      if (unsubscribeFirestore) unsubscribeFirestore();
+    };
   }, []);
 
   const logout = async () => {

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -6,20 +6,23 @@ import {
   EyeOff, 
   Mail, 
   Phone, 
-  Lock, 
+  Lock as LockIcon, 
   User,
   ArrowRight,
   CheckCircle2,
   Building2,
   TrendingUp,
-  Users
+  Users,
+  Facebook
 } from 'lucide-react';
 import { 
   registerUser, 
   loginUser, 
   loginWithGoogle,
+  loginWithFacebook,
   resetPassword 
 } from '../../services/authService';
+import { getAuthPageContent } from '../../services/firestoreService';
 import { useAuth } from '../../contexts/AuthContext';
 
 const SahaSahibiLogin = () => {
@@ -39,25 +42,30 @@ const SahaSahibiLogin = () => {
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
   const [showResetPassword, setShowResetPassword] = useState(false);
+  
+  const [pageContent, setPageContent] = useState({
+    prefixTitle: 'Saha Sahibi Paneli',
+    title: 'İşletmenizi',
+    highlightedTitle: 'Dijitale Taşıyın',
+    description: 'Tesisinizi binlerce sporcuyla buluşturun, rezervasyonları otomatikleştirin ve gelirinizi artırın.',
+    features: [
+      { title: 'Tesis Yönetimi', desc: 'Sahalarınızı kolayca yönetin, özelliklerini güncelleyin.' },
+      { title: 'Müşteri Ağı', desc: 'Binlerce sporcuya doğrudan ulaşın ve doluluk oranınızı artırın.' },
+      { title: 'Gelir Takibi', desc: 'Detaylı finansal raporlarla gelirinizi anlık takip edin.' }
+    ]
+  });
 
-  // Features to showcase on the left side
-  const features = [
-    {
-      icon: Building2,
-      title: "Tesis Yönetimi",
-      desc: "Sahalarınızı kolayca yönetin, özelliklerini güncelleyin."
-    },
-    {
-      icon: Users,
-      title: "Müşteri Ağı",
-      desc: "Binlerce sporcuya doğrudan ulaşın ve doluluk oranınızı artırın."
-    },
-    {
-      icon: TrendingUp,
-      title: "Gelir Takibi",
-      desc: "Detaylı finansal raporlarla gelirinizi anlık takip edin."
-    }
-  ];
+  useEffect(() => {
+    const fetchContent = async () => {
+      const result = await getAuthPageContent('owner');
+      if (result.success && result.data) {
+        setPageContent(prev => ({ ...prev, ...result.data }));
+      }
+    };
+    fetchContent();
+  }, []);
+
+  const features = pageContent.features;
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -133,19 +141,15 @@ const SahaSahibiLogin = () => {
           if (setNeedsOnboarding) setNeedsOnboarding(true);
         }
         
-        // Redirect logic
+        // Context'i güncelle
+        const nextPath = userType === 'owner' ? '/saha-sahibi/dashboard' : '/oyuncu/dashboard';
+        
+        // Timeout olmadan direkt yönlendirme yapma, PublicRoute bunu halletmeli
+        // Ama eğer PublicRoute hemen devreye girmezse diye manuel yönlendirme ekle
+        // Fakat userData'nın oturduğundan emin ol
         setTimeout(() => {
-          if (userType === 'owner') {
-             // If onboarding is needed, checking that is usually handled by auth guard, 
-             // but we'll send to onboarding or dashboard.
-             // Usually dashboard redirects to onboarding if needed. 
-             // Let's send to onboarding for safety as per original logic.
-            navigate('/saha-sahibi/onboarding', { replace: true });
-          } else {
-            // If a player tries to login here, redirect them appropriately
-            navigate('/oyuncu/onboarding', { replace: true });
-          }
-        }, 100);
+             navigate(nextPath, { replace: true });
+        }, 500);
       } else {
         setErrors({ submit: result.error });
       }
@@ -187,6 +191,8 @@ const SahaSahibiLogin = () => {
       
       if (provider === 'google') {
         result = await loginWithGoogle('owner'); // Force 'owner' type
+      } else if (provider === 'facebook') {
+        result = await loginWithFacebook('owner');
       }
       
       if (result.success) {
@@ -228,36 +234,39 @@ const SahaSahibiLogin = () => {
               <div className="p-3 bg-white/10 rounded-lg backdrop-blur-sm border border-white/20">
                 <Building2 size={32} className="text-green-400" />
               </div>
-              <h1 className="text-3xl font-bold tracking-tight">Saha Sahibi Paneli</h1>
+              <h1 className="text-3xl font-bold tracking-tight">{pageContent.prefixTitle}</h1>
             </div>
 
             <h2 className="text-5xl font-bold mb-6 leading-tight">
-              İşletmenizi<br />
-              <span className="text-green-400">Dijitale Taşıyın</span>
+              {pageContent.title}<br />
+              <span className="text-green-400">{pageContent.highlightedTitle}</span>
             </h2>
             
             <p className="text-lg text-gray-300 mb-12 max-w-md leading-relaxed">
-              Tesisinizi binlerce sporcuyla buluşturun, rezervasyonları otomatikleştirin ve gelirinizi artırın.
+              {pageContent.description}
             </p>
 
             <div className="space-y-8">
-              {features.map((feature, index) => (
-                <motion.div 
-                  key={index}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.4 + (index * 0.1) }}
-                  className="flex gap-4 items-start"
-                >
-                  <div className="p-2 bg-green-800/50 rounded-lg">
-                    <feature.icon className="w-6 h-6 text-green-400" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-lg mb-1">{feature.title}</h3>
-                    <p className="text-gray-400 text-sm">{feature.desc}</p>
-                  </div>
-                </motion.div>
-              ))}
+              {features.map((feature, index) => {
+                const Icon = [Building2, Users, TrendingUp][index % 3];
+                return (
+                  <motion.div 
+                    key={index}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.4 + (index * 0.1) }}
+                    className="flex gap-4 items-start"
+                  >
+                    <div className="p-2 bg-green-800/50 rounded-lg">
+                      <Icon className="w-6 h-6 text-green-400" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-lg mb-1">{feature.title}</h3>
+                      <p className="text-gray-400 text-sm">{feature.desc}</p>
+                    </div>
+                  </motion.div>
+                );
+              })}
             </div>
           </motion.div>
         </div>
@@ -303,7 +312,7 @@ const SahaSahibiLogin = () => {
             </div>
 
             {/* Social Login */}
-            <div className="mb-6">
+            <div className="mb-6 space-y-3">
               <button
                 type="button"
                 onClick={() => handleSocialLogin('google')}
@@ -311,6 +320,15 @@ const SahaSahibiLogin = () => {
               >
                 <span className="text-lg font-bold text-gray-800">G</span>
                 <span className="font-medium text-gray-700">Google ile {activeTab === 'login' ? 'Giriş Yap' : 'Kayıt Ol'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleSocialLogin('facebook')}
+                className="w-full flex items-center justify-center gap-3 py-3 px-4 rounded-xl border border-blue-600 bg-[#1877F2] hover:bg-[#166fe5] transition-all duration-200"
+              >
+                <Facebook className="text-white" size={20} />
+                <span className="font-medium text-white">Facebook ile {activeTab === 'login' ? 'Giriş Yap' : 'Kayıt Ol'}</span>
               </button>
               
               <div className="relative my-6">
@@ -390,7 +408,7 @@ const SahaSahibiLogin = () => {
                   )}
                 </div>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                  <LockIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                   <input
                     name="password"
                     type={showPassword ? 'text' : 'password'}

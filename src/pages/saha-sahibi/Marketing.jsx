@@ -9,7 +9,11 @@ import {
   deleteCampaign,
   getMessageTemplates,
   addMessageTemplate,
-  getCustomerSegments
+  getCustomerSegments,
+  addCustomerSegment,
+  deleteCustomerSegment,
+  sendMarketingMessage,
+  getSavedCustomerSegments
 } from '../../services/firestoreService';
 import { collection, query, onSnapshot, where, orderBy } from 'firebase/firestore';
 import { db } from '../../config/firebase';
@@ -51,8 +55,16 @@ const Marketing = () => {
   const [showTemplateModal, setShowTemplateModal] = useState(false);
   const [editingCampaign, setEditingCampaign] = useState(null);
   const [editingTemplate, setEditingTemplate] = useState(null);
+  const [showSegmentModal, setShowSegmentModal] = useState(false);
+  const [showSendModal, setShowSendModal] = useState(false);
+  const [selectedTemplateForSend, setSelectedTemplateForSend] = useState(null);
+  const [selectedSegmentForSend, setSelectedSegmentForSend] = useState('');
 
   // Form state'leri
+  const [segmentForm, setSegmentForm] = useState({
+      name: '',
+      description: ''
+  });
   const [campaignForm, setCampaignForm] = useState({
     name: '',
     type: '',
@@ -101,32 +113,42 @@ const Marketing = () => {
     // Kampanyalar için real-time listener
     const campaignsQuery = query(
       collection(db, 'campaigns'),
-      where('ownerId', '==', user.uid),
-      orderBy('createdAt', 'desc')
+      where('ownerId', '==', user.uid)
     );
 
     const unsubscribeCampaigns = onSnapshot(campaignsQuery, (snapshot) => {
-      const campaigns = [];
+      const campaignsData = [];
       snapshot.forEach((doc) => {
-        campaigns.push({ id: doc.id, ...doc.data() });
+        campaignsData.push({ id: doc.id, ...doc.data() });
       });
-      setCampaigns(campaigns);
+      // Client-side sort
+      campaignsData.sort((a, b) => {
+          const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt);
+          const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt);
+          return dateB - dateA;
+      });
+      setCampaigns(campaignsData);
     });
     unsubscribeFunctions.push(unsubscribeCampaigns);
 
     // Mesaj şablonları için real-time listener
     const templatesQuery = query(
       collection(db, 'messageTemplates'),
-      where('ownerId', '==', user.uid),
-      orderBy('createdAt', 'desc')
+      where('ownerId', '==', user.uid)
     );
 
     const unsubscribeTemplates = onSnapshot(templatesQuery, (snapshot) => {
-      const templates = [];
+      const templatesData = [];
       snapshot.forEach((doc) => {
-        templates.push({ id: doc.id, ...doc.data() });
+        templatesData.push({ id: doc.id, ...doc.data() });
       });
-      setMessageTemplates(templates);
+      // Client-side sort
+      templatesData.sort((a, b) => {
+          const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt);
+          const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt);
+          return dateB - dateA;
+      });
+      setMessageTemplates(templatesData);
     });
     unsubscribeFunctions.push(unsubscribeTemplates);
 
@@ -174,11 +196,12 @@ const Marketing = () => {
     setError(null);
 
     try {
-      const [statsResult, campaignsResult, segmentsResult, templatesResult] = await Promise.all([
+      const [statsResult, campaignsResult, segmentsResult, templatesResult, savedSegmentsResult] = await Promise.all([
         getMarketingStats(user.uid),
         getCampaigns(user.uid),
         getCustomerSegments(user.uid),
-        getMessageTemplates(user.uid)
+        getMessageTemplates(user.uid),
+        getSavedCustomerSegments(user.uid)
       ]);
 
       if (statsResult.success) {
@@ -186,9 +209,14 @@ const Marketing = () => {
         setCampaigns(statsResult.data.campaigns || []);
       }
 
-      if (segmentsResult.success) {
-        setCustomerSegments(segmentsResult.data);
+      let allSegments = [];
+      if (segmentsResult.success && Array.isArray(segmentsResult.data)) {
+        allSegments = [...segmentsResult.data];
       }
+      if (savedSegmentsResult.success && Array.isArray(savedSegmentsResult.data)) {
+        allSegments = [...allSegments, ...savedSegmentsResult.data];
+      }
+      setCustomerSegments(allSegments);
 
       if (templatesResult.success) {
         setMessageTemplates(templatesResult.data);
@@ -273,6 +301,61 @@ const Marketing = () => {
       }
     } catch (error) {
       console.error('Şablon kaydetme hatası:', error);
+    }
+  };
+
+  const handleSegmentSubmit = async (e) => {
+    e.preventDefault();
+    try {
+        const result = await addCustomerSegment({
+            ...segmentForm,
+            ownerId: user.uid,
+            count: Math.floor(Math.random() * 50) + 10, // Mock count
+            action: 'Mesaj Gönder'
+        });
+        if (result.success) {
+            setShowSegmentModal(false);
+            setSegmentForm({ name: '', description: '' });
+            loadMarketingData();
+        }
+    } catch (error) {
+        console.error('Segment ekleme hatası:', error);
+    }
+  };
+
+  const handleDeleteSegment = async (id) => {
+    if (window.confirm('Bu segmenti silmek istediğinizden emin misiniz?')) {
+        await deleteCustomerSegment(id);
+        loadMarketingData(); 
+    }
+  };
+
+  const openSendModal = (template) => {
+      setSelectedTemplateForSend(template);
+      setShowSendModal(true);
+  };
+
+  const handleSendMessageSubmit = async (e) => {
+    e.preventDefault();
+    if (!selectedTemplateForSend || !selectedSegmentForSend) return;
+
+    try {
+        const result = await sendMarketingMessage(
+            selectedTemplateForSend.id,
+            selectedSegmentForSend,
+            selectedTemplateForSend.type
+        );
+        
+        if (result.success) {
+            alert('Mesaj başarıyla gönderim sırasına alındı!');
+            setShowSendModal(false);
+            setSelectedTemplateForSend(null);
+            setSelectedSegmentForSend('');
+            loadMarketingData();
+        }
+    } catch (error) {
+        console.error('Mesaj gönderme hatası:', error);
+        alert('Gönderim başarısız.');
     }
   };
 
@@ -660,28 +743,40 @@ const Marketing = () => {
               <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
                 <div className="flex items-center justify-between mb-6">
                   <h3 className="text-lg font-semibold text-gray-900">Müşteri Segmentleri</h3>
-                  <button className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
+                  <button 
+                    onClick={() => setShowSegmentModal(true)}
+                    className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                  >
                     <Plus className="w-4 h-4" />
                     <span>Segment Oluştur</span>
                   </button>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {customerSegments.length > 0 ? (
-                    customerSegments.map((segment, index) => (
-                      <div key={index} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors">
+                    customerSegments.map((segment) => (
+                      <div key={segment.id} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors group">
                         <div className="flex items-center justify-between mb-3">
                           <div className="flex items-center space-x-3">
                             <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
                               <Users className="w-5 h-5 text-blue-600" />
                             </div>
                             <div>
-                              <h4 className="font-semibold text-gray-900">{segment.count}</h4>
+                              <h4 className="font-semibold text-gray-900">{segment.count || 0}</h4>
                               <p className="text-sm text-gray-600">{segment.name}</p>
                             </div>
                           </div>
+                          {segment.id && ( // Only show delete for real segments
+                             <button 
+                                onClick={() => handleDeleteSegment(segment.id)} 
+                                className="text-gray-300 hover:text-red-500 p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                                title="Segmenti Sil"
+                             >
+                                <Trash2 size={16} />
+                             </button>
+                          )}
                         </div>
                         <button className="w-full text-left text-sm text-green-600 hover:text-green-700 font-medium">
-                          {segment.action}
+                          {segment.action || 'İşlem Seç'}
                         </button>
                       </div>
                     ))
@@ -762,7 +857,11 @@ const Marketing = () => {
                             <button className="text-gray-400 hover:text-gray-600">
                               <Edit className="w-4 h-4" />
                             </button>
-                            <button className="text-gray-400 hover:text-gray-600">
+                            <button 
+                              onClick={() => openSendModal(template)}
+                              className="text-gray-400 hover:text-green-600"
+                              title="Gönder"
+                            >
                               <Send className="w-4 h-4" />
                             </button>
                           </div>
@@ -1064,6 +1163,94 @@ const Marketing = () => {
                     className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
                   >
                     Kaydet
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Segment Modal */}
+      {showSegmentModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl shadow-xl max-w-lg w-full">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-bold text-gray-900">Yeni Segment Oluştur</h2>
+                <button onClick={() => setShowSegmentModal(false)} className="text-gray-400 hover:text-gray-600">
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+              <form onSubmit={handleSegmentSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Segment Adı</label>
+                  <input
+                    type="text"
+                    value={segmentForm.name}
+                    onChange={(e) => setSegmentForm(prev => ({ ...prev, name: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                    placeholder="Örn: Hafta Sonu Oyuncuları"
+                    required
+                  />
+                </div>
+                <div>
+                   <label className="block text-sm font-medium text-gray-700 mb-2">Açıklama</label>
+                   <textarea
+                     value={segmentForm.description}
+                     onChange={(e) => setSegmentForm(prev => ({ ...prev, description: e.target.value }))}
+                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                     rows="3"
+                     placeholder="Segment açıklaması..."
+                   />
+                </div>
+                <div className="flex justify-end space-x-3 pt-4">
+                  <button type="button" onClick={() => setShowSegmentModal(false)} className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">İptal</button>
+                  <button type="submit" className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">Oluştur</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Mesaj Gönderim Modal */}
+      {showSendModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl shadow-xl max-w-lg w-full">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-bold text-gray-900">Mesaj Gönder</h2>
+                <button onClick={() => setShowSendModal(false)} className="text-gray-400 hover:text-gray-600">
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+              
+              <div className="mb-4 p-4 bg-gray-50 rounded-lg text-sm text-gray-600">
+                 <p className="font-bold mb-1">Seçili Şablon:</p>
+                 <p>"{selectedTemplateForSend?.name}"</p>
+                 <p className="mt-2 text-xs text-gray-500 italic">Kanal: {selectedTemplateForSend?.type}</p>
+              </div>
+
+              <form onSubmit={handleSendMessageSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Hedef Segment</label>
+                  <select
+                    value={selectedSegmentForSend}
+                    onChange={(e) => setSelectedSegmentForSend(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                    required
+                  >
+                    <option value="">Segment Seçin...</option>
+                    {customerSegments.map(seg => (
+                        <option key={seg.id} value={seg.id}>{seg.name} ({seg.count || 0} Kişi)</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex justify-end space-x-3 pt-4">
+                  <button type="button" onClick={() => setShowSendModal(false)} className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">İptal</button>
+                  <button type="submit" className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2">
+                     <Send className="w-4 h-4" /> Gönder
                   </button>
                 </div>
               </form>

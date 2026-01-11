@@ -21,8 +21,25 @@ import {
   X,
   MessageSquare,
   Star,
-  Medal
+  Medal,
+  Zap,
+  Award,
+  Shield,
+  Target,
+  Flame,
+  CheckCircle
 } from 'lucide-react';
+
+const getAchievements = (userData) => {
+  return [
+      { id: 'first_match', title: 'İlk Maç', icon: Zap, color: 'text-yellow-500', earned: (userData?.ratingCount || 0) >= 1 },
+      { id: 'experienced', title: 'Deneyimli', icon: Star, color: 'text-blue-500', earned: (userData?.ratingCount || 0) >= 10 },
+      { id: 'veteran', title: 'Efsane', icon: Award, color: 'text-purple-500', earned: (userData?.ratingCount || 0) >= 50 },
+      { id: 'reliable', title: 'Güvenilir', icon: Shield, color: 'text-green-500', earned: (userData?.sportsmanshipRating || 0) >= 4.5 },
+      { id: 'scorer', title: 'Yetenekli', icon: Target, color: 'text-red-500', earned: (userData?.skillRating || 0) >= 4.5 },
+      { id: 'mvp', title: 'MVP', icon: Flame, color: 'text-orange-500', earned: (userData?.rating || 0) >= 4.8 }
+  ];
+};
 
 import toast from '../utils/toast';
 
@@ -120,7 +137,7 @@ const OyuncuSidebar = () => {
       current: location.pathname === '/oyuncu/oyuncu-bul'
     },
     {
-      name: 'Maç Oluştur',
+      name: 'Maçlarım',
       href: '/oyuncu/mac-olustur',
       icon: Plus,
       current: location.pathname === '/oyuncu/mac-olustur'
@@ -252,9 +269,32 @@ const OyuncuSidebar = () => {
                  <h2 className="text-white font-bold text-base mb-0.5 max-w-full truncate px-2">
                      {userData?.fullName || userData?.displayName || 'Oyuncu'}
                  </h2>
-                 <div className="flex items-center gap-1.5 text-green-100 text-xs bg-white/10 px-2 py-1 rounded-full backdrop-blur-sm mt-1">
-                    <MapPin size={10} />
-                    <span className="truncate max-w-[120px]">{userData?.city || 'İstanbul'}</span>
+                 <div className="flex flex-wrap items-center justify-center gap-1.5 mt-1">
+                    <span className="text-[10px] font-bold bg-white/20 text-white px-2 py-0.5 rounded-full uppercase tracking-wider border border-white/10 shadow-sm">
+                      OYUNCU
+                    </span>
+                    <div className="flex items-center gap-1 text-green-100 text-xs bg-white/10 px-2 py-0.5 rounded-full backdrop-blur-sm border border-white/5">
+                        <MapPin size={10} />
+                        <span className="truncate max-w-[80px]">{userData?.city || 'İstanbul'}</span>
+                    </div>
+                 </div>
+
+                 {/* Rozetler (Mini) */}
+                 <div className="flex justify-center gap-1 mt-2.5 min-h-[20px]">
+                    {getAchievements(userData).filter(a => a.earned).length > 0 ? (
+                       getAchievements(userData).filter(a => a.earned).slice(0, 5).map(badge => {
+                           const Icon = badge.icon;
+                           return (
+                               <div key={badge.id} className="w-5 h-5 rounded-full bg-white/10 flex items-center justify-center border border-white/10" title={badge.title}>
+                                   <Icon size={12} className={badge.color} />
+                               </div>
+                           )
+                       })
+                    ) : (
+                      <div className="w-5 h-5 rounded-full bg-white/5 border border-white/5 flex items-center justify-center">
+                        <Award size={12} className="text-white/20" />
+                      </div>
+                    )}
                  </div>
                  
                  <div className="mt-4 w-full flex items-center justify-between border-t border-white/10 pt-3">

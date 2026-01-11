@@ -147,39 +147,44 @@ const Raporlar = () => {
   };
 
   const getDateRange = () => {
+    const toLocalISOString = (date) => {
+      const offset = date.getTimezoneOffset() * 60000;
+      return new Date(date.getTime() - offset).toISOString().split('T')[0];
+    };
+
     const now = new Date();
     let startDate, endDate;
     
     switch (dateRange) {
       case 'today':
-        startDate = endDate = now.toISOString().split('T')[0];
+        startDate = endDate = toLocalISOString(now);
         break;
       case 'week':
         const weekStart = new Date(now);
-        weekStart.setDate(now.getDate() - now.getDay());
-        startDate = weekStart.toISOString().split('T')[0];
-        endDate = now.toISOString().split('T')[0];
+        weekStart.setDate(now.getDate() - (now.getDay() === 0 ? 6 : now.getDay() - 1)); // Pazartesi'den başlat
+        startDate = toLocalISOString(weekStart);
+        endDate = toLocalISOString(now);
         break;
       case 'month':
-        startDate = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-        endDate = now.toISOString().split('T')[0];
+        startDate = toLocalISOString(new Date(now.getFullYear(), now.getMonth(), 1));
+        endDate = toLocalISOString(now);
         break;
       case 'quarter':
         const quarter = Math.floor(now.getMonth() / 3);
-        startDate = new Date(now.getFullYear(), quarter * 3, 1).toISOString().split('T')[0];
-        endDate = now.toISOString().split('T')[0];
+        startDate = toLocalISOString(new Date(now.getFullYear(), quarter * 3, 1));
+        endDate = toLocalISOString(now);
         break;
       case 'year':
-        startDate = new Date(now.getFullYear(), 0, 1).toISOString().split('T')[0];
-        endDate = now.toISOString().split('T')[0];
+        startDate = toLocalISOString(new Date(now.getFullYear(), 0, 1));
+        endDate = toLocalISOString(now);
         break;
       case 'custom':
         startDate = customStartDate;
         endDate = customEndDate;
         break;
       default:
-        startDate = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-        endDate = now.toISOString().split('T')[0];
+        startDate = toLocalISOString(new Date(now.getFullYear(), now.getMonth(), 1));
+        endDate = toLocalISOString(now);
     }
     
     return { startDate, endDate };
@@ -242,45 +247,66 @@ const Raporlar = () => {
   const handleExportPDF = () => {
     if (!reportData) return;
     
-    const doc = new jsPDF();
-    const pageWidth = doc.internal.pageSize.getWidth();
-    
-    // Başlık
-    doc.setFontSize(20);
-    doc.setFont('helvetica', 'bold');
-    doc.text('📊 Raporlar & Analizler', pageWidth / 2, 20, { align: 'center' });
-    
-    // Tarih aralığı
-    const { startDate, endDate } = getDateRange();
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'normal');
-    doc.text(`${formatDate(startDate)} - ${formatDate(endDate)}`, pageWidth / 2, 30, { align: 'center' });
-    
-    let yPosition = 50;
-    
-    // Ana metrikler
-    doc.setFontSize(16);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Ana Performans Metrikleri', 20, yPosition);
-    yPosition += 15;
-    
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'normal');
-    doc.text(`Toplam Gelir: ${formatCurrency(reportData.totalRevenue)}`, 20, yPosition);
-    yPosition += 10;
-    doc.text(`Toplam Rezervasyon: ${reportData.totalReservations}`, 20, yPosition);
-    yPosition += 10;
-    doc.text(`Doluluk Oranı: %${reportData.occupancyRate}`, 20, yPosition);
-    yPosition += 10;
-    doc.text(`Ortalama Fiyat: ${formatCurrency(reportData.averagePrice)}`, 20, yPosition);
-    yPosition += 10;
-    doc.text(`Aktif Müşteri: ${reportData.activeCustomers}`, 20, yPosition);
-    yPosition += 10;
-    doc.text(`İptal Oranı: %${reportData.cancellationRate}`, 20, yPosition);
-    yPosition += 20;
-    
-    // Dosyayı indir
-    doc.save(`raporlar-${dateRange}-${new Date().toISOString().split('T')[0]}.pdf`);
+    try {
+      const doc = new jsPDF();
+      const pageWidth = doc.internal.pageSize.getWidth();
+      
+      const replaceTurkishChars = (text) => {
+        const charMap = {
+          'ğ': 'g', 'Ğ': 'G',
+          'ü': 'u', 'Ü': 'U',
+          'ş': 's', 'Ş': 'S',
+          'ı': 'i', 'İ': 'I',
+          'ö': 'o', 'Ö': 'O',
+          'ç': 'c', 'Ç': 'C'
+        };
+        return String(text).replace(/[ğĞüÜşŞıİöÖçÇ]/g, (char) => charMap[char] || char);
+      };
+
+      const safeText = (text, x, y, options) => {
+        doc.text(replaceTurkishChars(text), x, y, options);
+      };
+      
+      // Başlık
+      doc.setFontSize(20);
+      doc.setFont('helvetica', 'bold');
+      safeText('Raporlar & Analizler', pageWidth / 2, 20, { align: 'center' });
+      
+      // Tarih aralığı
+      const { startDate, endDate } = getDateRange();
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'normal');
+      safeText(`${formatDate(startDate)} - ${formatDate(endDate)}`, pageWidth / 2, 30, { align: 'center' });
+      
+      let yPosition = 50;
+      
+      // Ana metrikler
+      doc.setFontSize(16);
+      doc.setFont('helvetica', 'bold');
+      safeText('Ana Performans Metrikleri', 20, yPosition);
+      yPosition += 15;
+      
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'normal');
+      safeText(`Toplam Gelir: ${formatCurrency(reportData.totalRevenue)}`, 20, yPosition);
+      yPosition += 10;
+      safeText(`Toplam Rezervasyon: ${reportData.totalReservations}`, 20, yPosition);
+      yPosition += 10;
+      safeText(`Doluluk Orani: %${reportData.occupancyRate}`, 20, yPosition);
+      yPosition += 10;
+      safeText(`Ortalama Fiyat: ${formatCurrency(reportData.averagePrice)}`, 20, yPosition);
+      yPosition += 10;
+      safeText(`Aktif Musteri: ${reportData.activeCustomers}`, 20, yPosition);
+      yPosition += 10;
+      safeText(`Iptal Orani: %${reportData.cancellationRate}`, 20, yPosition);
+      yPosition += 20;
+      
+      // Dosyayı indir
+      doc.save(`raporlar-${dateRange}-${new Date().toISOString().split('T')[0]}.pdf`);
+    } catch (error) {
+      console.error('PDF oluşturma hatası:', error);
+      alert('PDF oluşturulurken bir hata oluştu');
+    }
   };
 
   if (loading) {

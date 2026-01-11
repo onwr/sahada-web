@@ -3,8 +3,9 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Search, MapPin, ArrowRight, CheckCircle, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../contexts/AuthContext';
+import { getHeroContent } from '../services/firestoreService';
 
-// Mock Data for Hero Slides
+// Mock Data for Hero Slides (Fallback)
 const MOCK_SLIDES = [
   {
     id: '1',
@@ -55,7 +56,32 @@ const Hero = () => {
     // Slider State
     const [heroSlides, setHeroSlides] = useState(MOCK_SLIDES);
     const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
-    const [heroLoading, setHeroLoading] = useState(false);
+    const [heroLoading, setHeroLoading] = useState(true);
+
+    // Fetch Hero Content
+    useEffect(() => {
+        const fetchContent = async () => {
+            try {
+                const result = await getHeroContent();
+                if (result.success && result.data && result.data.slides && Array.isArray(result.data.slides) && result.data.slides.length > 0) {
+                    // Filter only active slides and sort by order
+                    const activeSlides = result.data.slides
+                        .filter(s => s.isActive)
+                        .sort((a, b) => a.order - b.order);
+                    
+                    if (activeSlides.length > 0) {
+                        setHeroSlides(activeSlides);
+                    }
+                }
+            } catch (error) {
+                console.error("Hero content fetch error:", error);
+            } finally {
+                setHeroLoading(false);
+            }
+        };
+
+        fetchContent();
+    }, []);
 
     // Auto-rotate slider
     useEffect(() => {

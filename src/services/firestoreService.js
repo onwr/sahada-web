@@ -17,7 +17,8 @@
   arrayUnion,
   arrayRemove,
   writeBatch,
-  deleteField
+  deleteField,
+  increment
 } from 'firebase/firestore';
 import { 
   updatePassword, 
@@ -33,7 +34,7 @@ const auth = getAuth();
 
 // TÃ¼m oyuncularÄ± getir
 export const getPlayers = async (filters = {}) => {
-  try {
+  try {  
     const usersRef = collection(db, 'users');
     let q = query(usersRef); 
 
@@ -646,7 +647,7 @@ export const getCustomerDetails = async (customerId, ownerId) => {
 // Finansal verileri getir
 export const getFinancialData = async (ownerId, period = 'month') => {
   try {
-    console.log('getFinancialData Ã§aÄŸrÄ±ldÄ±:', { ownerId, period });
+
     
     // Ã–nce tesisleri getir
     const tesislerRef = collection(db, 'tesisler');
@@ -662,10 +663,11 @@ export const getFinancialData = async (ownerId, period = 'month') => {
       tesisIds.push(doc.id);
     });
 
-    // Tesis yoksa bile manuel gelirleri ve giderleri getirebiliriz
-    console.log('Tesis sayÄ±sÄ±:', tesisIds.length);
 
-    // RezervasyonlarÄ± getir (eÄŸer tesis varsa)
+
+    // Tesis yoksa bile manuel gelirleri ve giderleri getirebiliriz
+
+    // Rezervasyonları getir (eğer tesis varsa)
     let reservations = [];
     if (tesisIds.length > 0) {
       const rezervasyonlarRef = collection(db, 'rezervasyonlar');
@@ -683,9 +685,6 @@ export const getFinancialData = async (ownerId, period = 'month') => {
         });
       });
     }
-    console.log('Rezervasyon sayÄ±sÄ±:', reservations.length);
-
-    // Tarih aralÄ±ÄŸÄ±nÄ± belirle
     const now = new Date();
     let startDate, endDate;
     
@@ -707,9 +706,7 @@ export const getFinancialData = async (ownerId, period = 'month') => {
         endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
     }
 
-    console.log('Tarih aralÄ±ÄŸÄ±:', { startDate: startDate.toISOString().split('T')[0], endDate: endDate.toISOString().split('T')[0], period });
 
-    // Manuel gelirleri getir
     const revenuesRef = collection(db, 'revenues');
     const revenuesQuery = query(
       revenuesRef,
@@ -754,14 +751,7 @@ export const getFinancialData = async (ownerId, period = 'month') => {
       return expDate >= startDate && expDate <= endDate;
     });
 
-    console.log('FiltrelenmiÅŸ veriler:', { 
-      totalRevenues: revenues.length, 
-      filteredRevenues: filteredRevenues.length,
-      totalExpenses: expenses.length,
-      filteredExpenses: filteredExpenses.length 
-    });
-
-    // Gelir hesapla (onaylanmÄ±ÅŸ rezervasyonlar + manuel gelirler)
+    // Gelir hesapla (onaylanmış rezervasyonlar + manuel gelirler)
     const confirmedReservations = reservations.filter(res => {
       const resDate = new Date(res.date);
       return (res.status === 'confirmed' || res.status === 'completed') && 
@@ -777,15 +767,6 @@ export const getFinancialData = async (ownerId, period = 'month') => {
     );
 
     const totalRevenue = reservationRevenue + manualRevenue;
-
-    console.log('Gelir hesaplamalarÄ±:', { 
-      reservationRevenue, 
-      manualRevenue, 
-      totalRevenue,
-      filteredRevenuesData: filteredRevenues.map(rev => ({ title: rev.title, amount: rev.amount, date: rev.date }))
-    });
-
-    // Gider hesapla
     const totalExpenses = filteredExpenses.reduce((sum, exp) => 
       sum + (exp.amount || 0), 0
     );
@@ -1150,19 +1131,55 @@ export const checkAvailability = async (tesisId, date, timeSlot) => {
   }
 };
 
-// Rezervasyon oluÅŸtur (transaction ile - race condition Ã¶nleme)
+// Komisyon oranını hesapla (Dynamic)
+export const calculateCommissionRate = async (ownerId) => {
+  try {
+    const settingsResult = await getPlatformSettings();
+    if (!settingsResult.success) return 5;
+
+    const settings = settingsResult.data;
+
+    // 1. Özel Kural Kontrolü
+    if (settings.specialRules && Array.isArray(settings.specialRules)) {
+      const userRule = settings.specialRules.find(r => r.userId === ownerId);
+      if (userRule && userRule.commissionRate !== null && userRule.commissionRate !== undefined && userRule.commissionRate !== '') {
+        return parseFloat(userRule.commissionRate);
+      }
+    }
+
+    // 2. Global Standart Oran
+    return parseFloat(settings.commission?.baseRate || 5);
+  } catch (error) {
+    console.error('Komisyon hesaplama hatası:', error);
+    return 5;
+  }
+};
+
+// Rezervasyon oluştur (transaction ile - race condition önleme)
 export const createRezervasyonWithTransaction = async (rezervasyonData, tesisId, date, timeSlot) => {
   try {
-    // Transaction dÄ±ÅŸÄ±nda son bir kez mÃ¼saitlik kontrolÃ¼ yap
+    // Transaction dışında son bir kez müsaitlik kontrolü yap
     const availabilityCheck = await checkAvailability(tesisId, date, timeSlot);
     if (!availabilityCheck.success || !availabilityCheck.available) {
       return {
         success: false,
-        error: 'SeÃ§ilen saat dilimi artÄ±k mÃ¼sait deÄŸil'
+        error: 'Seçilen saat dilimi artık müsait değil'
       };
     }
 
-    // Transaction ile rezervasyonu oluÅŸtur (atomic yazma garantisi)
+    // Dinamik Komisyon Hesaplama
+    let calculatedOwnerAmount = rezervasyonData.ownerAmount;
+    let appliedCommissionRate = 0;
+    
+    if (rezervasyonData.ownerId) {
+       const commissionRate = await calculateCommissionRate(rezervasyonData.ownerId);
+       appliedCommissionRate = commissionRate;
+       const total = rezervasyonData.totalAmount || rezervasyonData.price || 0;
+       const commissionAmount = (total * commissionRate) / 100;
+       calculatedOwnerAmount = total - commissionAmount;
+    }
+
+    // Transaction ile rezervasyonu oluştur (atomic yazma garantisi)
     let reservationId = null;
     await runTransaction(db, async (transaction) => {
       const docRef = doc(collection(db, 'rezervasyonlar'));
@@ -1170,18 +1187,20 @@ export const createRezervasyonWithTransaction = async (rezervasyonData, tesisId,
       
       transaction.set(docRef, {
         ...rezervasyonData,
+        ownerAmount: calculatedOwnerAmount, // Calculated amount overwrite
+        appliedCommissionRate: appliedCommissionRate, // Store rate for history
         status: rezervasyonData?.status ?? 'pending',
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       });
     });
     
-    // Rezervasyon baÅŸarÄ±yla oluÅŸturulduysa ve confirmed status'Ã¼ varsa, saha sahibi bakiyesini gÃ¼ncelle
-    if (rezervasyonData.status === 'confirmed' && rezervasyonData.ownerAmount && rezervasyonData.ownerId) {
+    // Rezervasyon başarıyla oluşturulduysa ve confirmed status'ü varsa, saha sahibi bakiyesini güncelle
+    if (rezervasyonData.status === 'confirmed' && calculatedOwnerAmount && rezervasyonData.ownerId) {
       try {
         await updateOwnerBalance(
           rezervasyonData.ownerId,
-          rezervasyonData.ownerAmount,
+          calculatedOwnerAmount,
           {
             type: 'reservation_income',
             reservationId: reservationId,
@@ -1190,42 +1209,71 @@ export const createRezervasyonWithTransaction = async (rezervasyonData, tesisId,
           }
         );
       } catch (balanceError) {
-        console.error('Bakiye gÃ¼ncelleme hatasÄ±:', balanceError);
-        // Bakiye gÃ¼ncelleme hatasÄ± rezervasyonu iptal etmez, sadece log'lar
+        console.error('Bakiye güncelleme hatası:', balanceError);
+        // Bakiye güncelleme hatası rezervasyonu iptal etmez, sadece log'lar
       }
     }
     
+    // SAHA SAHİBİNE BİLDİRİM GÖNDER
+    if (rezervasyonData.ownerId) {
+        try {
+            await addDoc(collection(db, 'notifications'), {
+                userId: rezervasyonData.ownerId,
+                type: 'reservation_new',
+                title: 'Yeni Rezervasyon!',
+                message: `${rezervasyonData.tesisName || 'Sahanız'} için yeni bir rezervasyon oluşturuldu. (${rezervasyonData.date} - ${rezervasyonData.timeSlot})`,
+                read: false,
+                createdAt: serverTimestamp()
+            });
+        } catch (notifError) {
+            console.error('Bildirim oluşturma hatası:', notifError);
+        }
+    }
+
     return {
       success: true,
       id: reservationId
     };
   } catch (error) {
-    console.error('Transaction ile rezervasyon oluÅŸturma hatasÄ±:', error);
+    console.error('Transaction ile rezervasyon oluşturma hatası:', error);
     return {
       success: false,
-      error: error.message || 'Rezervasyon oluÅŸturulamadÄ±'
+      error: error.message || 'Rezervasyon oluşturulamadı'
     };
   }
 };
 
-// Rezervasyon oluÅŸtur (komisyon hesaplama ve bakiye gÃ¼ncelleme ile)
-// Not: Online Ã¶deme ile rezervasyon iÃ§in createRezervasyonWithTransaction kullanÄ±n (race condition Ã¶nleme iÃ§in)
-// Bu fonksiyon transaction kullanmaz, bu yÃ¼zden race condition riski taÅŸÄ±r
+// Rezervasyon oluştur (komisyon hesaplama ve bakiye güncelleme ile)
+// Not: Online ödeme ile rezervasyon için createRezervasyonWithTransaction kullanın (race condition önleme için)
 export const createRezervasyon = async (rezervasyonData) => {
   try {
+    // Dinamik Komisyon Hesaplama
+    let calculatedOwnerAmount = rezervasyonData.ownerAmount;
+    let appliedCommissionRate = 0;
+    
+    if (rezervasyonData.ownerId) {
+       const commissionRate = await calculateCommissionRate(rezervasyonData.ownerId);
+       appliedCommissionRate = commissionRate;
+       const total = rezervasyonData.totalAmount || rezervasyonData.price || 0;
+       const commissionAmount = (total * commissionRate) / 100;
+       calculatedOwnerAmount = total - commissionAmount;
+    }
+
     const docRef = await addDoc(collection(db, 'rezervasyonlar'), {
       ...rezervasyonData,
+      ownerAmount: calculatedOwnerAmount,
+      appliedCommissionRate: appliedCommissionRate,
       status: rezervasyonData?.status ?? 'pending',
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp()
     });
     
-    // Rezervasyon baÅŸarÄ±yla oluÅŸturulduysa ve confirmed status'Ã¼ varsa, saha sahibi bakiyesini gÃ¼ncelle
-    if (rezervasyonData.status === 'confirmed' && rezervasyonData.ownerAmount && rezervasyonData.ownerId) {
+    // Rezervasyon başarıyla oluşturulduysa ve confirmed status'ü varsa, saha sahibi bakiyesini güncelle
+    if (rezervasyonData.status === 'confirmed' && calculatedOwnerAmount && rezervasyonData.ownerId) {
       try {
         await updateOwnerBalance(
           rezervasyonData.ownerId,
-          rezervasyonData.ownerAmount,
+          calculatedOwnerAmount,
           {
             type: 'reservation_income',
             reservationId: docRef.id,
@@ -1234,17 +1282,33 @@ export const createRezervasyon = async (rezervasyonData) => {
           }
         );
       } catch (balanceError) {
-        console.error('Bakiye gÃ¼ncelleme hatasÄ±:', balanceError);
-        // Bakiye gÃ¼ncelleme hatasÄ± rezervasyonu iptal etmez, sadece log'lar
+        console.error('Bakiye güncelleme hatası:', balanceError);
+        // Bakiye güncelleme hatası rezervasyonu iptal etmez, sadece log'lar
       }
     }
     
+    // SAHA SAHİBİNE BİLDİRİM GÖNDER
+    if (rezervasyonData.ownerId) {
+       try {
+           await addDoc(collection(db, 'notifications'), {
+               userId: rezervasyonData.ownerId,
+               type: 'reservation_new',
+               title: 'Yeni Rezervasyon!',
+               message: `${rezervasyonData.tesisName || 'Sahanız'} için yeni bir rezervasyon oluşturuldu. (${rezervasyonData.date} - ${rezervasyonData.timeSlot})`,
+               read: false,
+               createdAt: serverTimestamp()
+           });
+       } catch (notifError) {
+           console.error('Bildirim oluşturma hatası:', notifError);
+       }
+   }
+
     return {
       success: true,
       id: docRef.id
     };
   } catch (error) {
-    console.error('Rezervasyon oluÅŸturma hatasÄ±:', error);
+    console.error('Rezervasyon oluşturma hatası:', error);
     return {
       success: false,
       error: error.message
@@ -1948,14 +2012,31 @@ export const getReportData = async (ownerId, startDate, endDate) => {
       });
     });
 
-    // Tarih aralÄ±ÄŸÄ±na gÃ¶re filtrele
+    // Tarih aralığına göre filtrele (Mevcut Dönem)
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    // Saat ayarı yap
+    start.setHours(0, 0, 0, 0);
+    end.setHours(23, 59, 59, 999);
+
     const filteredReservations = reservations.filter(res => {
       const resDate = new Date(res.date);
-      return resDate >= new Date(startDate) && resDate <= new Date(endDate);
+      return resDate >= start && resDate <= end;
+    });
+
+    // Önceki dönem tarih aralığını hesapla
+    const duration = end.getTime() - start.getTime();
+    const previousStart = new Date(start.getTime() - duration - 1); 
+    const previousEnd = new Date(start.getTime() - 1);
+
+    // Tarih aralığına göre filtrele (Önceki Dönem)
+    const previousReservations = reservations.filter(res => {
+      const resDate = new Date(res.date);
+      return resDate >= previousStart && resDate <= previousEnd;
     });
 
     // Rapor verilerini hesapla
-    const reportData = calculateReportMetrics(filteredReservations, tesisler, startDate, endDate);
+    const reportData = calculateReportMetrics(filteredReservations, previousReservations, tesisler, startDate, endDate);
 
     return {
       success: true,
@@ -1971,7 +2052,7 @@ export const getReportData = async (ownerId, startDate, endDate) => {
 };
 
 // BoÅŸ rapor verisi
-const getEmptyReportData = () => {
+function getEmptyReportData() {
   return {
     totalRevenue: 0,
     totalReservations: 0,
@@ -1992,10 +2073,11 @@ const getEmptyReportData = () => {
     customerGrowth: 0,
     cancellationGrowth: 0
   };
-};
+}
 
 // Rapor metriklerini hesapla
-const calculateReportMetrics = (reservations, tesisler, startDate, endDate) => {
+function calculateReportMetrics(currentReservations, previousReservations, tesisler, startDate, endDate) {
+  const reservations = currentReservations;
   // Temel metrikler
   const confirmedReservations = reservations.filter(res => 
     res.status === 'confirmed' || res.status === 'completed'
@@ -2047,7 +2129,9 @@ const calculateReportMetrics = (reservations, tesisler, startDate, endDate) => {
   for (let i = 0; i < 7; i++) {
     const dayReservations = confirmedReservations.filter(res => {
       const date = new Date(res.date);
-      return date.getDay() === i;
+      // Pzt (i=0) -> 1, Sal (i=1) -> 2, ..., Cmt (i=5) -> 6, Paz (i=6) -> 0
+      const expectedDay = i === 6 ? 0 : i + 1;
+      return date.getDay() === expectedDay;
     });
     
     const dayRevenue = dayReservations.reduce((sum, res) => 
@@ -2149,13 +2233,32 @@ const calculateReportMetrics = (reservations, tesisler, startDate, endDate) => {
   const cancellationRate = reservations.length > 0 ? 
     Math.round((cancelledReservations / reservations.length) * 100 * 10) / 10 : 0;
 
-  // Doluluk oranÄ± hesapla
-  const totalCapacity = tesisler.reduce((sum, tesis) => sum + (tesis.capacity || 0), 0) * 
-    Math.ceil((new Date(endDate) - new Date(startDate)) / (1000 * 60 * 60 * 24));
+  // Doluluk oranı hesapla
+  const dayCount = Math.max(1, Math.ceil((new Date(endDate).getTime() - new Date(startDate).getTime()) / (1000 * 60 * 60 * 24)));
+  const totalCapacity = tesisler.reduce((sum, tesis) => sum + (tesis.capacity || 0), 0) * dayCount;
   const usedCapacity = confirmedReservations.reduce((sum, res) => 
     sum + (res.playerCount || res.totalPlayers || 1), 0
   );
   const occupancyRate = totalCapacity > 0 ? Math.round((usedCapacity / totalCapacity) * 100) : 0;
+
+  // --- Önceki Dönem Metrikleri ve Büyüme Hesaplama ---
+  const prevConfirmed = previousReservations.filter(res => res.status === 'confirmed' || res.status === 'completed');
+  const prevRevenue = prevConfirmed.reduce((sum, res) => sum + (res.totalAmount || res.price || 0), 0);
+  const prevReservations = prevConfirmed.length;
+  
+  const prevUsedCapacity = prevConfirmed.reduce((sum, res) => sum + (res.playerCount || res.totalPlayers || 1), 0);
+  const prevOccupancyRate = totalCapacity > 0 ? Math.round((prevUsedCapacity / totalCapacity) * 100) : 0; // Kapasite aynı varsayıyoruz (tarih aralığı aynı süre çünkü)
+  
+  const prevPrice = prevReservations > 0 ? Math.round(prevRevenue / prevReservations) : 0;
+  
+  const prevUniqueCustomers = new Set(prevConfirmed.map(res => res.customerId || res.customerName || 'unknown')).size;
+  const prevCancelled = previousReservations.filter(res => res.status === 'cancelled').length;
+  const prevCancelRate = previousReservations.length > 0 ? Math.round((prevCancelled / previousReservations.length) * 100 * 10)/10 : 0;
+
+  const calculateGrowth = (curr, prev) => {
+    if (prev === 0) return curr > 0 ? 100 : 0;
+    return Math.round(((curr - prev) / prev) * 100 * 10) / 10;
+  };
 
   return {
     totalRevenue,
@@ -2170,29 +2273,30 @@ const calculateReportMetrics = (reservations, tesisler, startDate, endDate) => {
     paymentMethods,
     sahaPerformance,
     topCustomers,
-    revenueGrowth: 24.5, // VarsayÄ±lan deÄŸerler - gerÃ§ek uygulamada Ã¶nceki dÃ¶nemle karÅŸÄ±laÅŸtÄ±rma yapÄ±lÄ±r
-    reservationGrowth: 18.2,
-    occupancyGrowth: -3.1,
-    priceGrowth: 5.7,
-    customerGrowth: 12.3,
-    cancellationGrowth: -8.2
+    
+    revenueGrowth: calculateGrowth(totalRevenue, prevRevenue),
+    reservationGrowth: calculateGrowth(totalReservations, prevReservations),
+    occupancyGrowth: Number((occupancyRate - prevOccupancyRate).toFixed(1)),
+    priceGrowth: calculateGrowth(averagePrice, prevPrice),
+    customerGrowth: calculateGrowth(activeCustomers, prevUniqueCustomers),
+    cancellationGrowth: Number((cancellationRate - prevCancelRate).toFixed(1))
   };
 };
 
 // MÃ¼ÅŸteri segmentini belirle
-const getCustomerSegment = (totalSpent, reservations) => {
+function getCustomerSegment(totalSpent, reservations) {
   if (totalSpent >= 5000 || reservations >= 20) return 'VIP';
   if (totalSpent >= 2000 || reservations >= 10) return 'DÃ¼zenli';
   if (reservations >= 5) return 'HaftalÄ±k';
   return 'Tek Seferlik';
-};
+}
 
 // Performans seviyesini belirle
-const getPerformanceLevel = (occupancy, cancellationRate) => {
+function getPerformanceLevel(occupancy, cancellationRate) {
   if (occupancy >= 75 && cancellationRate <= 5) return 'YÃ¼ksek';
   if (occupancy >= 50 && cancellationRate <= 10) return 'Orta';
   return 'DÃ¼ÅŸÃ¼k';
-};
+}
 
 // Marketing Servisleri
 
@@ -4115,6 +4219,7 @@ export const sendTeamInvitation = async (teamId, inviterId, invitedUserId) => {
     const notificationData = {
       userId: invitedUserId,
       type: 'team_invitation',
+      link: '/oyuncu/ekip',
       title: 'TakÄ±m Daveti',
       message: `${teamData.name} takÄ±mÄ±na katÄ±lmaya davet edildiniz.`,
       relatedId: teamId, // TakÄ±m ID'si
@@ -6061,17 +6166,18 @@ export const deleteTicketAdmin = async (ticketId) => {
   }
 };
 
-// Ticket yanÄ±tÄ± ekle (mevcut fonksiyon)
 export const addTicketReply = async (ticketId, replyData) => {
   try {
     const ticketDoc = await getDoc(doc(db, 'tickets', ticketId));
     if (ticketDoc.exists()) {
       const ticket = ticketDoc.data();
       const replies = ticket.replies || [];
+      
       replies.push({
         ...replyData,
-        createdAt: serverTimestamp()
+        createdAt: new Date()
       });
+      
       await updateDoc(doc(db, 'tickets', ticketId), {
         replies,
         updatedAt: serverTimestamp()
@@ -7692,7 +7798,24 @@ export const getOpenMatches = async (filters = {}) => {
     
     return { success: true, data: filteredMatches };
   } catch (error) {
-    console.error('AÃ§Ä±k maÃ§lar getirme hatasÄ±:', error);
+    console.error('Açık maçlar getirme hatası:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+// Tek açık maç getir
+export const getOpenMatch = async (matchId) => {
+  try {
+    const docRef = doc(db, 'openMatches', matchId);
+    const docSnap = await getDoc(docRef);
+
+    if (docSnap.exists()) {
+      return { success: true, data: { id: docSnap.id, ...docSnap.data() } };
+    } else {
+      return { success: false, error: 'Maç bulunamadı' };
+    }
+  } catch (error) {
+    console.error('Maç getirme hatası:', error);
     return { success: false, error: error.message };
   }
 };
@@ -8301,19 +8424,9 @@ export const getBlogCategories = async () => {
       categories.push({ id: doc.id, ...doc.data() });
     });
     
-    // EÄŸer kategori yoksa varsayÄ±lan kategorileri dÃ¶ndÃ¼r
-    if (categories.length === 0) {
-      return {
-        success: true,
-        data: [
-          { id: 'saglik', name: 'SaÄŸlÄ±k', color: 'bg-green-500', slug: 'saglik' },
-          { id: 'antrenman', name: 'Antrenman', color: 'bg-blue-500', slug: 'antrenman' },
-          { id: 'ekipman', name: 'Ekipman', color: 'bg-orange-500', slug: 'ekipman' },
-          { id: 'haberler', name: 'Haberler', color: 'bg-purple-500', slug: 'haberler' },
-          { id: 'ipuclari', name: 'Ä°puÃ§larÄ±', color: 'bg-pink-500', slug: 'ipuclari' }
-        ]
-      };
-    }
+    // Kategori yoksa boş döner, varsayılan kategori döndürmez.
+    // Bu sayede "olmayan" kategorileri düzenlemeye çalışma hatası önlenir.
+
     
     return { success: true, data: categories };
   } catch (error) {
@@ -9543,6 +9656,33 @@ export const savePage = async (pageData) => {
     }
 };
 
+export const getAuthPageContent = async (pageType) => {
+    try {
+        const docRef = doc(db, 'settings', 'auth_pages');
+        const docSnap = await getDoc(docRef);
+        
+        if (docSnap.exists()) {
+            const data = docSnap.data();
+            return { success: true, data: data[pageType] || null };
+        }
+        return { success: true, data: null };
+    } catch (error) {
+        console.error("Error fetching auth page content:", error);
+        return { success: false, error: error.message };
+    }
+};
+
+export const saveAuthPageContent = async (pageType, content) => {
+    try {
+        const docRef = doc(db, 'settings', 'auth_pages');
+        await setDoc(docRef, { [pageType]: content }, { merge: true });
+        return { success: true };
+    } catch (error) {
+        console.error("Error saving auth page content:", error);
+        return { success: false, error: error.message };
+    }
+};
+
 // Delete page
 export const deletePage = async (id) => {
     try {
@@ -9564,6 +9704,70 @@ export const togglePagePublish = async (id, currentStatus) => {
         return { success: true };
     } catch (error) {
         console.error("Error toggling page status:", error);
+        return { success: false, error: error.message };
+    }
+};
+
+// Müşteri Segmenti Ekle
+export const addCustomerSegment = async (segmentData) => {
+  try {
+    await addDoc(collection(db, 'customerSegments'), {
+      ...segmentData,
+      createdAt: serverTimestamp()
+    });
+    return { success: true };
+  } catch (error) {
+    console.error('Segment ekleme hatası:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+// Müşteri Segmenti Sil
+export const deleteCustomerSegment = async (segmentId) => {
+  try {
+    await deleteDoc(doc(db, 'customerSegments', segmentId));
+    return { success: true };
+  } catch (error) {
+    console.error('Segment silme hatası:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+// Marketing Mesajı Gönder (Mock veya Log)
+export const sendMarketingMessage = async (templateId, segmentId, channel) => {
+  try {
+    // Mesaj log kaydı oluştur
+    await addDoc(collection(db, 'messageLogs'), {
+      templateId,
+      segmentId,
+      channel,
+      sentAt: serverTimestamp(),
+      status: 'sent',
+      recipientCount: 0 // İleride gerçek segment sayısını eklemeli
+    });
+    
+    // Şablon istatistiklerini güncelle
+    const templateRef = doc(db, 'messageTemplates', templateId);
+    await updateDoc(templateRef, {
+      'stats.sent': increment(1), 
+      'stats.lastSent': serverTimestamp()
+    });
+
+    return { success: true };
+  } catch (error) {
+    console.error('Mesaj gönderme hatası:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+// Kaydedilmiş Segmentleri Getir
+export const getSavedCustomerSegments = async (ownerId) => {
+    try {
+        const q = query(collection(db, 'customerSegments'), where('ownerId', '==', ownerId), orderBy('createdAt', 'desc'));
+        const snapshot = await getDocs(q);
+        const segments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        return { success: true, data: segments };
+    } catch (error) {
         return { success: false, error: error.message };
     }
 };

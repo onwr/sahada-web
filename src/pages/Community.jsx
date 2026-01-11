@@ -141,6 +141,7 @@ const PostCard = ({ post, isLiked, commentsOpen, toggleLike, toggleComments, han
             {post.type === PostType.POLL && <span className="text-xs font-bold text-purple-600 bg-purple-50 px-2 py-1 rounded">ANKET</span>}
             {post.type === PostType.PLAYER_SEARCH && <span className="text-xs font-bold text-red-600 bg-red-50 px-2 py-1 rounded">OYUNCU ARANIYOR</span>}
             {post.type === PostType.REVIEW && <span className="text-xs font-bold text-yellow-600 bg-yellow-50 px-2 py-1 rounded">İNCELEME</span>}
+            {post.type === PostType.SCOREBOARD && <span className="text-xs font-bold text-green-600 bg-green-50 px-2 py-1 rounded">MAÇ SONUCU</span>}
             {post.type === PostType.GENERAL && <span className="text-xs font-bold text-gray-600 bg-gray-50 px-2 py-1 rounded">PAYLAŞIM</span>}
             
             {isAuthor && (
@@ -166,6 +167,7 @@ const PostCard = ({ post, isLiked, commentsOpen, toggleLike, toggleComments, han
             <p className="text-gray-700 leading-relaxed mb-3 whitespace-pre-wrap">{post.content}</p>
           )}
 
+          {/* POLL RENDER */}
           {post.type === PostType.POLL && post.pollOptions && (
             <div className="space-y-2 mt-3">
               {post.pollOptions.map((option, idx) => {
@@ -245,30 +247,69 @@ const PostCard = ({ post, isLiked, commentsOpen, toggleLike, toggleComments, han
 
           {/* SCOREBOARD RENDER */}
           {post.type === PostType.SCOREBOARD && post.homeTeam && (
-            <div className="bg-black text-white rounded-xl overflow-hidden mt-3 relative">
+            <div className="bg-[#0f172a] text-white rounded-xl overflow-hidden mt-3 relative">
               {post.image && (
-                <div className="absolute inset-0 opacity-40">
+                <div className="absolute inset-0 opacity-20">
                   <img src={post.image} className="w-full h-full object-cover" alt="Match bg" />
                 </div>
               )}
-              <div className="relative z-10 p-6 text-center">
-                <div className="flex justify-between items-center mb-4">
-                  <span className="font-bold text-xl">{post.homeTeam}</span>
-                  <div className="bg-white/10 backdrop-blur-md px-4 py-2 rounded-lg border border-white/20">
-                    <span className="text-3xl font-black text-green-400 tracking-widest">{post.score}</span>
-                  </div>
-                  <span className="font-bold text-xl">{post.awayTeam}</span>
+              <div className="relative z-10 p-6">
+                <div className="flex justify-between items-center mb-6">
+                   <div className="text-center flex-1">
+                       <h4 className="font-bold text-lg md:text-xl text-white mb-1">{post.homeTeam}</h4>
+                       <span className="text-xs text-slate-400">Ev Sahibi</span>
+                   </div>
+                   <div className="bg-white/10 backdrop-blur-md px-4 py-2 rounded-lg border border-white/20 mx-2">
+                       <span className="text-2xl md:text-3xl font-black text-green-400 tracking-widest whitespace-nowrap">{post.score}</span>
+                   </div>
+                   <div className="text-center flex-1">
+                       <h4 className="font-bold text-lg md:text-xl text-white mb-1">{post.awayTeam}</h4>
+                       <span className="text-xs text-slate-400">Deplasman</span>
+                   </div>
                 </div>
-                <div>
-                  <div className="inline-flex items-center gap-2 bg-yellow-500/20 text-yellow-400 px-3 py-1 rounded-full text-xs font-bold border border-yellow-500/30">
-                    <Trophy size={12} /> MVP: {post.mvp}
-                  </div>
-                  <p className="text-xs text-gray-400 mt-2 flex items-center justify-center gap-1">
-                    <MapPin size={10} /> {post.facilityName}
-                  </p>
+                
+                <div className="flex items-center justify-center gap-2 mt-4 pt-4 border-t border-white/10">
+                   {post.mvp && (
+                       <div className="inline-flex items-center gap-1.5 bg-yellow-500/20 text-yellow-400 px-3 py-1 rounded-full text-xs font-bold border border-yellow-500/30">
+                          <Trophy size={12} /> MVP: {post.mvp}
+                       </div>
+                   )}
+                   {post.facilityName && (
+                       <div className="inline-flex items-center gap-1.5 text-slate-300 text-xs">
+                          <MapPin size={12} /> {post.facilityName}
+                       </div>
+                   )}
                 </div>
               </div>
             </div>
+          )}
+          
+          {/* REVIEW RENDER */}
+          {post.type === PostType.REVIEW && (
+             <div className="bg-yellow-50/50 border border-yellow-100 rounded-xl p-4 mt-3">
+                 <div className="flex items-start gap-4">
+                     <div className="w-16 h-16 bg-yellow-100 rounded-lg flex items-center justify-center flex-shrink-0 text-yellow-600">
+                         <Star size={32} fill="currentColor" />
+                     </div>
+                     <div>
+                         <h4 className="font-bold text-gray-900 text-lg flex items-center gap-2">
+                             {post.facilityName}
+                         </h4>
+                         <div className="flex items-center gap-1 my-1">
+                             {[...Array(5)].map((_, i) => (
+                                 <Star 
+                                    key={i} 
+                                    size={16} 
+                                    fill={i < post.rating ? "#CA8A04" : "none"} 
+                                    className={i < post.rating ? "text-yellow-600" : "text-gray-300"} 
+                                />
+                             ))}
+                             <span className="text-sm font-bold text-yellow-700 ml-1">{post.rating}/5</span>
+                         </div>
+                         <p className="text-sm text-gray-600 mt-2 italic">"{post.reviewText || post.content}"</p>
+                     </div>
+                 </div>
+             </div>
           )}
         </div>
 
@@ -384,6 +425,13 @@ const Community = () => {
   const [showLocationInput, setShowLocationInput] = useState(false);
   const [locationText, setLocationText] = useState('');
 
+  // New Modes State
+  const [isMatchMode, setIsMatchMode] = useState(false);
+  const [matchDetails, setMatchDetails] = useState({ homeTeam: '', awayTeam: '', homeScore: '', awayScore: '', mvp: '' });
+
+  const [isReviewMode, setIsReviewMode] = useState(false);
+  const [reviewDetails, setReviewDetails] = useState({ facilityName: '', rating: 0 });
+
   // Interaction State
   const [likedPosts, setLikedPosts] = useState(new Set());
   const [openComments, setOpenComments] = useState(new Set());
@@ -458,6 +506,23 @@ const Community = () => {
     }
   };
 
+  // Mode Toggles (Exclusive)
+  const togglePollMode = () => {
+      setIsPollMode(!isPollMode);
+      if(!isPollMode) { setIsMatchMode(false); setIsReviewMode(false); setShowLocationInput(false); }
+  };
+  const toggleMatchMode = () => {
+      setIsMatchMode(!isMatchMode);
+      if(!isMatchMode) { setIsPollMode(false); setIsReviewMode(false); setShowLocationInput(false); }
+  };
+  const toggleReviewMode = () => {
+      setIsReviewMode(!isReviewMode);
+      if(!isReviewMode) { setIsPollMode(false); setIsMatchMode(false); setShowLocationInput(false); }
+  };
+  const toggleLocationInput = () => {
+      setShowLocationInput(!showLocationInput);
+  };
+
   const handlePollOptionChange = (index, value) => {
     const newOptions = [...pollOptions];
     newOptions[index].text = value;
@@ -478,7 +543,7 @@ const Community = () => {
   };
 
   const handlePostSubmit = async () => {
-    if (!newPostContent.trim() && !selectedImage && !isPollMode) return;
+    if (!newPostContent.trim() && !selectedImage && !isPollMode && !isMatchMode && !isReviewMode) return;
 
     if (!currentUser) {
         toast.error('Paylaşım yapmak için giriş yapmalısınız.');
@@ -490,6 +555,7 @@ const Community = () => {
     let imageUrl = null;
     let finalPostType = PostType.GENERAL;
     let finalPollOptions = null;
+    let extraData = {};
 
     // 1. Upload Image
     if (selectedImage) {
@@ -506,7 +572,7 @@ const Community = () => {
         }
     }
 
-    // 2. Prepare Poll Data
+    // 2. Prepare Mode Data
     if (isPollMode) {
         const validOptions = pollOptions.filter(o => o.text.trim() !== '');
         if (validOptions.length < 2) {
@@ -521,9 +587,42 @@ const Community = () => {
             votes: 0, 
             percentage: 0 
         }));
+    } else if (isMatchMode) {
+        if (!matchDetails.homeTeam || !matchDetails.awayTeam || !matchDetails.homeScore || !matchDetails.awayScore) {
+            toast.error('Lütfen tüm maç bilgilerini giriniz.');
+             playNotificationSound();
+            setIsPosting(false);
+            return;
+        }
+        finalPostType = PostType.SCOREBOARD;
+        extraData = {
+            homeTeam: matchDetails.homeTeam,
+            awayTeam: matchDetails.awayTeam,
+            score: `${matchDetails.homeScore} - ${matchDetails.awayScore}`,
+            mvp: matchDetails.mvp || 'Belirtilmedi',
+            facilityName: locationText || 'Saha Belirtilmedi'
+        };
+    } else if (isReviewMode) {
+        if (!reviewDetails.facilityName || reviewDetails.rating === 0) {
+             toast.error('Lütfen saha ismi ve puanlama giriniz.');
+             playNotificationSound();
+             setIsPosting(false);
+             return;
+        }
+        finalPostType = PostType.REVIEW;
+        extraData = {
+            facilityName: reviewDetails.facilityName,
+            rating: reviewDetails.rating,
+            reviewText: newPostContent 
+        };
     }
 
     // 3. Construct Post Object
+    const defaultTitle = isPollMode ? 'Anket: ' + newPostContent : 
+                         isMatchMode ? 'Maç Sonucu: ' + matchDetails.homeTeam + ' vs ' + matchDetails.awayTeam :
+                         isReviewMode ? 'Saha İncelemesi: ' + reviewDetails.facilityName :
+                         (newPostContent.length > 20 ? newPostContent.substring(0, 20) + '...' : 'Yeni Paylaşım');
+
     const newPostData = {
         type: finalPostType,
         author: {
@@ -532,11 +631,12 @@ const Community = () => {
             avatar: currentUser.photoURL || `https://ui-avatars.com/api/?name=${currentUser.email}&background=random`,
             badges: ['Üye'] 
         },
-        title: isPollMode ? 'Anket: ' + newPostContent : (newPostContent.length > 20 ? newPostContent.substring(0, 20) + '...' : 'Yeni Paylaşım'),
+        title: defaultTitle,
         content: newPostContent,
         image: imageUrl,
         pollOptions: finalPollOptions,
         location: showLocationInput ? locationText : null,
+        ...extraData
     };
 
     const result = await createPost(newPostData);
@@ -545,7 +645,11 @@ const Community = () => {
         setNewPostContent('');
         setSelectedImage(null);
         setIsPollMode(false);
+        setIsMatchMode(false);
+        setIsReviewMode(false);
         setPollOptions([{ text: '' }, { text: '' }]);
+        setMatchDetails({ homeTeam: '', awayTeam: '', homeScore: '', awayScore: '', mvp: '' });
+        setReviewDetails({ facilityName: '', rating: 0 });
         setShowLocationInput(false);
         setLocationText('');
         
@@ -910,7 +1014,7 @@ const Community = () => {
                       <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 space-y-3 mt-2">
                           <div className="flex justify-between items-center mb-2">
                             <span className="text-xs font-bold text-gray-500 uppercase">Anket Seçenekleri</span>
-                            <button onClick={() => setIsPollMode(false)} className="text-gray-400 hover:text-red-500"><X size={16}/></button>
+                            <button onClick={togglePollMode} className="text-gray-400 hover:text-red-500"><X size={16}/></button>
                           </div>
                           {pollOptions.map((option, idx) => (
                               <div key={idx} className="flex gap-2">
@@ -936,7 +1040,74 @@ const Community = () => {
                       </div>
                   )}
 
-                  {/* 3. Location Input */}
+                  {/* 3. Match Result Creator */}
+                  {isMatchMode && (
+                      <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3 mt-2">
+                          <div className="flex justify-between items-center mb-2">
+                            <span className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1"><Trophy size={14}/> Maç Skoru</span>
+                            <button onClick={toggleMatchMode} className="text-gray-400 hover:text-red-500"><X size={16}/></button>
+                          </div>
+                          <div className="flex items-center gap-3">
+                              <input 
+                                type="text" placeholder="Ev Sahibi" 
+                                className="flex-1 text-center bg-white border border-gray-200 rounded px-2 py-2 text-sm font-bold placeholder:font-normal"
+                                value={matchDetails.homeTeam} onChange={e => setMatchDetails({...matchDetails, homeTeam: e.target.value})}
+                              />
+                              <input 
+                                type="number" placeholder="0" 
+                                className="w-12 text-center bg-white border border-gray-200 rounded px-1 py-2 font-black text-lg"
+                                value={matchDetails.homeScore} onChange={e => setMatchDetails({...matchDetails, homeScore: e.target.value})}
+                              />
+                              <span className="text-gray-400 font-bold">-</span>
+                              <input 
+                                type="number" placeholder="0" 
+                                className="w-12 text-center bg-white border border-gray-200 rounded px-1 py-2 font-black text-lg"
+                                value={matchDetails.awayScore} onChange={e => setMatchDetails({...matchDetails, awayScore: e.target.value})}
+                              />
+                              <input 
+                                type="text" placeholder="Deplasman" 
+                                className="flex-1 text-center bg-white border border-gray-200 rounded px-2 py-2 text-sm font-bold placeholder:font-normal"
+                                value={matchDetails.awayTeam} onChange={e => setMatchDetails({...matchDetails, awayTeam: e.target.value})}
+                              />
+                          </div>
+                          <input 
+                            type="text" placeholder="MVP (Maçın Adamı)" 
+                            className="w-full bg-white border border-gray-200 rounded px-3 py-1.5 text-sm"
+                            value={matchDetails.mvp} onChange={e => setMatchDetails({...matchDetails, mvp: e.target.value})}
+                          />
+                      </div>
+                  )}
+
+                  {/* 4. Review Creator */}
+                  {isReviewMode && (
+                      <div className="bg-yellow-50 p-4 rounded-xl border border-yellow-200 space-y-3 mt-2">
+                          <div className="flex justify-between items-center mb-2">
+                            <span className="text-xs font-bold text-yellow-600 uppercase flex items-center gap-1"><Star size={14}/> Saha İncelemesi</span>
+                            <button onClick={toggleReviewMode} className="text-gray-400 hover:text-red-500"><X size={16}/></button>
+                          </div>
+                          <input 
+                             type="text" placeholder="Saha / Tesis Adı"
+                             className="w-full bg-white border border-yellow-200 rounded px-3 py-2 text-sm focus:border-yellow-500 outline-none"
+                             value={reviewDetails.facilityName} onChange={e => setReviewDetails({...reviewDetails, facilityName: e.target.value})}
+                          />
+                          <div className="flex items-center gap-2">
+                              <span className="text-sm text-yellow-800 font-medium">Puanın:</span>
+                              <div className="flex gap-1">
+                                  {[1,2,3,4,5].map(star => (
+                                      <button key={star} onClick={() => setReviewDetails({...reviewDetails, rating: star})}>
+                                          <Star 
+                                            size={24} 
+                                            fill={star <= reviewDetails.rating ? "#CA8A04" : "none"} 
+                                            className={`${star <= reviewDetails.rating ? "text-yellow-600" : "text-gray-300"} hover:text-yellow-500 transition-colors`}
+                                          />
+                                      </button>
+                                  ))}
+                              </div>
+                          </div>
+                      </div>
+                  )}
+
+                  {/* 5. Location Input */}
                   {showLocationInput && (
                       <div className="flex gap-2 items-center bg-blue-50 p-2 rounded-lg border border-blue-100 mt-2">
                           <MapPin size={16} className="text-blue-500" />
@@ -947,7 +1118,7 @@ const Community = () => {
                             value={locationText}
                             onChange={(e) => setLocationText(e.target.value)}
                           />
-                          <button onClick={() => { setShowLocationInput(false); setLocationText(''); }} className="text-blue-400 hover:text-blue-700">
+                          <button onClick={toggleLocationInput} className="text-blue-400 hover:text-blue-700">
                               <X size={14} />
                           </button>
                       </div>
@@ -965,7 +1136,7 @@ const Community = () => {
                   </label>
                   
                   <button 
-                    onClick={() => setIsPollMode(!isPollMode)}
+                    onClick={togglePollMode}
                     className={`p-2 rounded-lg transition-colors group relative ${isPollMode ? 'text-green-600 bg-green-50' : 'text-gray-500 hover:text-green-600 hover:bg-green-50'}`}
                   >
                     <BarChart2 size={20} />
@@ -973,7 +1144,23 @@ const Community = () => {
                   </button>
 
                   <button 
-                    onClick={() => setShowLocationInput(!showLocationInput)}
+                    onClick={toggleMatchMode}
+                    className={`p-2 rounded-lg transition-colors group relative ${isMatchMode ? 'text-green-600 bg-green-50' : 'text-gray-500 hover:text-green-600 hover:bg-green-50'}`}
+                  >
+                    <Trophy size={20} />
+                    <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-gray-800 text-white text-[10px] py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">Maç Sonucu</span>
+                  </button>
+
+                  <button 
+                    onClick={toggleReviewMode}
+                    className={`p-2 rounded-lg transition-colors group relative ${isReviewMode ? 'text-green-600 bg-green-50' : 'text-gray-500 hover:text-green-600 hover:bg-green-50'}`}
+                  >
+                    <Star size={20} />
+                    <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-gray-800 text-white text-[10px] py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">Saha İncelemesi</span>
+                  </button>
+
+                  <button 
+                    onClick={toggleLocationInput}
                     className={`p-2 rounded-lg transition-colors group relative ${showLocationInput ? 'text-green-600 bg-green-50' : 'text-gray-500 hover:text-green-600 hover:bg-green-50'}`}
                   >
                     <MapPin size={20} />
@@ -982,8 +1169,8 @@ const Community = () => {
                 </div>
                 <button
                   onClick={handlePostSubmit}
-                  disabled={(!newPostContent.trim() && !selectedImage && !isPollMode) || isPosting}
-                  className={`bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg font-bold text-sm transition-all shadow-lg shadow-green-600/20 flex items-center gap-2 ${((!newPostContent.trim() && !selectedImage && !isPollMode) || isPosting) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  disabled={(!newPostContent.trim() && !selectedImage && !isPollMode && !isMatchMode && !isReviewMode) || isPosting}
+                  className={`bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg font-bold text-sm transition-all shadow-lg shadow-green-600/20 flex items-center gap-2 ${((!newPostContent.trim() && !selectedImage && !isPollMode && !isMatchMode && !isReviewMode) || isPosting) ? 'opacity-50 cursor-not-allowed' : ''}`}
                 >
                   {isPosting ? 'Paylaşılıyor...' : 'Paylaş'} <Send size={14} />
                 </button>

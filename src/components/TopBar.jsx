@@ -35,9 +35,7 @@ const TopBar = () => {
               Saha Sahibi Girişi
             </Link>
           )}
-          <Link to="/pricing" className="text-green-500 hover:text-green-400 transition-colors font-bold">
-            Fiyatlandırma
-          </Link>
+
         </div>
       </div>
     </div>

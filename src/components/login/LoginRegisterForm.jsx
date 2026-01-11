@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { 
   Eye, 
   EyeOff, 
@@ -8,18 +8,23 @@ import {
   Phone, 
   Lock, 
   User, 
-  Check
+
+  Check,
+  Facebook
 } from 'lucide-react';
 import { 
   registerUser, 
   loginUser, 
   loginWithGoogle, 
+  loginWithFacebook,
   resetPassword 
 } from '../../services/authService';
+import { getAuthPageContent } from '../../services/firestoreService';
 import { useAuth } from '../../contexts/AuthContext';
 
 const LoginRegisterForm = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { isAuthenticated, userData, setUserData, setNeedsOnboarding } = useAuth();
   const [activeTab, setActiveTab] = useState('login');
   const [userType, setUserType] = useState('player');
@@ -36,6 +41,27 @@ const LoginRegisterForm = () => {
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
   const [showResetPassword, setShowResetPassword] = useState(false);
+  
+  const [pageContent, setPageContent] = useState({
+    title: 'Sahada Buluşalım!',
+    description: "Türkiye'nin en büyük spor platformuna katıl, takımını kur, sahada yerini al!",
+    features: [
+      '15.000+ aktif saha',
+      '100.000+ sporcu', 
+      'Anında oyuncu bulma',
+      'Güvenli ödeme sistemi'
+    ]
+  });
+
+  useEffect(() => {
+    const fetchContent = async () => {
+      const result = await getAuthPageContent('player');
+      if (result.success && result.data) {
+        setPageContent(prev => ({ ...prev, ...result.data }));
+      }
+    };
+    fetchContent();
+  }, []); // Run only on mount.  Note: imports like useEffect need to be present at top of file. `import React, { useState }` is there but useEffect is missing. I will fix that too.
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -144,7 +170,9 @@ const LoginRegisterForm = () => {
           
           // Context güncellendikten sonra kısa bir gecikme ile yönlendir
           setTimeout(() => {
-            if (finalUserType === 'player') {
+            if (location.state?.from) {
+              navigate(location.state.from, { replace: true });
+            } else if (finalUserType === 'player') {
               navigate('/oyuncu/onboarding', { replace: true });
             } else if (finalUserType === 'owner') {
               navigate('/saha-sahibi/onboarding', { replace: true });
@@ -154,13 +182,15 @@ const LoginRegisterForm = () => {
           }, 100);
         } else {
           // Giriş durumunda hemen yönlendir
-          if (finalUserType === 'player') {
-            navigate('/oyuncu/onboarding', { replace: true });
-          } else if (finalUserType === 'owner') {
-            navigate('/saha-sahibi/onboarding', { replace: true });
-          } else {
-            navigate('/oyuncu/onboarding', { replace: true });
-          }
+            if (location.state?.from) {
+              navigate(location.state.from, { replace: true });
+            } else if (finalUserType === 'player') {
+              navigate('/oyuncu/onboarding', { replace: true });
+            } else if (finalUserType === 'owner') {
+              navigate('/saha-sahibi/onboarding', { replace: true });
+            } else {
+              navigate('/oyuncu/onboarding', { replace: true });
+            }
         }
       } else {
         setErrors({ submit: result.error });
@@ -183,6 +213,8 @@ const LoginRegisterForm = () => {
       
       if (provider === 'google') {
         result = await loginWithGoogle(userType);
+      } else if (provider === 'facebook') {
+        result = await loginWithFacebook(userType);
       }
       
       if (result.success) {
@@ -196,7 +228,9 @@ const LoginRegisterForm = () => {
           finalUserType
         });
         
-        if (finalUserType === 'player') {
+        if (location.state?.from) {
+          navigate(location.state.from, { replace: true });
+        } else if (finalUserType === 'player') {
           navigate('/oyuncu/onboarding');
         } else if (finalUserType === 'owner') {
           navigate('/saha-sahibi/onboarding');
@@ -244,15 +278,11 @@ const LoginRegisterForm = () => {
   };
 
   const socialLoginButtons = [
-    { name: 'Google', icon: 'G', color: 'bg-white text-gray-700 border-gray-300', provider: 'google' }
+    { name: 'Google', icon: 'G', color: 'bg-white text-gray-700 border-gray-300', provider: 'google' },
+    { name: 'Facebook', icon: Facebook, color: 'bg-[#1877F2] text-white border-transparent', provider: 'facebook' }
   ];
 
-  const features = [
-    '15.000+ aktif saha',
-    '100.000+ sporcu', 
-    'Anında oyuncu bulma',
-    'Güvenli ödeme sistemi'
-  ];
+  const features = pageContent.features;
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-2 sm:p-4">
@@ -799,10 +829,10 @@ const LoginRegisterForm = () => {
               className="relative z-10"
             >
               <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold mb-3 sm:mb-4">
-                Sahada Buluşalım!
+                {pageContent.title}
               </h2>
               <p className="text-base sm:text-lg lg:text-xl mb-6 sm:mb-8 text-green-100">
-                Türkiye'nin en büyük spor platformuna katıl, takımını kur, sahada yerini al!
+                {pageContent.description}
               </p>
               
               <div className="space-y-3 sm:space-y-4">

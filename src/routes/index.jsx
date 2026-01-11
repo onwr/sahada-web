@@ -6,10 +6,12 @@ import SahaDetay from '../pages/SahaDetay';
 import Rezervasyon from '../pages/Rezervasyon';
 import PaymentCallback from '../pages/PaymentCallback';
 import OyuncuBul from '../pages/OyuncuBul';
+import MacDetay from '../pages/MacDetay';
 import YakinSahalar from '../pages/YakinSahalar';
 import OyuncuDetay from '../pages/OyuncuDetay';
 import Blog from '../pages/Blog';
 import BlogDetail from '../pages/BlogDetail';
+import Turnuvalar from '../pages/Turnuvalar';
 import TestPanel from '../pages/TestPanel';
 import OyuncuLayout from '../layouts/OyuncuLayout';
 import SahaSahibiLayout from '../layouts/SahaSahibiLayout';
@@ -23,20 +25,24 @@ import Pricing from '../pages/Pricing';
 
 import SahaSahibiLogin from '../pages/saha-sahibi/SahaSahibiLogin';
 import DynamicPage from '../pages/DynamicPage';
+import GizlilikSozlesmesi from '../pages/GizlilikSozlesmesi';
 
 const AppRoutes = () => {
   return (
     <Routes>
       <Route path="/" element={<Home />} />
+      <Route path="/gizlilik-sozlesmesi" element={<GizlilikSozlesmesi />} />
       <Route path="/pricing" element={<Pricing />} />
       <Route path="/saha-detay/:id" element={<SahaDetay />} />
       <Route path="/rezervasyon/:id" element={<Rezervasyon />} />
       <Route path="/payment-callback" element={<PaymentCallback />} />
       <Route path="/oyuncu-bul" element={<OyuncuBul />} />
+      <Route path="/mac-detay/:id" element={<MacDetay />} />
       <Route path="/yakin-sahalar" element={<YakinSahalar />} />
       <Route path="/oyuncu-detay/:id" element={<OyuncuDetay />} />
       <Route path="/blog" element={<Blog />} />
       <Route path="/blog/:slug" element={<BlogDetail />} />
+      <Route path="/turnuvalar" element={<Turnuvalar />} />
       <Route path="/test" element={<TestPanel />} />
       <Route path="/market/product/:id" element={<ProductDetail />} />
       <Route path="/community" element={<Community />} />

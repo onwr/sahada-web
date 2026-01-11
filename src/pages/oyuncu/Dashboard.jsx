@@ -6,6 +6,7 @@ import { getPlayerStats, getPlayerReservations, getPlayerTeams, getAllTesisler, 
 import { collection, query, onSnapshot, where } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import OyuncuSidebar from '../../components/OyuncuSidebar';
+import DashboardHeader from '../../components/DashboardHeader';
 
 import { 
   Calendar, 
@@ -174,7 +175,7 @@ const Dashboard = () => {
       const compareDate = new Date(resDate);
       compareDate.setHours(0, 0, 0, 0);
       
-      return compareDate >= today && (r.status === 'confirmed' || r.status === 'pending');
+      return compareDate >= today && (r.status === 'confirmed' || r.status === 'pending' || r.status === 'open');
     }).length;
     const completedMatches = reservationsData.filter(r => r.status === 'completed').length;
 
@@ -197,7 +198,7 @@ const Dashboard = () => {
         const compareDate = new Date(resDate);
         compareDate.setHours(0, 0, 0, 0);
         
-        return compareDate >= today && (res.status === 'confirmed' || res.status === 'pending');
+        return compareDate >= today && (res.status === 'confirmed' || res.status === 'pending' || res.status === 'open');
       })
       .sort((a, b) => {
         const dateA = a.date?.toDate ? a.date.toDate() : new Date(a.date);
@@ -324,6 +325,7 @@ const Dashboard = () => {
     switch (status) {
       case 'confirmed': return 'bg-green-100 text-green-800';
       case 'pending': return 'bg-yellow-100 text-yellow-800';
+      case 'open': return 'bg-blue-100 text-blue-800';
       case 'cancelled': return 'bg-red-100 text-red-800';
       default: return 'bg-gray-100 text-gray-800';
     }
@@ -333,6 +335,7 @@ const Dashboard = () => {
     switch (status) {
       case 'confirmed': return 'Onaylandı';
       case 'pending': return 'Beklemede';
+      case 'open': return 'Açık Maç';
       case 'cancelled': return 'İptal';
       default: return 'Bilinmiyor';
     }
@@ -391,12 +394,17 @@ const Dashboard = () => {
       <OyuncuSidebar />
 
       <div className="flex-1 flex flex-col overflow-hidden">
+
+
         {/* Hero Section */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           className="relative bg-gradient-to-r from-green-600 via-green-500 to-emerald-500 px-4 py-6 sm:px-6 sm:py-8 md:px-8 md:py-12 text-white overflow-hidden"
         >
+          {/* Header */}
+          <DashboardHeader variant="hero" />
+          
           {/* Background Image */}
           <div 
             className="absolute inset-0 bg-cover bg-center bg-no-repeat"
@@ -406,8 +414,8 @@ const Dashboard = () => {
           />
           <div className="absolute inset-0 bg-gradient-to-r from-green-600/90 via-green-500/90 to-emerald-500/90" />
           
-          <div className="relative max-w-7xl mx-auto z-10">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-6">
+          <div className="relative mt-10 md:mt-0  max-w-7xl mx-auto z-10">
+            <div className="flex flex-col sm:flex-row  items-start sm:items-center justify-between gap-4 sm:gap-6">
               <div className="flex-1">
                 <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-2">
                   Hoş geldin, {userData?.fullName || userData?.displayName || 'Oyuncu'}! 👋

@@ -4,6 +4,7 @@ import { getPlayerReservations, cancelReservation, getInvoice, getTesis } from '
 import { collection, query, onSnapshot, where } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import OyuncuSidebar from '../../components/OyuncuSidebar';
+import DashboardHeader from '../../components/DashboardHeader';
 import { 
   Calendar, 
   Clock, 
@@ -334,16 +335,11 @@ Durum: ${getStatusText(invoice.status)}
 
       <div className="flex-1 flex flex-col">
         {/* Header */}
-        <header className="bg-white shadow-sm border-b px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">Rezervasyonlar</h1>
-              <p className="text-gray-600 mt-1">
-                Toplam {filteredReservations.length} rezervasyon
-              </p>
-            </div>
-          </div>
-        </header>
+        <DashboardHeader title="Rezervasyonlar">
+           <div className="hidden sm:block text-sm text-gray-500 font-medium bg-gray-100 px-3 py-1 rounded-full">
+              {filteredReservations.length} adet
+           </div>
+        </DashboardHeader>
 
         {/* Filters */}
         <div className="bg-white border-b px-6 py-4">

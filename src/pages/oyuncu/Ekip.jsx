@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import { getPlayerTeams, createTeam, addTeamMember, removeTeamMember, deleteTeam, getUserByEmail, getPlayerReservations, sendTeamInvitation, getUserByPhone, searchUserByName, searchUsers } from '../../services/firestoreService';
+import { getPlayerTeams, createTeam, addTeamMember, removeTeamMember, deleteTeam, getUserByEmail, getPlayerReservations, sendTeamInvitation, getUserByPhone, searchUserByName, searchUsers, respondToTeamInvitation } from '../../services/firestoreService';
 import { uploadTeamImage } from '../../services/cdnService';
 import { doc, getDoc, collection, query, onSnapshot, where, updateDoc } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import OyuncuSidebar from '../../components/OyuncuSidebar';
+import DashboardHeader from '../../components/DashboardHeader';
 import { 
   Users, 
   Plus, 
@@ -23,7 +24,8 @@ import {
   MapPin,
   DollarSign,
   Upload,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Check
 } from 'lucide-react';
 import toast from '../../utils/toast';
 
@@ -53,6 +55,7 @@ const Ekip = () => {
     maxMembers: 22
   });
   const [teamImageFile, setTeamImageFile] = useState(null);
+  const [invitations, setInvitations] = useState([]);
 
   useEffect(() => {
     if (!user) return;
@@ -85,7 +88,21 @@ const Ekip = () => {
       setLoading(false);
     });
 
-    return () => unsubscribe();
+    // Invitation Listener
+    const invQ = query(
+        collection(db, 'notifications'), 
+        where('userId', '==', user.uid), 
+        where('type', '==', 'team_invitation'), 
+        where('status', '==', 'pending')
+    );
+    const unsubscribeInv = onSnapshot(invQ, (snapshot) => {
+        setInvitations(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+
+    return () => {
+        unsubscribe();
+        unsubscribeInv();
+    };
   };
 
   const loadTeams = async () => {
@@ -430,6 +447,20 @@ const Ekip = () => {
     }
   };
 
+  const handleInvitation = async (invitationId, action) => {
+      try {
+          const result = await respondToTeamInvitation(invitationId, action, user.uid);
+          if (result.success) {
+              toast.success(action === 'accepted' ? 'Davet kabul edildi' : 'Davet reddedildi');
+          } else {
+              toast.error(result.error);
+          }
+      } catch (err) {
+          console.error(err);
+          toast.error('İşlem başarısız');
+      }
+  };
+
   if (loading) {
     return (
       <div className="flex h-screen bg-gray-50 items-center justify-center">
@@ -443,23 +474,57 @@ const Ekip = () => {
       <OyuncuSidebar />
 
       <div className="flex-1 flex flex-col">
-        <header className="bg-white shadow-sm border-b px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">Ekip/Takım Yönetimi</h1>
-              <p className="text-gray-600 mt-1">Ekiplerinizi oluşturun ve yönetin</p>
-            </div>
+        <DashboardHeader title="Ekip/Takım Yönetimi">
             <button
               onClick={() => setShowCreateModal(true)}
-              className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+              className="flex items-center space-x-2 px-3 sm:px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-medium transition-colors shadow-sm"
             >
               <Plus className="w-4 h-4" />
-              <span>Yeni Ekip Oluştur</span>
+              <span className="hidden sm:inline">Yeni Ekip Oluştur</span>
             </button>
-          </div>
-        </header>
+        </DashboardHeader>
 
         <div className="flex-1 overflow-hidden">
+          {/* Davetler */}
+          {invitations.length > 0 && !selectedTeam && (
+            <div className="p-6 pb-0">
+               <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
+                  <h3 className="text-blue-900 font-bold mb-3 flex items-center gap-2">
+                      <Mail className="w-5 h-5" />
+                      Bekleyen Davetler ({invitations.length})
+                  </h3>
+                  <div className="space-y-3">
+                      {invitations.map(inv => (
+                          <div key={inv.id} className="bg-white p-3 rounded-lg shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                              <div>
+                                  <p className="font-medium text-gray-900 text-sm">{inv.message}</p>
+                                  <p className="text-xs text-gray-500 mt-1">
+                                      {inv.createdAt?.toDate ? inv.createdAt.toDate().toLocaleDateString('tr-TR') : 'Yeni'}
+                                  </p>
+                              </div>
+                              <div className="flex items-center gap-2 w-full sm:w-auto">
+                                  <button 
+                                    onClick={() => handleInvitation(inv.id, 'accepted')} 
+                                    className="flex-1 sm:flex-none flex items-center justify-center gap-1 px-3 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors text-sm font-medium"
+                                  >
+                                      <Check className="w-4 h-4" />
+                                      Kabul Et
+                                  </button>
+                                  <button 
+                                    onClick={() => handleInvitation(inv.id, 'rejected')} 
+                                    className="flex-1 sm:flex-none flex items-center justify-center gap-1 px-3 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors text-sm font-medium"
+                                  >
+                                      <X className="w-4 h-4" />
+                                      Reddet
+                                  </button>
+                              </div>
+                          </div>
+                      ))}
+                  </div>
+               </div>
+            </div>
+          )}
+
           {/* Ekip Listesi ve Detay Görünümü */}
           {!selectedTeam ? (
             <div className="p-6 overflow-y-auto">

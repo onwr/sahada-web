@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { getFinancialData, getExpenses, addExpense, updateExpense, deleteExpense, getRevenues, addRevenue, updateRevenue, deleteRevenue, getOwnerBalance, getWalletTransactions, createWithdrawalRequest, getWithdrawalRequestsByOwner, updateUserData } from '../../services/firestoreService';
-import { collection, query, onSnapshot, orderBy, where } from 'firebase/firestore';
+import { collection, query, onSnapshot, orderBy, where, limit } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import SahaSahibiSidebar from '../../components/SahaSahibiSidebar';
 import { 
@@ -64,9 +64,7 @@ const Finansal = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  console.log(financialData);
-  
-  // Filtreleme ve görünüm
+
   const [period, setPeriod] = useState('month'); // week, month, year
   const [activeTab, setActiveTab] = useState('overview'); // overview, revenue, expenses, balance
   const [balance, setBalance] = useState(0);
@@ -155,16 +153,21 @@ const Finansal = () => {
     if (activeTab === 'expenses' || activeTab === 'overview') {
       const expensesQuery = query(
         collection(db, 'expenses'),
-        where('ownerId', '==', user.uid),
-        orderBy('createdAt', 'desc')
+        where('ownerId', '==', user.uid)
       );
       
       const unsubscribeExpenses = onSnapshot(expensesQuery, (snapshot) => {
-        const expenses = [];
+        const expensesData = [];
         snapshot.forEach((doc) => {
-          expenses.push({ id: doc.id, ...doc.data() });
+          expensesData.push({ id: doc.id, ...doc.data() });
         });
-        setExpenses(expenses);
+        // Client-side sort
+        expensesData.sort((a, b) => {
+          const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt);
+          const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt);
+          return dateB - dateA;
+        });
+        setExpenses(expensesData);
       });
       unsubscribeFunctions.push(unsubscribeExpenses);
     }
@@ -173,16 +176,21 @@ const Finansal = () => {
     if (activeTab === 'revenue' || activeTab === 'overview') {
       const revenuesQuery = query(
         collection(db, 'revenues'),
-        where('ownerId', '==', user.uid),
-        orderBy('createdAt', 'desc')
+        where('ownerId', '==', user.uid)
       );
       
       const unsubscribeRevenues = onSnapshot(revenuesQuery, (snapshot) => {
-        const revenues = [];
+        const revenuesData = [];
         snapshot.forEach((doc) => {
-          revenues.push({ id: doc.id, ...doc.data() });
+          revenuesData.push({ id: doc.id, ...doc.data() });
         });
-        setRevenues(revenues);
+        // Client-side sort
+        revenuesData.sort((a, b) => {
+          const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt);
+          const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt);
+          return dateB - dateA;
+        });
+        setRevenues(revenuesData);
       });
       unsubscribeFunctions.push(unsubscribeRevenues);
     }
@@ -258,11 +266,10 @@ const Finansal = () => {
 
   const loadFinancialData = async () => {
     if (!user) {
-      console.log('User yok, finansal veri yüklenmiyor');
+
       return;
     }
     
-    console.log('Finansal veri yükleniyor, user:', user.uid);
     setLoading(true);
     setError(null);
     
@@ -272,8 +279,6 @@ const Finansal = () => {
         getExpenses(user.uid),
         getRevenues(user.uid)
       ]);
-
-      console.log('Finansal sonuç:', financialResult);
 
       if (financialResult.success) {
         setFinancialData(financialResult.data);

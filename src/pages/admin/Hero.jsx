@@ -2,40 +2,39 @@ import React, { useState, useEffect } from 'react';
 import { getHeroContent, updateHeroContent, logAdminAction } from '../../services/firestoreService';
 import { useAuth } from '../../contexts/AuthContext';
 import AdminSidebar from '../../components/AdminSidebar';
-import { Save, AlertCircle, CheckCircle, Plus, Trash2, Palette } from 'lucide-react';
+import { Save, AlertCircle, CheckCircle, Plus, Trash2, Edit2, Image as ImageIcon, ArrowUp, ArrowDown, GripVertical, Loader2 } from 'lucide-react';
+import { toast } from 'react-hot-toast';
+
+const INITIAL_SLIDES = [
+  {
+    id: '1',
+    title: 'Maç Eksik Olmasın.',
+    subtitle: "İster saha kirala, ister eksik oyuncunu bul. Türkiye'nin en büyük sporcu topluluğu ile sahaya çıkmaya hazırsın.",
+    buttonText: 'Hemen Başla',
+    buttonLink: '/yakin-sahalar',
+    imageUrl: 'https://images.unsplash.com/photo-1579952363873-27f3bade9f55?q=80&w=2070&auto=format&fit=crop',
+    isActive: true,
+    order: 1
+  },
+  {
+    id: '2',
+    title: 'Rakip Bul, Maç Yap',
+    subtitle: "Kendi seviyende rakiplerle karşılaşmak için hemen ilan oluştur veya mevcut maçlara katıl.",
+    buttonText: 'Maç Bul',
+    buttonLink: '/oyuncu-bul',
+    imageUrl: 'https://images.unsplash.com/photo-1543351611-58f69d7c1781?q=80&w=2540&auto=format&fit=crop',
+    isActive: true,
+    order: 2
+  }
+];
 
 const Hero = () => {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [heroContent, setHeroContent] = useState({
-    title: '',
-    subtitle: '',
-    activeUsersText: 'kişi şu an online',
-    backgroundColor: {
-      from: '#00a651',
-      to: '#04c956'
-    },
-    tabs: [
-      { key: 'saha', label: 'Saha Kirala' },
-      { key: 'oyuncu', label: 'Oyuncu Bul' },
-      { key: 'takim', label: 'Takım Ara' }
-    ],
-    searchFields: {
-      sportTypes: ['Tümü', 'Futbol', 'Basketbol', 'Tenis'],
-      timeSlots: [
-        'Tümü',
-        'Sabah (06:00-12:00)',
-        'Öğle (12:00-18:00)',
-        'Akşam (18:00-00:00)',
-        'Gece (00:00-06:00)'
-      ]
-    },
-    searchButtonText: 'Ara',
-    enabled: true
-  });
-  const [error, setError] = useState(null);
-  const [success, setSuccess] = useState(null);
+  const [slides, setSlides] = useState([]);
+  const [editingSlide, setEditingSlide] = useState(null); // The slide currently being edited or added
+  const [isEditing, setIsEditing] = useState(false); // Mode flag
 
   useEffect(() => {
     loadHeroContent();
@@ -45,111 +44,101 @@ const Hero = () => {
     setLoading(true);
     try {
       const result = await getHeroContent();
-      if (result.success && result.data) {
-        setHeroContent(result.data);
+      if (result.success && result.data && result.data.slides && Array.isArray(result.data.slides)) {
+        setSlides(result.data.slides.sort((a, b) => a.order - b.order));
+      } else {
+        // Fallback to initial mock data if no slides found or legacy data
+        setSlides(INITIAL_SLIDES);
       }
     } catch (err) {
-      setError('Hero içeriği yüklenirken hata oluştu');
+      console.error(err);
+      toast.error('Hero içeriği yüklenirken hata oluştu');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSave = async () => {
+  const handleSaveAll = async () => {
     setSaving(true);
-    setError(null);
-    setSuccess(null);
     try {
-      const result = await updateHeroContent(heroContent);
+      const result = await updateHeroContent({ slides });
       if (result.success) {
-        await logAdminAction(user?.uid || 'admin', 'hero_content_updated', {
-          heroContent: heroContent
-        });
-        setSuccess('Hero içeriği başarıyla güncellendi');
-        setTimeout(() => setSuccess(null), 3000);
+        await logAdminAction(user?.uid || 'admin', 'hero_slides_updated', { count: slides.length });
+        toast.success('Hero slaytları başarıyla güncellendi');
       } else {
-        setError('Hero içeriği güncellenirken hata oluştu');
+        toast.error('Güncelleme başarısız oldu');
       }
     } catch (err) {
-      setError('Hero içeriği güncellenirken hata oluştu');
+      console.error(err);
+      toast.error('Bir hata oluştu');
     } finally {
       setSaving(false);
     }
   };
 
-  const handleAddTab = () => {
-    const newKey = `tab_${Date.now()}`;
-    setHeroContent({
-      ...heroContent,
-      tabs: [...heroContent.tabs, { key: newKey, label: 'Yeni Tab' }]
+  const handleAddNewResult = () => {
+    setEditingSlide({
+      id: Date.now().toString(),
+      title: '',
+      subtitle: '',
+      buttonText: '',
+      buttonLink: '',
+      imageUrl: '',
+      isActive: true,
+      order: slides.length + 1
     });
+    setIsEditing(true);
   };
 
-  const handleRemoveTab = (index) => {
-    if (heroContent.tabs.length > 1) {
-      setHeroContent({
-        ...heroContent,
-        tabs: heroContent.tabs.filter((_, i) => i !== index)
-      });
+  const handleEditSlide = (slide) => {
+    setEditingSlide({ ...slide });
+    setIsEditing(true);
+  };
+
+  const handleDeleteSlide = (id) => {
+    if (window.confirm('Bu slaytı silmek istediğinizden emin misiniz?')) {
+      setSlides(prev => prev.filter(s => s.id !== id));
     }
   };
 
-  const handleUpdateTab = (index, field, value) => {
-    const updatedTabs = [...heroContent.tabs];
-    updatedTabs[index] = { ...updatedTabs[index], [field]: value };
-    setHeroContent({ ...heroContent, tabs: updatedTabs });
-  };
+  const handleSaveSlide = () => {
+    if (!editingSlide.title || !editingSlide.imageUrl) {
+        toast.error("Başlık ve Görsel URL zorunludur.");
+        return;
+    }
 
-  const handleAddSportType = () => {
-    setHeroContent({
-      ...heroContent,
-      searchFields: {
-        ...heroContent.searchFields,
-        sportTypes: [...heroContent.searchFields.sportTypes, 'Yeni Spor']
+    setSlides(prev => {
+      const existingIndex = prev.findIndex(s => s.id === editingSlide.id);
+      if (existingIndex >= 0) {
+        const newSlides = [...prev];
+        newSlides[existingIndex] = editingSlide;
+        return newSlides.sort((a, b) => a.order - b.order);
+      } else {
+        return [...prev, editingSlide].sort((a, b) => a.order - b.order);
       }
     });
+    setIsEditing(false);
+    setEditingSlide(null);
   };
 
-  const handleRemoveSportType = (index) => {
-    if (heroContent.searchFields.sportTypes.length > 1) {
-      setHeroContent({
-        ...heroContent,
-        searchFields: {
-          ...heroContent.searchFields,
-          sportTypes: heroContent.searchFields.sportTypes.filter((_, i) => i !== index)
-        }
-      });
+  const handleMoveSlide = (index, direction) => {
+    const newSlides = [...slides];
+    if (direction === 'up' && index > 0) {
+      [newSlides[index], newSlides[index - 1]] = [newSlides[index - 1], newSlides[index]];
+    } else if (direction === 'down' && index < newSlides.length - 1) {
+      [newSlides[index], newSlides[index + 1]] = [newSlides[index + 1], newSlides[index]];
     }
-  };
-
-  const handleAddTimeSlot = () => {
-    setHeroContent({
-      ...heroContent,
-      searchFields: {
-        ...heroContent.searchFields,
-        timeSlots: [...heroContent.searchFields.timeSlots, 'Yeni Saat Dilimi']
-      }
-    });
-  };
-
-  const handleRemoveTimeSlot = (index) => {
-    if (heroContent.searchFields.timeSlots.length > 1) {
-      setHeroContent({
-        ...heroContent,
-        searchFields: {
-          ...heroContent.searchFields,
-          timeSlots: heroContent.searchFields.timeSlots.filter((_, i) => i !== index)
-        }
-      });
-    }
+    // Re-assign order numbers
+    const reordered = newSlides.map((s, i) => ({ ...s, order: i + 1 }));
+    setSlides(reordered);
   };
 
   if (loading) {
     return (
       <div className="flex h-screen bg-gray-50 items-center justify-center">
         <div className="text-center">
-          <div className="w-8 h-8 border-4 border-green-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600">Yükleniyor...</p>
+            <Loader2 className="w-8 h-8 border-4 border-green-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+            <p className="text-gray-600">Yükleniyor...</p>
         </div>
       </div>
     );
@@ -159,305 +148,222 @@ const Hero = () => {
     <div className="flex h-screen bg-gray-50">
       <AdminSidebar />
       <div className="flex-1 flex flex-col">
+        {/* Header */}
         <header className="bg-white shadow-sm border-b px-6 py-4">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Hero Yönetimi</h1>
-            <p className="text-gray-600 mt-1">Ana sayfa hero bölümünü yönet</p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">Hero Yönetimi</h1>
+              <p className="text-gray-600 mt-1">Ana sayfa kayan görselleri (slider) yönetin.</p>
+            </div>
+            {!isEditing && (
+                <button
+                onClick={handleSaveAll}
+                disabled={saving}
+                className="px-4 py-2 bg-green-600 text-white rounded-lg flex items-center gap-2 hover:bg-green-700 disabled:opacity-50"
+                >
+                {saving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
+                Yayına Al (Kaydet)
+                </button>
+            )}
           </div>
         </header>
+
+        {/* Content */}
         <div className="flex-1 p-6 overflow-y-auto">
-          {error && (
-            <div className="mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg flex items-center">
-              <AlertCircle className="w-5 h-5 mr-2" />
-              {error}
-            </div>
-          )}
-          {success && (
-            <div className="mb-6 bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg flex items-center">
-              <CheckCircle className="w-5 h-5 mr-2" />
-              {success}
-            </div>
-          )}
-          
-          <div className="space-y-6">
-            {/* Genel Ayarlar */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Genel Ayarlar</h3>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Durum
-                  </label>
-                  <label className="flex items-center">
-                    <input
-                      type="checkbox"
-                      checked={heroContent.enabled}
-                      onChange={(e) => setHeroContent({ ...heroContent, enabled: e.target.checked })}
-                      className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
-                    />
-                    <span className="ml-2 text-sm text-gray-700">Hero bölümünü göster</span>
-                  </label>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Başlık
-                  </label>
-                  <input
-                    type="text"
-                    value={heroContent.title}
-                    onChange={(e) => setHeroContent({ ...heroContent, title: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
-                    placeholder="Ana başlık metni"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Alt Başlık
-                  </label>
-                  <textarea
-                    value={heroContent.subtitle}
-                    onChange={(e) => setHeroContent({ ...heroContent, subtitle: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
-                    rows="3"
-                    placeholder="Alt başlık metni"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Aktif Kullanıcı Metni
-                  </label>
-                  <input
-                    type="text"
-                    value={heroContent.activeUsersText}
-                    onChange={(e) => setHeroContent({ ...heroContent, activeUsersText: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
-                    placeholder="kişi şu an online"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Arama Butonu Metni
-                  </label>
-                  <input
-                    type="text"
-                    value={heroContent.searchButtonText}
-                    onChange={(e) => setHeroContent({ ...heroContent, searchButtonText: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
-                    placeholder="Ara"
-                  />
-                </div>
-              </div>
-            </div>
+            {isEditing && editingSlide ? (
+                /* Edit Form */
+                <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 max-w-4xl mx-auto">
+                     <div className="flex items-center justify-between mb-6 border-b pb-4">
+                        <h2 className="text-xl font-bold text-gray-800">
+                             {slides.find(s => s.id === editingSlide.id) ? 'Slaytı Düzenle' : 'Yeni Slayt Ekle'}
+                        </h2>
+                        <button onClick={() => setIsEditing(false)} className="text-gray-500 hover:text-gray-700">İptal</button>
+                     </div>
+                     
+                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Başlık <span className="text-red-500">*</span></label>
+                                <input 
+                                    type="text" 
+                                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500"
+                                    value={editingSlide.title}
+                                    onChange={e => setEditingSlide({...editingSlide, title: e.target.value})}
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Alt Başlık</label>
+                                <textarea 
+                                    rows={3}
+                                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500"
+                                    value={editingSlide.subtitle}
+                                    onChange={e => setEditingSlide({...editingSlide, subtitle: e.target.value})}
+                                />
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Buton Metni</label>
+                                    <input 
+                                        type="text" 
+                                        className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500"
+                                        value={editingSlide.buttonText}
+                                        onChange={e => setEditingSlide({...editingSlide, buttonText: e.target.value})}
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Buton Linki</label>
+                                    <input 
+                                        type="text" 
+                                        className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500"
+                                        value={editingSlide.buttonLink}
+                                        onChange={e => setEditingSlide({...editingSlide, buttonLink: e.target.value})}
+                                    />
+                                </div>
+                            </div>
+                            <div>
+                                <label className="flex items-center gap-2 cursor-pointer mt-2">
+                                    <input 
+                                        type="checkbox"
+                                        className="w-5 h-5 text-green-600 rounded focus:ring-green-500"
+                                        checked={editingSlide.isActive}
+                                        onChange={e => setEditingSlide({...editingSlide, isActive: e.target.checked})} 
+                                    />
+                                    <span className="text-gray-700 font-medium">Bu slayt aktif olsun</span>
+                                </label>
+                            </div>
+                        </div>
 
-            {/* Arka Plan Renkleri */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-              <div className="flex items-center mb-4">
-                <Palette className="w-5 h-5 text-gray-600 mr-2" />
-                <h3 className="text-lg font-semibold text-gray-900">Arka Plan Renkleri</h3>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Başlangıç Rengi
-                  </label>
-                  <div className="flex items-center space-x-2">
-                    <input
-                      type="color"
-                      value={heroContent.backgroundColor.from}
-                      onChange={(e) => setHeroContent({
-                        ...heroContent,
-                        backgroundColor: { ...heroContent.backgroundColor, from: e.target.value }
-                      })}
-                      className="w-16 h-10 border border-gray-300 rounded cursor-pointer"
-                    />
-                    <input
-                      type="text"
-                      value={heroContent.backgroundColor.from}
-                      onChange={(e) => setHeroContent({
-                        ...heroContent,
-                        backgroundColor: { ...heroContent.backgroundColor, from: e.target.value }
-                      })}
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
-                      placeholder="#00a651"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Bitiş Rengi
-                  </label>
-                  <div className="flex items-center space-x-2">
-                    <input
-                      type="color"
-                      value={heroContent.backgroundColor.to}
-                      onChange={(e) => setHeroContent({
-                        ...heroContent,
-                        backgroundColor: { ...heroContent.backgroundColor, to: e.target.value }
-                      })}
-                      className="w-16 h-10 border border-gray-300 rounded cursor-pointer"
-                    />
-                    <input
-                      type="text"
-                      value={heroContent.backgroundColor.to}
-                      onChange={(e) => setHeroContent({
-                        ...heroContent,
-                        backgroundColor: { ...heroContent.backgroundColor, to: e.target.value }
-                      })}
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
-                      placeholder="#04c956"
-                    />
-                  </div>
-                </div>
-              </div>
-              <div className="mt-4 p-4 rounded-lg" style={{
-                background: `linear-gradient(to bottom right, ${heroContent.backgroundColor.from}, ${heroContent.backgroundColor.to})`
-              }}>
-                <p className="text-white text-sm font-medium">Önizleme</p>
-              </div>
-            </div>
+                        <div className="space-y-4">
+                             <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Görsel URL <span className="text-red-500">*</span></label>
+                                <div className="flex gap-2">
+                                    <input 
+                                        type="text" 
+                                        className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500"
+                                        value={editingSlide.imageUrl}
+                                        onChange={e => setEditingSlide({...editingSlide, imageUrl: e.target.value})}
+                                        placeholder="https://..."
+                                    />
+                                </div>
+                                <p className="text-xs text-gray-500 mt-1">Unsplash veya başka bir kaynaktan doğrudan görsel linki.</p>
+                            </div>
+                            
+                            <div className="border-2 border-dashed border-gray-200 rounded-xl p-2 bg-gray-50 flex items-center justify-center min-h-[200px]">
+                                {editingSlide.imageUrl ? (
+                                    <img src={editingSlide.imageUrl} alt="Preview" className="max-h-[250px] w-full object-cover rounded-lg shadow-sm" onError={(e) => e.target.src = 'https://via.placeholder.com/400x200?text=Gorsel+Hatasi'} />
+                                ) : (
+                                    <div className="text-center text-gray-400">
+                                        <ImageIcon className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                                        <p>Görsel önizlemesi burada görünecek</p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                     </div>
 
-            {/* Tab'lar */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">Tab'lar</h3>
-                <button
-                  onClick={handleAddTab}
-                  className="flex items-center space-x-2 px-3 py-1.5 bg-green-50 text-green-700 rounded-lg hover:bg-green-100 transition-colors"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span className="text-sm font-medium">Tab Ekle</span>
-                </button>
-              </div>
-              <div className="space-y-3">
-                {heroContent.tabs.map((tab, index) => (
-                  <div key={index} className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
-                    <div className="flex-1 grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1">Key</label>
-                        <input
-                          type="text"
-                          value={tab.key}
-                          onChange={(e) => handleUpdateTab(index, 'key', e.target.value)}
-                          className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-green-500"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1">Label</label>
-                        <input
-                          type="text"
-                          value={tab.label}
-                          onChange={(e) => handleUpdateTab(index, 'label', e.target.value)}
-                          className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-green-500"
-                        />
-                      </div>
+                     <div className="flex justify-end gap-3 mt-8 pt-4 border-t">
+                        <button 
+                            onClick={() => setIsEditing(false)} 
+                            className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                        >
+                            İptal
+                        </button>
+                        <button 
+                            onClick={handleSaveSlide} 
+                            className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2"
+                        >
+                            <Save size={18} />
+                            Listeye Ekle / Güncelle
+                        </button>
+                     </div>
+                </div>
+            ) : (
+                /* List View */
+                <div className="max-w-5xl mx-auto space-y-6">
+                    <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex gap-3 text-blue-800 text-sm">
+                        <AlertCircle className="shrink-0 w-5 h-5" />
+                        <p>Burada yaptığınız değişiklikler "Yayına Al" butonuna basana kadar kaydedilmez. Sıralamayı değiştirmek için okları kullanın.</p>
                     </div>
-                    {heroContent.tabs.length > 1 && (
-                      <button
-                        onClick={() => handleRemoveTab(index)}
-                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
 
-            {/* Spor Türleri */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">Spor Türleri</h3>
-                <button
-                  onClick={handleAddSportType}
-                  className="flex items-center space-x-2 px-3 py-1.5 bg-green-50 text-green-700 rounded-lg hover:bg-green-100 transition-colors"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span className="text-sm font-medium">Ekle</span>
-                </button>
-              </div>
-              <div className="space-y-2">
-                {heroContent.searchFields.sportTypes.map((sport, index) => (
-                  <div key={index} className="flex items-center space-x-2">
-                    <input
-                      type="text"
-                      value={sport}
-                      onChange={(e) => {
-                        const updated = [...heroContent.searchFields.sportTypes];
-                        updated[index] = e.target.value;
-                        setHeroContent({
-                          ...heroContent,
-                          searchFields: { ...heroContent.searchFields, sportTypes: updated }
-                        });
-                      }}
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
-                    />
-                    {heroContent.searchFields.sportTypes.length > 1 && (
-                      <button
-                        onClick={() => handleRemoveSportType(index)}
-                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
+                    <div className="grid gap-4">
+                        {slides.map((slide, index) => (
+                            <div key={slide.id} className={`bg-white rounded-xl p-4 shadow-sm border ${slide.isActive ? 'border-gray-200' : 'border-red-200 bg-red-50/30'} flex flex-col md:flex-row gap-4 items-center`}>
+                                {/* Drag/Order Controls */}
+                                <div className="flex flex-row md:flex-col gap-1">
+                                    <button 
+                                        onClick={() => handleMoveSlide(index, 'up')} 
+                                        disabled={index === 0}
+                                        className="p-1 text-gray-400 hover:text-green-600 disabled:opacity-30"
+                                    >
+                                        <ArrowUp size={20} />
+                                    </button>
+                                    <span className="text-center font-mono text-xs text-gray-400 font-bold">{index + 1}</span>
+                                    <button 
+                                        onClick={() => handleMoveSlide(index, 'down')} 
+                                        disabled={index === slides.length - 1}
+                                        className="p-1 text-gray-400 hover:text-green-600 disabled:opacity-30"
+                                    >
+                                        <ArrowDown size={20} />
+                                    </button>
+                                </div>
 
-            {/* Saat Dilimleri */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">Saat Dilimleri</h3>
-                <button
-                  onClick={handleAddTimeSlot}
-                  className="flex items-center space-x-2 px-3 py-1.5 bg-green-50 text-green-700 rounded-lg hover:bg-green-100 transition-colors"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span className="text-sm font-medium">Ekle</span>
-                </button>
-              </div>
-              <div className="space-y-2">
-                {heroContent.searchFields.timeSlots.map((slot, index) => (
-                  <div key={index} className="flex items-center space-x-2">
-                    <input
-                      type="text"
-                      value={slot}
-                      onChange={(e) => {
-                        const updated = [...heroContent.searchFields.timeSlots];
-                        updated[index] = e.target.value;
-                        setHeroContent({
-                          ...heroContent,
-                          searchFields: { ...heroContent.searchFields, timeSlots: updated }
-                        });
-                      }}
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
-                    />
-                    {heroContent.searchFields.timeSlots.length > 1 && (
-                      <button
-                        onClick={() => handleRemoveTimeSlot(index)}
-                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
+                                {/* Thumbnail */}
+                                <div className="w-full md:w-48 h-32 bg-gray-100 rounded-lg overflow-hidden shrink-0">
+                                    <img src={slide.imageUrl} alt={slide.title} className="w-full h-full object-cover" />
+                                </div>
 
-            {/* Kaydet Butonu */}
-            <div className="flex justify-end pt-6">
-              <button
-                onClick={handleSave}
-                disabled={saving}
-                className="flex items-center space-x-2 px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
-              >
-                <Save className="w-4 h-4" />
-                <span>{saving ? 'Kaydediliyor...' : 'Kaydet'}</span>
-              </button>
-            </div>
-          </div>
+                                {/* Details */}
+                                <div className="flex-1 min-w-0 text-center md:text-left">
+                                    <h3 className="font-bold text-lg text-gray-900 truncate">{slide.title}</h3>
+                                    <p className="text-gray-500 text-sm line-clamp-2 mb-2">{slide.subtitle}</p>
+                                    <div className="flex flex-wrap gap-2 justify-center md:justify-start">
+                                        <span className={`text-xs px-2 py-1 rounded-full border ${slide.isActive ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
+                                            {slide.isActive ? 'Aktif' : 'Pasif'}
+                                        </span>
+                                        {slide.buttonText && (
+                                            <span className="text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-600 border border-gray-200">
+                                                BTN: {slide.buttonText}
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Actions */}
+                                <div className="flex gap-2">
+                                    <button 
+                                        onClick={() => handleEditSlide(slide)}
+                                        className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                                        title="Düzenle"
+                                    >
+                                        <Edit2 size={20} />
+                                    </button>
+                                    <button 
+                                        onClick={() => handleDeleteSlide(slide.id)}
+                                        className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                        title="Sil"
+                                    >
+                                        <Trash2 size={20} />
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+
+                        {slides.length === 0 && (
+                            <div className="text-center py-12 bg-white rounded-xl border border-dashed border-gray-300">
+                                <p className="text-gray-500">Henüz hiç slayt yok.</p>
+                            </div>
+                        )}
+                    </div>
+                    
+                    <button 
+                        onClick={handleAddNewResult}
+                        className="w-full py-4 border-2 border-dashed border-gray-300 rounded-xl text-gray-500 hover:border-green-500 hover:text-green-600 hover:bg-green-50 transition-all flex items-center justify-center gap-2 font-medium"
+                    >
+                        <Plus size={20} />
+                        Yeni Slayt Ekle
+                    </button>
+                </div>
+            )}
         </div>
       </div>
     </div>

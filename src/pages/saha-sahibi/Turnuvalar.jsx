@@ -61,6 +61,70 @@ const Turnuvalar = () => {
   const [showTeamModal, setShowTeamModal] = useState(false);
   const [editingTournament, setEditingTournament] = useState(null);
 
+  // Standings state
+  const [standings, setStandings] = useState([]);
+
+  // Calculate standings when matches or teams change
+  useEffect(() => {
+    if (tournamentTeams.length === 0) {
+      setStandings([]);
+      return;
+    }
+
+    const newStandings = tournamentTeams.map(team => ({
+      ...team,
+      played: 0,
+      won: 0,
+      drawn: 0,
+      lost: 0,
+      goalsFor: 0,
+      goalsAgainst: 0,
+      points: 0
+    }));
+
+    tournamentMatches.forEach(match => {
+      if (match.status === 'completed' && match.score) {
+        const team1 = newStandings.find(t => t.id === match.team1Id);
+        const team2 = newStandings.find(t => t.id === match.team2Id);
+
+        if (team1 && team2) {
+          team1.played += 1;
+          team2.played += 1;
+          team1.goalsFor += match.score.score1 || 0;
+          team1.goalsAgainst += match.score.score2 || 0;
+          team2.goalsFor += match.score.score2 || 0;
+          team2.goalsAgainst += match.score.score1 || 0;
+
+          if (match.score.score1 > match.score.score2) {
+            team1.won += 1;
+            team1.points += 3;
+            team2.lost += 1;
+          } else if (match.score.score1 < match.score.score2) {
+            team2.won += 1;
+            team2.points += 3;
+            team1.lost += 1;
+          } else {
+            team1.drawn += 1;
+            team1.points += 1;
+            team2.drawn += 1;
+            team2.points += 1;
+          }
+        }
+      }
+    });
+
+    // Sort by points, then goal difference, then goals for
+    newStandings.sort((a, b) => {
+      if (b.points !== a.points) return b.points - a.points;
+      const gdA = a.goalsFor - a.goalsAgainst;
+      const gdB = b.goalsFor - b.goalsAgainst;
+      if (gdB !== gdA) return gdB - gdA;
+      return b.goalsFor - a.goalsFor;
+    });
+
+    setStandings(newStandings);
+  }, [tournamentMatches, tournamentTeams]);
+
   // Form state'leri
   const [tournamentForm, setTournamentForm] = useState({
     name: '',
@@ -139,16 +203,28 @@ const Turnuvalar = () => {
     // Turnuvalar için real-time listener
     const tournamentsQuery = query(
       collection(db, 'tournaments'),
-      where('ownerId', '==', user.uid),
-      orderBy('createdAt', 'desc')
+      where('ownerId', '==', user.uid)
     );
 
     const unsubscribeTournaments = onSnapshot(tournamentsQuery, (snapshot) => {
-      const tournaments = [];
+      const tournamentsData = [];
       snapshot.forEach((doc) => {
-        tournaments.push({ id: doc.id, ...doc.data() });
+        tournamentsData.push({ id: doc.id, ...doc.data() });
       });
-      setTournaments(tournaments);
+      
+      // Client-side sort
+      tournamentsData.sort((a, b) => {
+        const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt);
+        const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt);
+        return dateB - dateA;
+      });
+
+      setTournaments(tournamentsData);
+      
+      // Select first tournament if none selected
+      if (!selectedTournament && tournamentsData.length > 0) {
+        setSelectedTournament(tournamentsData[0]);
+      }
       
       // İstatistikleri yeniden yükle
       loadTournamentData();
@@ -605,7 +681,11 @@ const Turnuvalar = () => {
             <div className="divide-y divide-gray-200">
               {tournaments.length > 0 ? (
                 tournaments.map((tournament) => (
-                  <div key={tournament.id} className="p-6 hover:bg-gray-50 transition-colors">
+                  <div 
+                    key={tournament.id} 
+                    className={`p-6 hover:bg-gray-50 transition-colors cursor-pointer ${selectedTournament?.id === tournament.id ? 'bg-green-50' : ''}`}
+                    onClick={() => setSelectedTournament(tournament)}
+                  >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-4">
                         <div className="text-2xl">🏆</div>
@@ -619,7 +699,7 @@ const Turnuvalar = () => {
                           <div className="flex items-center space-x-6 text-sm text-gray-500">
                             <span className="flex items-center">
                               <Calendar className="w-4 h-4 mr-1" />
-                              {new Date(tournament.startDate).toLocaleDateString('tr-TR')} - {new Date(tournament.endDate).toLocaleDateString('tr-TR')}
+                              {tournament.startDate?.toDate ? new Date(tournament.startDate.toDate()).toLocaleDateString('tr-TR') : tournament.startDate} - {tournament.endDate?.toDate ? new Date(tournament.endDate.toDate()).toLocaleDateString('tr-TR') : tournament.endDate}
                             </span>
                           </div>
                           <div className="grid grid-cols-4 gap-4 mt-3">
@@ -663,7 +743,8 @@ const Turnuvalar = () => {
                           {tournament.status === 'completed' && tournament.prizePool > 0 && (
                             <div className="mt-3">
                               <button
-                                onClick={async () => {
+                                onClick={async (e) => {
+                                  e.stopPropagation();
                                   if (window.confirm('Ödülleri dağıtmak istediğinizden emin misiniz?')) {
                                     try {
                                       setLoading(true);
@@ -691,17 +772,23 @@ const Turnuvalar = () => {
                         </div>
                       </div>
                       <div className="flex items-center space-x-2">
-                        <button className="text-gray-400 hover:text-gray-600">
+                        <button className="text-gray-400 hover:text-gray-600" onClick={(e) => e.stopPropagation()}>
                           <BarChart3 className="w-4 h-4" />
                         </button>
                         <button 
-                          onClick={() => handleEditTournament(tournament)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEditTournament(tournament);
+                          }}
                           className="text-gray-400 hover:text-gray-600"
                         >
                           <Edit className="w-4 h-4" />
                         </button>
                         <button 
-                          onClick={() => handleDeleteTournament(tournament.id)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteTournament(tournament.id);
+                          }}
                           className="text-red-400 hover:text-red-600"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -720,70 +807,62 @@ const Turnuvalar = () => {
             </div>
           </div>
 
-          {/* Today's Matches */}
+          {/* Matches Section */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 mb-8">
             <div className="p-6 border-b border-gray-100">
               <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-gray-900">Bugünün Maçları</h3>
-                <button className="text-sm text-green-600 hover:text-green-700">Tüm Fikstür →</button>
+                <h3 className="text-lg font-semibold text-gray-900">
+                  {selectedTournament ? `${selectedTournament.name} - Maçlar` : 'Maçlar'}
+                </h3>
               </div>
             </div>
             <div className="p-6">
               <div className="space-y-4">
-                {/* Sample match data */}
-                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                  <div className="flex items-center space-x-4">
-                    <div className="text-center">
-                      <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-bold text-sm">KS</div>
-                      <span className="text-xs text-gray-500 mt-1">Kartal Spor</span>
-                      <span className="text-xs text-gray-400">Grup A</span>
+                {tournamentMatches.length > 0 ? (
+                  tournamentMatches.map((match) => (
+                    <div key={match.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                      <div className="flex items-center space-x-4 flex-1">
+                        <div className="text-center w-24">
+                          <span className="text-xs text-gray-500 font-bold block truncate">{match.team1Name || 'Takım 1'}</span>
+                        </div>
+                        <div className="text-center px-2">
+                          {match.status === 'completed' ? (
+                             <span className="font-bold text-gray-900">{match.score?.score1} - {match.score?.score2}</span>
+                          ) : (
+                             <span className="text-gray-400">VS</span>
+                          )}
+                        </div>
+                        <div className="text-center w-24">
+                          <span className="text-xs text-gray-500 font-bold block truncate">{match.team2Name || 'Takım 2'}</span>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-sm font-semibold text-gray-900">
+                          {match.matchDate?.toDate ? match.matchDate.toDate().toLocaleTimeString('tr-TR', {hour: '2-digit', minute:'2-digit'}) : match.matchTime}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          {match.matchDate?.toDate ? match.matchDate.toDate().toLocaleDateString('tr-TR') : match.date}
+                        </div>
+                        <div className="text-xs text-gray-500">{match.pitchName || 'Saha Belirlenmedi'}</div>
+                      </div>
                     </div>
-                    <div className="text-center">
-                      <span className="text-gray-400">VS</span>
-                    </div>
-                    <div className="text-center">
-                      <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center text-red-600 font-bold text-sm">YG</div>
-                      <span className="text-xs text-gray-500 mt-1">Yıldız Gücü</span>
-                      <span className="text-xs text-gray-400">Grup A</span>
-                    </div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-lg font-semibold text-gray-900">19:00</div>
-                    <div className="text-sm text-gray-500">Saha 1</div>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                  <div className="flex items-center space-x-4">
-                    <div className="text-center">
-                      <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center text-green-600 font-bold text-sm">AS</div>
-                      <span className="text-xs text-gray-500 mt-1">Aslan Spor</span>
-                      <span className="text-xs text-gray-400">Grup B</span>
-                    </div>
-                    <div className="text-center">
-                      <span className="text-gray-400">VS</span>
-                    </div>
-                    <div className="text-center">
-                      <div className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center text-orange-600 font-bold text-sm">FK</div>
-                      <span className="text-xs text-gray-500 mt-1">Fırtına Kulübü</span>
-                      <span className="text-xs text-gray-400">Grup B</span>
-                    </div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-lg font-semibold text-gray-900">20:00</div>
-                    <div className="text-sm text-gray-500">Saha 2</div>
-                  </div>
-                </div>
+                  ))
+                ) : (
+                  <p className="text-center text-gray-500 py-4">
+                    {selectedTournament ? 'Bu turnuvada henüz maç bulunmuyor.' : 'Maçları görüntülemek için bir turnuva seçin.'}
+                  </p>
+                )}
               </div>
             </div>
           </div>
 
-          {/* Standings */}
+          {/* Standings Section */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100">
             <div className="p-6 border-b border-gray-100">
               <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-gray-900">Puan Durumu - Yaz Turnuvası</h3>
-                <button className="text-sm text-green-600 hover:text-green-700">Detaylı Tablo →</button>
+                <h3 className="text-lg font-semibold text-gray-900">
+                   {selectedTournament ? `${selectedTournament.name} - Puan Durumu` : 'Puan Durumu'}
+                </h3>
               </div>
             </div>
             <div className="overflow-x-auto">
@@ -803,74 +882,35 @@ const Turnuvalar = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
-                  <tr className="hover:bg-gray-50">
-                    <td className="px-6 py-4 text-sm font-medium text-gray-900">1</td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center space-x-2">
-                        <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-bold text-xs">KS</div>
-                        <span className="font-medium">Kartal Spor</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-center text-sm text-gray-900">3</td>
-                    <td className="px-6 py-4 text-center text-sm text-gray-900">3</td>
-                    <td className="px-6 py-4 text-center text-sm text-gray-900">0</td>
-                    <td className="px-6 py-4 text-center text-sm text-gray-900">0</td>
-                    <td className="px-6 py-4 text-center text-sm text-gray-900">12</td>
-                    <td className="px-6 py-4 text-center text-sm text-gray-900">4</td>
-                    <td className="px-6 py-4 text-center text-sm text-gray-900">+8</td>
-                    <td className="px-6 py-4 text-center text-sm font-medium text-gray-900">9</td>
-                  </tr>
-                  <tr className="hover:bg-gray-50">
-                    <td className="px-6 py-4 text-sm font-medium text-gray-900">2</td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center space-x-2">
-                        <div className="w-6 h-6 bg-red-100 rounded-full flex items-center justify-center text-red-600 font-bold text-xs">YG</div>
-                        <span className="font-medium">Yıldız Gücü</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-center text-sm text-gray-900">3</td>
-                    <td className="px-6 py-4 text-center text-sm text-gray-900">2</td>
-                    <td className="px-6 py-4 text-center text-sm text-gray-900">1</td>
-                    <td className="px-6 py-4 text-center text-sm text-gray-900">0</td>
-                    <td className="px-6 py-4 text-center text-sm text-gray-900">8</td>
-                    <td className="px-6 py-4 text-center text-sm text-gray-900">3</td>
-                    <td className="px-6 py-4 text-center text-sm text-gray-900">+5</td>
-                    <td className="px-6 py-4 text-center text-sm font-medium text-gray-900">7</td>
-                  </tr>
-                  <tr className="hover:bg-gray-50">
-                    <td className="px-6 py-4 text-sm font-medium text-gray-900">3</td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center space-x-2">
-                        <div className="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center text-green-600 font-bold text-xs">AS</div>
-                        <span className="font-medium">Aslan Spor</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-center text-sm text-gray-900">3</td>
-                    <td className="px-6 py-4 text-center text-sm text-gray-900">2</td>
-                    <td className="px-6 py-4 text-center text-sm text-gray-900">0</td>
-                    <td className="px-6 py-4 text-center text-sm text-gray-900">1</td>
-                    <td className="px-6 py-4 text-center text-sm text-gray-900">7</td>
-                    <td className="px-6 py-4 text-center text-sm text-gray-900">5</td>
-                    <td className="px-6 py-4 text-center text-sm text-gray-900">+2</td>
-                    <td className="px-6 py-4 text-center text-sm font-medium text-gray-900">6</td>
-                  </tr>
-                  <tr className="hover:bg-gray-50">
-                    <td className="px-6 py-4 text-sm font-medium text-gray-900">4</td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center space-x-2">
-                        <div className="w-6 h-6 bg-orange-100 rounded-full flex items-center justify-center text-orange-600 font-bold text-xs">FK</div>
-                        <span className="font-medium">Fırtına Kulübü</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-center text-sm text-gray-900">3</td>
-                    <td className="px-6 py-4 text-center text-sm text-gray-900">1</td>
-                    <td className="px-6 py-4 text-center text-sm text-gray-900">1</td>
-                    <td className="px-6 py-4 text-center text-sm text-gray-900">1</td>
-                    <td className="px-6 py-4 text-center text-sm text-gray-900">5</td>
-                    <td className="px-6 py-4 text-center text-sm text-gray-900">6</td>
-                    <td className="px-6 py-4 text-center text-sm text-gray-900">-1</td>
-                    <td className="px-6 py-4 text-center text-sm font-medium text-gray-900">4</td>
-                  </tr>
+                  {standings.length > 0 ? (
+                    standings.map((team, index) => (
+                      <tr key={team.id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 text-sm font-medium text-gray-900">{index + 1}</td>
+                        <td className="px-6 py-4">
+                          <div className="flex items-center space-x-2">
+                             <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-bold text-xs uppercase">
+                               {team.teamName?.substring(0, 2) || 'TK'}
+                             </div>
+                            <span className="font-medium">{team.teamName}</span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 text-center text-sm text-gray-900">{team.played}</td>
+                        <td className="px-6 py-4 text-center text-sm text-gray-900">{team.won}</td>
+                        <td className="px-6 py-4 text-center text-sm text-gray-900">{team.drawn}</td>
+                        <td className="px-6 py-4 text-center text-sm text-gray-900">{team.lost}</td>
+                        <td className="px-6 py-4 text-center text-sm text-gray-900">{team.goalsFor}</td>
+                        <td className="px-6 py-4 text-center text-sm text-gray-900">{team.goalsAgainst}</td>
+                        <td className="px-6 py-4 text-center text-sm text-gray-900">{team.goalsFor - team.goalsAgainst}</td>
+                        <td className="px-6 py-4 text-center text-sm font-bold text-gray-900">{team.points}</td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan="10" className="px-6 py-4 text-center text-sm text-gray-500">
+                        {selectedTournament ? 'Henüz takım verisi bulunmuyor.' : 'Puan durumunu görüntülemek için bir turnuva seçin.'}
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>

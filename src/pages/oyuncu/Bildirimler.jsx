@@ -220,9 +220,26 @@ const Bildirimler = () => {
   };
 
   const cleanMessage = (msg) => {
-    if (!msg) return '';
+    if (!msg || typeof msg !== 'string') return '';
+    
+    // Fix UTF-8 encoding issues (Mojibake)
+    let cleaned = msg
+      .replace(/Ã¶/g, 'ö')
+      .replace(/Ã§/g, 'ç')
+      .replace(/ÅŸ/g, 'ş')
+      .replace(/ÄŸ/g, 'ğ')
+      .replace(/Ã¼/g, 'ü')
+      .replace(/Ä±/g, 'ı')
+      .replace(/Ä°/g, 'İ')
+      .replace(/Ã–/g, 'Ö')
+      .replace(/Ã‡/g, 'Ç')
+      .replace(/Åž/g, 'Ş')
+      .replace(/GK/g, 'Ğ') // Bazı durumlarda farklı gelebilir, not düşüldü
+      .replace(/Äž/g, 'Ğ')
+      .replace(/Ãœ/g, 'Ü');
+
     // Regex to match Firestore Timestamp string representation
-    return msg.replace(/Timestamp\(seconds=(\d+),\s*nanoseconds=(\d+)\)/g, (match, seconds) => {
+    return cleaned.replace(/Timestamp\(seconds=(\d+),\s*nanoseconds=(\d+)\)/g, (match, seconds) => {
       try {
         const date = new Date(parseInt(seconds) * 1000);
         return date.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' });
@@ -314,7 +331,7 @@ const Bildirimler = () => {
                           </div>
                           <div>
                             <h3 className="font-bold text-gray-900 text-lg hover:text-blue-600 cursor-pointer" onClick={() => navigate(`/oyuncu-detay/${req.senderId || req.relatedUserId}`)}>
-                                {req.senderName || 'Kullanıcı'}
+                                {cleanMessage(req.senderName || 'Kullanıcı')}
                             </h3>
                             <p className="text-sm text-gray-500">{cleanMessage(req.message)}</p>
                           </div>
@@ -422,11 +439,11 @@ const Bildirimler = () => {
                             <Users size={28} className="text-indigo-500" />
                           </div>
                           <div>
-                            <h3 className="font-bold text-gray-900 text-lg">{invite.teamName}</h3>
+                            <h3 className="font-bold text-gray-900 text-lg">{cleanMessage(invite.teamName)}</h3>
                             <p className="text-sm text-gray-500">Takımına davet edildiniz</p>
                             {invite.message && (
                                 <p className="text-sm text-indigo-600 mt-2 bg-indigo-50 px-3 py-1 rounded-lg inline-block italic">
-                                  "{invite.message}"
+                                  "{cleanMessage(invite.message)}"
                                 </p>
                             )}
                           </div>
@@ -500,7 +517,7 @@ const Bildirimler = () => {
                         <div className="flex items-start justify-between gap-4">
                           <div>
                             <h3 className={`font-bold text-lg ${n.read ? 'text-gray-600' : 'text-gray-900'}`}>
-                              {n.title}
+                              {cleanMessage(n.title)}
                             </h3>
                             <p className="text-gray-500 mt-1 leading-relaxed">
                               {cleanMessage(n.message)}

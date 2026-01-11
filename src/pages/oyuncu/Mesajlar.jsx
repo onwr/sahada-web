@@ -689,15 +689,20 @@ const Mesajlar = () => {
                             <button 
                                 onClick={async () => {
                                     toast.loading('İşleniyor...');
-                                    // Notification ID bulmak zor olabilir buradan, ancak respondToChatInvitation notificationId ister.
-                                    // Alternatif olarak conversation'ı doğrudan güncellemek daha kolay olabilir (yetki varsa).
-                                    // Ama respondToChatInvitation notification'ı da güncelliyor.
-                                    // Burada bildirim ID'si elimizde yok. 
-                                    // Basitçe conversation'ı update edelim. 
-                                    const convRef = doc(db, 'conversations', selectedConversation.id);
-                                    await updateDoc(convRef, { status: 'accepted', updatedAt: serverTimestamp() });
-                                    toast.dismiss();
-                                    toast.success('Davet kabul edildi');
+                                    try {
+                                        const convRef = doc(db, 'conversations', selectedConversation.id);
+                                        await updateDoc(convRef, { status: 'accepted', updatedAt: serverTimestamp() });
+                                        
+                                        // Arayüzü anında güncelle
+                                        setSelectedConversation(prev => ({ ...prev, status: 'accepted' }));
+                                        
+                                        toast.dismiss();
+                                        toast.success('Davet kabul edildi');
+                                    } catch (error) {
+                                        console.error('Kabul hatası:', error);
+                                        toast.dismiss();
+                                        toast.error('İşlem başarısız');
+                                    }
                                 }}
                                 className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium"
                             >
@@ -706,9 +711,18 @@ const Mesajlar = () => {
                             <button 
                                 onClick={async () => {
                                     if(confirm('Reddetmek istediğinize emin misiniz?')) {
-                                        const convRef = doc(db, 'conversations', selectedConversation.id);
-                                        await updateDoc(convRef, { status: 'rejected', updatedAt: serverTimestamp() });
-                                        toast.success('Davet reddedildi');
+                                        try {
+                                            const convRef = doc(db, 'conversations', selectedConversation.id);
+                                            await updateDoc(convRef, { status: 'rejected', updatedAt: serverTimestamp() });
+                                            
+                                            // Arayüzü anında güncelle (seçimi kaldır)
+                                            setSelectedConversation(null);
+                                            
+                                            toast.success('Davet reddedildi');
+                                        } catch (error) {
+                                            console.error('Reddetme hatası:', error);
+                                            toast.error('İşlem başarısız');
+                                        }
                                     }
                                 }}
                                 className="px-6 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 font-medium"

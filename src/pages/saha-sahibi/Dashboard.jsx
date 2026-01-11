@@ -5,6 +5,7 @@ import { getDashboardStats, getTodaySchedule, getRecentReservations, getTesisler
 import { collection, query, onSnapshot, where, orderBy, limit, getDocs } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import SahaSahibiSidebar from '../../components/SahaSahibiSidebar';
+import DashboardHeader from '../../components/DashboardHeader';
 import { 
   Calendar, 
   DollarSign, 
@@ -731,31 +732,17 @@ const Dashboard = () => {
       {/* Main Content */}
       <div className="flex-1 flex flex-col">
         {/* Header */}
-        <header className="bg-white shadow-sm border-b border-gray-200 pl-16 pr-6 md:px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-xl font-bold text-gray-900">Dashboard</h1>
-              <p className="text-gray-500 text-sm mt-0.5">Saha yönetim özeti ve istatistikler</p>
-            </div>
-            <div className="flex items-center space-x-3">
-              <button className="flex items-center space-x-2 px-4 py-2 text-gray-600 hover:bg-gray-50 rounded-xl transition-all duration-150 font-medium">
-                <Download className="w-4 h-4" />
-                <span>Rapor İndir</span>
-              </button>
+        {/* Header */}
+        <DashboardHeader title="Dashboard">
+
               <button 
                 onClick={() => navigate('/saha-sahibi/rezervasyonlar')}
                 className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-xl hover:bg-green-700 font-semibold shadow-sm transition-all duration-150"
               >
                 <Plus className="w-4 h-4" />
-                <span>Yeni Rezervasyon</span>
+                <span className="hidden sm:inline">Yeni Rezervasyon</span>
               </button>
-              <button className="relative p-2 text-gray-600 hover:bg-gray-50 rounded-xl transition-all duration-150">
-                <Bell className="w-5 h-5" />
-                <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full border-2 border-white"></span>
-              </button>
-            </div>
-          </div>
-        </header>
+        </DashboardHeader>
 
         {/* Main Content Area */}
         <div className="flex-1 p-6 overflow-y-auto bg-gray-50">

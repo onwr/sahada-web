@@ -219,34 +219,28 @@ const OyuncuBul = () => {
     }
   };
 
+  // Effect 1: Realtime Match Listener
   useEffect(() => {
-    // Real-time listener'ı her zaman kur (public maçlar için)
+    if (!user || searchType !== 'match') return;
+    
     const cleanup = setupRealtimeListener();
-    
-    if (user) {
-      if (searchType === 'match') {
-        loadMatches();
-        loadUserMatches();
-      } else if (allPlayers.length === 0) {
-        // Fetch only if not already loaded
+    return cleanup;
+  }, [user, searchType]);
+
+  // Effect 2: Player Loading
+  useEffect(() => {
+     if (user && searchType === 'player' && allPlayers.length === 0) {
         loadPlayers();
-      }
-    }
-    
+     }
+  }, [user, searchType, allPlayers.length]);
+
+  // Effect 3: Map & Tesisler
+  useEffect(() => {
     if (mapView) {
       getUserLocation();
-      if (searchType === 'match') {
-        loadTesisler();
-      } else {
-        // Players are loaded via loadPlayers, but maybe we need tesisler for context or not
-        loadTesisler(); 
-      }
+      loadTesisler();
     }
-    
-    return () => {
-      if (cleanup) cleanup();
-    };
-  }, [user, activeTab, mapView, searchType]); // Removed filters from dependencies
+  }, [mapView]);
 
   // Separate effect for local filtering of players
   useEffect(() => {
@@ -357,20 +351,25 @@ const OyuncuBul = () => {
       
       // Tarih filtresini client-side yap (gelecek maçlar)
       const now = new Date();
+      now.setHours(0, 0, 0, 0); // Saat detayını sıfırla - Bugünü de kapsasın
+      
       const futureMatches = matchesData.filter(m => {
+        if (!m.date) return false;
         const matchDate = m.date?.toDate ? m.date.toDate() : new Date(m.date);
-        return matchDate >= now;
+        const mDate = new Date(matchDate);
+        mDate.setHours(0, 0, 0, 0);
+        
+        return mDate >= now;
       });
       
       console.log(`📅 Gelecek maçlar: ${futureMatches.length}`);
       
-      let filtered = applyFilters(futureMatches);
-      console.log(`✅ Filtreleme sonrası: ${filtered.length} maç`);
       
-      setMatches(filtered);
+      // Store raw future matches (filtering applied in render)
+      setMatches(futureMatches);
       
       // User matches (sadece user varsa)
-      if (user && (activeTab === 'organized' || activeTab === 'joined')) {
+      if (user) {
         const organized = futureMatches.filter(m => m.organizerId === user.uid);
         const joined = futureMatches.filter(m => 
           m.players && m.players.includes(user.uid) && m.organizerId !== user.uid
@@ -573,7 +572,7 @@ const OyuncuBul = () => {
     } else if (activeTab === 'joined') {
       return userMatches.joined;
     }
-    return matches;
+    return applyFilters(matches);
   };
 
   const handleFilterChange = (key, value) => {
@@ -955,6 +954,7 @@ const OyuncuBul = () => {
                       >
                         <option value="all">Hepsi</option>
                         <option value="free">💰 Ücretsiz</option>
+                        <option value="paid">💳 Ücretli</option>
                       </select>
                     </div>
                   </>

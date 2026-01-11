@@ -23,7 +23,8 @@ import {
   X,
   Crown,
   BookOpen,
-  Layout
+  Layout,
+  Lock as LockIcon
 } from 'lucide-react';
 
 const AdminSidebar = () => {
@@ -136,6 +137,12 @@ const AdminSidebar = () => {
           name: 'Sayfa Yönetimi',
           href: '/admin/pages',
           icon: FileText,
+          badge: null
+        },
+        {
+          name: 'Giriş Ekranı',
+          href: '/admin/auth-pages',
+          icon: LockIcon,
           badge: null
         },
         {
@@ -274,9 +281,14 @@ const AdminSidebar = () => {
               <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center">
                 <Shield className="w-4 h-4 text-white" />
               </div>
-              <span className="text-white text-sm font-semibold">
-                {userData?.displayName || 'Admin'}
-              </span>
+              <div className="flex flex-col">
+                <span className="text-white text-sm font-semibold leading-tight">
+                  {userData?.displayName || 'Admin'}
+                </span>
+                <span className="text-[10px] text-green-200 font-bold uppercase tracking-wider">
+                  ADMIN
+                </span>
+              </div>
             </div>
             {notificationCount > 0 && (
               <span className="bg-red-500 text-white text-xs font-bold rounded-full min-w-[20px] h-5 px-1.5 flex items-center justify-center shadow-lg animate-pulse">

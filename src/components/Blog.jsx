@@ -150,13 +150,7 @@ const Blog = () => {
       <div className='container mx-auto max-w-screen-xl px-4'>
         {/* Header */}
         <div className='flex flex-col lg:flex-row lg:items-center lg:justify-between mb-8'>
-          <motion.div
-            initial={{ opacity: 0, x: -30 }}
-            whileInView={{ opacity: 1, x: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6 }}
-            className="mb-6 lg:mb-0"
-          >
+          <div className="mb-6 lg:mb-0">
             <div className="flex items-center gap-3 mb-2">
               <div className="w-12 h-12 bg-gradient-to-br from-green-600 to-green-700 rounded-xl flex items-center justify-center shadow-lg">
                 <BookOpen className="w-6 h-6 text-white" />
@@ -166,30 +160,20 @@ const Blog = () => {
               </h2>
             </div>
             <p className="text-gray-600 text-lg">En güncel haberler, ipuçları ve rehberler</p>
-          </motion.div>
+          </div>
 
-          <motion.button
-            initial={{ opacity: 0, x: 30 }}
-            whileInView={{ opacity: 1, x: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6, delay: 0.2 }}
+          <button
             onClick={() => navigate('/blog')}
             className='flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-xl hover:from-green-700 hover:to-green-800 font-semibold transition-all duration-200 shadow-lg hover:shadow-xl group'
           >
             Tüm Yazılar
             <ArrowRight size={20} className='group-hover:translate-x-1 transition-transform duration-200' />
-          </motion.button>
+          </button>
         </div>
 
         {/* Category Filter */}
         {categories.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6 }}
-            className='flex flex-wrap gap-3 mb-10'
-          >
+          <div className='flex flex-wrap gap-3 mb-10'>
             <button
               onClick={() => setSelectedCategory('all')}
               className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
@@ -213,7 +197,7 @@ const Blog = () => {
                 {category.name}
               </button>
             ))}
-          </motion.div>
+          </div>
         )}
 
         {/* Error State */}
@@ -238,15 +222,10 @@ const Blog = () => {
           <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8'>
             {blogPosts.length > 0 ? (
               blogPosts.map((post, index) => (
-                <motion.article
+                <article
                   key={post.id}
-                  initial={{ opacity: 0, y: 40 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 0.6, delay: index * 0.1 }}
-                  whileHover={{ y: -8, transition: { duration: 0.2 } }}
                   onClick={() => navigate(`/blog/${post.slug || post.id}`)}
-                  className='bg-white rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300 group cursor-pointer border border-gray-100'
+                  className='bg-white rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300 group cursor-pointer border border-gray-100 hover:-translate-y-2'
                 >
                   {/* Image */}
                   <div className='relative h-56 overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200'>
@@ -306,7 +285,7 @@ const Blog = () => {
                       </div>
                     )}
                   </div>
-                </motion.article>
+                </article>
               ))
             ) : (
               <div className="col-span-full text-center py-16">

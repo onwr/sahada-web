@@ -17,6 +17,7 @@ import Ayarlar from '../pages/admin/Ayarlar';
 import AuditLog from '../pages/admin/AuditLog';
 import Turnuvalar from '../pages/admin/Turnuvalar';
 import Pages from '../pages/admin/Pages';
+import AuthPageSettings from '../pages/admin/AuthPageSettings';
 
 const AdminLayout = () => {
   return (
@@ -39,6 +40,7 @@ const AdminLayout = () => {
       <Route path="audit-log" element={<AuditLog />} />
       <Route path="turnuvalar" element={<Turnuvalar />} />
       <Route path="pages" element={<Pages />} />
+      <Route path="auth-pages" element={<AuthPageSettings />} />
       <Route path="*" element={<Navigate to="/admin/dashboard" replace />} />
     </Routes>
     </>

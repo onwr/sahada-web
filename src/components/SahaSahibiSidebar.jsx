@@ -78,19 +78,19 @@ const SahaSahibiSidebar = () => {
       icon: FileText,
       current: location.pathname === '/saha-sahibi/raporlar'
     },
-    {
-      name: 'CRM',
-      href: '/saha-sahibi/crm',
-      icon: Users,
-      current: location.pathname === '/saha-sahibi/crm',
-      premium: true
-    },
-    {
-      name: 'Premium',
-      href: '/saha-sahibi/premium',
-      icon: Star,
-      current: location.pathname === '/saha-sahibi/premium'
-    },
+    // {
+    //   name: 'CRM',
+    //   href: '/saha-sahibi/crm',
+    //   icon: Users,
+    //   current: location.pathname === '/saha-sahibi/crm',
+    //   premium: true
+    // },
+    // {
+    //   name: 'Premium',
+    //   href: '/saha-sahibi/premium',
+    //   icon: Star,
+    //   current: location.pathname === '/saha-sahibi/premium'
+    // },
     {
       name: 'Mesajlar',
       href: '/saha-sahibi/mesajlar',
@@ -225,12 +225,17 @@ const SahaSahibiSidebar = () => {
                     {userData?.businessName || userData?.displayName || 'Saha Sahibi'}
                 </h2>
                 
-                {userData?.city && (
-                  <div className="flex items-center gap-1.5 text-green-100 text-xs bg-white/10 px-2 py-1 rounded-full backdrop-blur-sm mt-1">
-                      <MapPin size={10} />
-                      <span className="truncate max-w-[120px]">{userData.city}</span>
-                  </div>
-                )}
+                <div className="flex flex-wrap items-center justify-center gap-1.5 mt-1">
+                    <span className="text-[10px] font-bold bg-white/20 text-white px-2 py-0.5 rounded-full uppercase tracking-wider border border-white/10 shadow-sm">
+                      SAHA SAHİBİ
+                    </span>
+                    {userData?.city && (
+                      <div className="flex items-center gap-1 text-green-100 text-xs bg-white/10 px-2 py-0.5 rounded-full backdrop-blur-sm border border-white/5">
+                          <MapPin size={10} />
+                          <span className="truncate max-w-[80px]">{userData.city}</span>
+                      </div>
+                    )}
+                </div>
                 
                 <div className="mt-4 w-full flex items-center justify-between border-t border-white/10 pt-3">
                     <div className="flex flex-col items-center flex-1 border-r border-white/10">

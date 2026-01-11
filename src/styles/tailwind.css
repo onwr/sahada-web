@@ -1,5 +1,15 @@
 @import 'tailwindcss';
 
+@theme {
+  --font-sans: 'Inter', sans-serif;
+  
+  --color-primary: #00A651;
+  --color-secondary: #2196F3;
+  --color-accent: #FF6B35;
+  --color-dark: #1A1A1A;
+  --color-light: #FAFAFA;
+}
+
 @keyframes fadeIn {
   from {
     opacity: 0;

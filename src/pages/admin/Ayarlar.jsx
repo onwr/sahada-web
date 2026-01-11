@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { getPlatformSettings, updatePlatformSettings, logAdminAction } from '../../services/firestoreService';
+import { getPlatformSettings, updatePlatformSettings, logAdminAction, searchUsers } from '../../services/firestoreService';
 import { useAuth } from '../../contexts/AuthContext';
 import AdminSidebar from '../../components/AdminSidebar';
 import { 
   Settings, Save, AlertCircle, CheckCircle, Globe, Percent, 
-  Share2, Users, Shield, Plus, Trash2, Layout, Lock, Code, Image 
+  Share2, Users, Shield, Plus, Trash2, Layout, Lock, Code, Image,
+  CreditCard, Search, UserCheck, Banknote
 } from 'lucide-react';
 
 const Ayarlar = () => {
@@ -48,6 +49,18 @@ const Ayarlar = () => {
       ]
     },
 
+    // Membership & Payments
+    membership: {
+      mandatoryPayment: false, // Aylık ödeme zorunlu mu?
+      monthlyFee: 0, // Aylık ücret
+      currency: 'TRY'
+    },
+
+    // User Specific Rules (Special Offers / Commissions)
+    specialRules: [
+      // { userId: '123', userName: 'Ahmet', type: 'commission', value: 2.5, description: 'Özel Anlaşma' }
+    ],
+
     // Admins (Mock User Management for now)
     admins: [
       { id: 1, name: 'Admin User', email: 'admin@sahada.com', role: 'super_admin', addedAt: new Date().toISOString() }
@@ -56,6 +69,19 @@ const Ayarlar = () => {
 
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
+
+  // User Search State
+  const [userQuery, setUserQuery] = useState('');
+  const [userSearchResults, setUserSearchResults] = useState([]);
+  const [isSearchingUsers, setIsSearchingUsers] = useState(false);
+  const [selectedUserForRule, setSelectedUserForRule] = useState(null);
+  
+  // Rule Form State
+  const [newRuleData, setNewRuleData] = useState({
+    commissionRate: '',
+    specialMonthlyFee: '',
+    note: ''
+  });
 
   useEffect(() => {
     loadSettings();
@@ -73,6 +99,8 @@ const Ayarlar = () => {
           socialMedia: { ...prev.socialMedia, ...result.data.socialMedia },
           integrations: { ...prev.integrations, ...result.data.integrations },
           commission: { ...prev.commission, ...result.data.commission },
+          membership: { ...prev.membership, ...result.data.membership },
+          specialRules: result.data.specialRules || prev.specialRules,
           admins: result.data.admins || prev.admins
         }));
       }
@@ -134,6 +162,67 @@ const Ayarlar = () => {
     });
   };
 
+  // Special Rules Handlers
+  const handleSearchUsers = async (text) => {
+    setUserQuery(text);
+    if (text.length < 2) {
+      setUserSearchResults([]);
+      return;
+    }
+
+    setIsSearchingUsers(true);
+    try {
+      const result = await searchUsers(text);
+      if (result.success) {
+        setUserSearchResults(result.data);
+      }
+    } catch (error) {
+      console.error('User search error:', error);
+    } finally {
+      setIsSearchingUsers(false);
+    }
+  };
+
+  const selectUserForRule = (user) => {
+    setSelectedUserForRule(user);
+    setUserQuery('');
+    setUserSearchResults([]);
+    // Reset form or optionally pre-fill if rule exists
+    setNewRuleData({ commissionRate: '', specialMonthlyFee: '', note: '' });
+  };
+
+  const addSpecialRule = () => {
+    if (!selectedUserForRule) return;
+
+    const rule = {
+      userId: selectedUserForRule.id,
+      userName: selectedUserForRule.fullName || selectedUserForRule.displayName || selectedUserForRule.email,
+      userType: selectedUserForRule.role || 'user',
+      commissionRate: newRuleData.commissionRate ? parseFloat(newRuleData.commissionRate) : null,
+      monthlyFee: newRuleData.specialMonthlyFee ? parseFloat(newRuleData.specialMonthlyFee) : null,
+      note: newRuleData.note,
+      createdAt: new Date().toISOString()
+    };
+
+    // Remove existing rule for this user if any, then add new
+    const filteredRules = (settings.specialRules || []).filter(r => r.userId !== selectedUserForRule.id);
+    
+    setSettings({
+      ...settings,
+      specialRules: [...filteredRules, rule]
+    });
+
+    setSelectedUserForRule(null);
+    setNewRuleData({ commissionRate: '', specialMonthlyFee: '', note: '' });
+  };
+
+  const removeSpecialRule = (userId) => {
+    setSettings({
+      ...settings,
+      specialRules: settings.specialRules.filter(r => r.userId !== userId)
+    });
+  };
+
   // Admin Handlers
   const [newAdmin, setNewAdmin] = useState({ name: '', email: '', role: 'editor' });
   
@@ -169,6 +258,7 @@ const Ayarlar = () => {
   const tabs = [
     { id: 'general', label: 'Genel Ayarlar', icon: Globe },
     { id: 'commission', label: 'Komisyon Sistemi', icon: Percent },
+    { id: 'payment_offers', label: 'Ödemeler & Teklifler', icon: CreditCard },
     { id: 'integrations', label: 'Entegrasyonlar & SEO', icon: Code },
     { id: 'admins', label: 'Yöneticiler', icon: Shield },
   ];
@@ -435,6 +525,267 @@ const Ayarlar = () => {
               </div>
             )}
 
+            {/* --- PAYMENT & OFFERS TAB --- */}
+            {activeTab === 'payment_offers' && (
+              <>
+                {/* Global Payment Settings */}
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 mb-6">
+                  <h3 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2">
+                    <Banknote size={20} className="text-emerald-500" />
+                    Saha Sahibi Ödeme Ayarları
+                  </h3>
+                  
+                  <div className="flex flex-col md:flex-row gap-8">
+                    <div className="flex-1">
+                      <div className="flex items-start gap-3">
+                        <div className="flex items-center h-5 mt-1">
+                          <input
+                            id="mandatoryPayment"
+                            type="checkbox"
+                            className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
+                            checked={settings.membership?.mandatoryPayment || false}
+                            onChange={(e) => setSettings({
+                              ...settings,
+                              membership: { ...settings.membership, mandatoryPayment: e.target.checked }
+                            })}
+                          />
+                        </div>
+                        <div>
+                          <label htmlFor="mandatoryPayment" className="font-medium text-gray-900">
+                            Aylık Ödeme Zorunlu Olsun
+                          </label>
+                          <p className="text-sm text-gray-500 mt-1">
+                            Bu seçenek işaretlendiğinde, saha sahipleri panel erişimi için aylık ödeme yapmak zorunda kalır.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex-1">
+                       <label className="block text-sm font-medium text-gray-700 mb-1">
+                         Standart Aylık Üyelik Bedeli
+                       </label>
+                       <div className="relative">
+                          <input 
+                            type="number" 
+                            className="w-full border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 p-2.5 pl-10 border"
+                            placeholder="0.00"
+                            value={settings.membership?.monthlyFee || 0}
+                            onChange={(e) => setSettings({
+                              ...settings,
+                              membership: { ...settings.membership, monthlyFee: parseFloat(e.target.value) }
+                            })}
+                          />
+                          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <span className="text-gray-500 font-bold">₺</span>
+                          </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* User Specific Rules */}
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                  <div className="flex justify-between items-center mb-6">
+                    <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                       <UserCheck size={20} className="text-purple-500" />
+                       Kullanıcıya Özel Ayarlar
+                    </h3>
+                  </div>
+
+                  {/* Add New User Rule Section */}
+                  <div className="bg-gray-50 p-5 rounded-xl border border-gray-200 mb-8">
+                    <h4 className="text-sm font-bold text-gray-800 mb-4 border-b border-gray-200 pb-2">
+                      Yeni Özel Teklif / Kural Ekle
+                    </h4>
+                    
+                    {!selectedUserForRule ? (
+                      <div className="relative">
+                        <label className="block text-xs font-medium text-gray-500 mb-1">Kullanıcı Ara (İsim, E-posta veya Telefon)</label>
+                        <div className="flex gap-2">
+                          <input 
+                            type="text"
+                            className="flex-1 border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none"
+                            placeholder="Kullanıcı adı yazın..."
+                            value={userQuery}
+                            onChange={(e) => handleSearchUsers(e.target.value)}
+                          />
+                          <div className="bg-white p-2.5 rounded-lg border border-gray-300 text-gray-400">
+                             <Search size={20} />
+                          </div>
+                        </div>
+                        
+                        {/* Search Results Dropdown */}
+                        {userSearchResults.length > 0 && (
+                          <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded-xl shadow-xl border border-gray-100 max-h-60 overflow-y-auto z-10 p-1">
+                            {userSearchResults.map(u => (
+                              <button
+                                key={u.id}
+                                onClick={() => selectUserForRule(u)}
+                                className="w-full text-left p-3 hover:bg-purple-50 rounded-lg transition-colors group flex items-center gap-3"
+                              >
+                                <div className="w-8 h-8 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center font-bold">
+                                  {u.fullName ? u.fullName.charAt(0).toUpperCase() : u.email.charAt(0).toUpperCase()}
+                                </div>
+                                <div>
+                                  <p className="font-medium text-gray-900 group-hover:text-purple-700">
+                                    {u.fullName || 'İsimsiz Kullanıcı'} 
+                                    <span className="text-xs font-normal text-gray-500 ml-2">({u.role || 'user'})</span>
+                                  </p>
+                                  <p className="text-xs text-gray-500">{u.email} • {u.phone || 'Tel Yok'}</p>
+                                </div>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                        {isSearchingUsers && (
+                          <div className="absolute top-full left-0 right-0 mt-2 text-center text-sm text-gray-500 py-2">
+                            Aranıyor...
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between bg-purple-50 p-3 rounded-lg border border-purple-100">
+                           <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center font-bold text-lg">
+                                {selectedUserForRule.fullName ? selectedUserForRule.fullName.charAt(0).toUpperCase() : 'U'}
+                              </div>
+                              <div>
+                                <p className="font-bold text-gray-900">{selectedUserForRule.fullName || 'İsimsiz'}</p>
+                                <p className="text-xs text-gray-500">{selectedUserForRule.email}</p>
+                              </div>
+                           </div>
+                           <button 
+                            onClick={() => setSelectedUserForRule(null)}
+                            className="text-xs text-red-500 hover:underline font-medium"
+                           >
+                            Kullanıcıyı Değiştir
+                           </button>
+                        </div>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-xs font-medium text-gray-500 mb-1">
+                              Özel Komisyon Oranı (%)
+                            </label>
+                            <input 
+                              type="number"
+                              className="w-full border border-gray-300 rounded-lg p-2"
+                              placeholder={`Varsayılan: %${settings.commission?.baseRate || 5}`}
+                              value={newRuleData.commissionRate}
+                              onChange={(e) => setNewRuleData({...newRuleData, commissionRate: e.target.value})}
+                            />
+                            <p className="text-[10px] text-gray-400 mt-1">Boş bırakılırsa standart tarife uygulanır.</p>
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-500 mb-1">
+                              Özel Aylık Ücret (TL)
+                            </label>
+                            <input 
+                              type="number"
+                              className="w-full border border-gray-300 rounded-lg p-2"
+                              placeholder={`Varsayılan: ₺${settings.membership?.monthlyFee || 0}`}
+                              value={newRuleData.specialMonthlyFee}
+                              onChange={(e) => setNewRuleData({...newRuleData, specialMonthlyFee: e.target.value})}
+                            />
+                            <p className="text-[10px] text-gray-400 mt-1">Boş bırakılırsa standart ücret uygulanır.</p>
+                          </div>
+                          <div className="md:col-span-2">
+                            <label className="block text-xs font-medium text-gray-500 mb-1">
+                               Not / Açıklama
+                            </label>
+                            <input 
+                              type="text"
+                              className="w-full border border-gray-300 rounded-lg p-2"
+                              placeholder="Örn: X tarihe kadar geçerli promosyon..."
+                              value={newRuleData.note}
+                              onChange={(e) => setNewRuleData({...newRuleData, note: e.target.value})}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="flex justify-end pt-2">
+                          <button 
+                            onClick={addSpecialRule}
+                            className="bg-purple-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-purple-700 transition-colors shadow-sm flex items-center gap-2"
+                          >
+                            <Plus size={16} />
+                            Listeye Ekle
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Active Rules List */}
+                  <div className="border rounded-xl overflow-hidden">
+                    <table className="w-full text-left">
+                      <thead className="bg-gray-50 border-b">
+                        <tr>
+                          <th className="px-6 py-3 text-xs font-bold text-gray-500 uppercase">Kullanıcı</th>
+                          <th className="px-6 py-3 text-xs font-bold text-gray-500 uppercase">Komisyon</th>
+                          <th className="px-6 py-3 text-xs font-bold text-gray-500 uppercase">Aylık Ücret</th>
+                          <th className="px-6 py-3 text-xs font-bold text-gray-500 uppercase">Not</th>
+                          <th className="px-6 py-3 text-xs font-bold text-gray-500 uppercase text-right">İşlem</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {(settings.specialRules || []).map((rule, idx) => (
+                          <tr key={idx} className="group hover:bg-gray-50">
+                             <td className="px-6 py-4">
+                                <p className="font-medium text-gray-900">{rule.userName}</p>
+                                <p className="text-xs text-gray-500 flex items-center gap-1">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span> 
+                                  Aktif
+                                </p>
+                             </td>
+                             <td className="px-6 py-4">
+                               {rule.commissionRate !== null && rule.commissionRate !== '' ? (
+                                 <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                   %{rule.commissionRate}
+                                 </span>
+                               ) : (
+                                 <span className="text-gray-400 text-xs">-</span>
+                               )}
+                             </td>
+                             <td className="px-6 py-4">
+                               {rule.monthlyFee !== null && rule.monthlyFee !== '' ? (
+                                 <span className="font-medium text-gray-900">₺{rule.monthlyFee}</span>
+                               ) : (
+                                  <span className="text-gray-400 text-xs">-</span>
+                               )}
+                             </td>
+                             <td className="px-6 py-4 text-sm text-gray-600 italic">
+                               {rule.note || '-'}
+                             </td>
+                             <td className="px-6 py-4 text-right">
+                                <button 
+                                  onClick={() => removeSpecialRule(rule.userId)}
+                                  className="text-red-400 hover:text-red-600 p-2 hover:bg-red-50 rounded-full transition-colors"
+                                >
+                                  <Trash2 size={16} />
+                                </button>
+                             </td>
+                          </tr>
+                        ))}
+                        {(!settings.specialRules || settings.specialRules.length === 0) && (
+                          <tr>
+                            <td colSpan="5" className="text-center py-12 text-gray-400">
+                              <div className="flex justify-center mb-2">
+                                <UserCheck className="w-8 h-8 opacity-20" />
+                              </div>
+                              Henüz özel bir kullanıcı kuralı tanımlanmadı.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </>
+            )}
+
             {/* --- INTEGRATIONS TAB --- */}
             {activeTab === 'integrations' && (
               <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 space-y-6">
@@ -445,7 +796,7 @@ const Ayarlar = () => {
                   
                   <div className="grid grid-cols-1 gap-6">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-2">
+                      <label className="flex text-sm font-medium text-gray-700 mb-1 items-center gap-2">
                         Google Analytics ID <span className="text-xs text-gray-400 font-normal">(G-XXXXXXXXXX)</span>
                       </label>
                       <input 
@@ -456,7 +807,7 @@ const Ayarlar = () => {
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-2">
+                      <label className="flex text-sm font-medium text-gray-700 mb-1 items-center gap-2">
                         Google Ads ID <span className="text-xs text-gray-400 font-normal">(AW-XXXXXXXXXX)</span>
                       </label>
                       <input 

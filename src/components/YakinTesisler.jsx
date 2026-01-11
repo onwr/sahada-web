@@ -100,31 +100,7 @@ const YakinTesisler = () => {
              return { ...m, calculatedMissing: missing };
           })
           .filter(m => m.calculatedMissing > 0 && m.status === 'open')
-          .slice(0, 6)
-          .map(m => {
-             const dateObj = m.date?.toDate ? m.date.toDate() : new Date(m.date);
-             const dateStr = dateObj.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long' });
-             
-             return {
-               id: m.id,
-               sport: m.format === 'football' ? 'Futbol' : m.sport || 'Futbol',
-               title: m.description || m.title || (m.tesisName ? `${m.tesisName} Maçı` : 'Halı Saha Maçı'),
-               missingPlayers: m.calculatedMissing,
-               date: dateStr,
-               time: m.timeSlot || '00:00',
-               location: m.tesisName || m.location || 'Konum belirtilmedi',
-               pricePerPerson: m.pricePerPlayer || 0,
-               organizer: {
-                 name: m.organizerName || 'Kullanıcı',
-                 avatar: m.organizerAvatar || null
-               },
-               players: m.players || [],
-               joinRequests: m.joinRequests || [],
-               organizerId: m.organizerId,
-               maxPlayers: m.maxPlayers || 14,
-               userStatus: (m.players || []).includes(currentUser?.uid) ? 'joined' : (m.joinRequests || []).includes(currentUser?.uid) ? 'requested' : 'none'
-             };
-          });
+          .slice(0, 6);
           
         setUrgentMatches(dynamicMatches.length > 0 ? dynamicMatches : []);
       } else {
@@ -168,46 +144,12 @@ const YakinTesisler = () => {
     navigate(`/saha-detay/${facilityId}`);
   };
 
-  const handleJoinMatch = async (match) => {
-    console.log('handleJoinMatch triggered for match:', match);
-    if (!currentUser) {
-        console.log('User not logged in, redirecting to login');
-        navigate('/login');
-        return;
-    }
-
-    // Already joined -> Open details
-    if (match.userStatus === 'joined') {
-        setSelectedMatch(match);
-        return;
-    }
-
-    // Already requested -> Info
-    if (match.userStatus === 'requested') {
-        alert('Bu maça katılma isteğiniz zaten gönderildi.');
-        return;
-    }
-
-    if (window.confirm(`${match.title} maçına katılma isteği göndermek istediğinize emin misiniz?`)) {
-        try {
-            console.log('Attempting to request join match:', match.id, 'User:', currentUser.uid);
-            const result = await requestJoinMatch(match.id, currentUser.uid, currentUser);
-            console.log('Join request result:', result);
-            if (result.success) {
-                alert('Katılma isteğiniz başarıyla gönderildi! Organizatör onayladığında bildirim alacaksınız.');
-                loadContent(); // Datayı yenile
-            } else {
-                alert('İstek gönderilirken bir sorun oluştu: ' + result.error);
-            }
-        } catch (error) {
-            console.error('Katılma isteği hatası:', error);
-            alert('Bir hata oluştu.');
-        }
-    }
+  const handleJoinMatch = (match) => {
+     navigate(`/mac-detay/${match.id}`);
   };
 
   const handleCreateAdClick = () => {
-      if(currentUser) navigate('/panel/player'); else navigate('/login');
+      if(currentUser) navigate('/oyuncu/dashboard'); else navigate('/login');
   };
 
   return (

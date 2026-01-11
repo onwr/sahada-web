@@ -23,6 +23,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { updateUserData } from '../../services/authService';
 import { uploadProfileImage, getImageUrl, getOptimizedImageUrl } from '../../services/cdnService';
 import ProfileImageUploader from '../ProfileImageUploader';
+import toast from '../../utils/toast';
 
 const OyuncuOnboard = () => {
   const navigate = useNavigate();
@@ -32,6 +33,7 @@ const OyuncuOnboard = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     // Temel Bilgiler
+    fullName: '',
     profilePhoto: null,
     birthYear: '',
     gender: '',
@@ -64,7 +66,8 @@ const OyuncuOnboard = () => {
     terms: false,
     kvkk: false,
     campaigns: false,
-    whatsapp: false
+    whatsapp: false,
+    membershipAgreement: false
   });
 
   const steps = [
@@ -137,6 +140,7 @@ const OyuncuOnboard = () => {
       
       setFormData(prev => ({
         ...prev,
+        fullName: userData.fullName || userData.displayName || '',
         birthYear: userData.birthYear || '',
         gender: userData.gender || '',
         phone: userData.phone || '',
@@ -291,6 +295,7 @@ const OyuncuOnboard = () => {
     let completion = 20; // Başlangıç puanı (kayıt)
 
     // Temel bilgiler (+10 puan)
+    if (formData.fullName) completion += 5;
     if (formData.birthYear) completion += 5;
     if (formData.gender) completion += 3;
     if (formData.whatsapp) completion += 2;
@@ -314,17 +319,16 @@ const OyuncuOnboard = () => {
     completion = Math.min(completion, 100);
 
     setProfileCompletion(completion);
-
-    // Ödül gösterimi
-    if (completion >= 100 && !showReward) {
-      setShowReward(true);
-    }
   };
 
   const validateStep = (step) => {
     const newErrors = {};
 
     if (step === 1) {
+      if (!formData.fullName || formData.fullName.trim().length < 3) {
+        newErrors.fullName = 'Geçerli bir ad soyad giriniz';
+      }
+
       if (!formData.birthYear) {
         newErrors.birthYear = 'Doğum yılı gereklidir';
       } else if (new Date().getFullYear() - parseInt(formData.birthYear) < 13) {
@@ -406,8 +410,10 @@ const OyuncuOnboard = () => {
     }
 
     // Zorunlu anlaşmaları kontrol et
-    if (!agreements.terms || !agreements.kvkk) {
-      setErrors({ submit: 'Kullanım koşulları ve KVKK onayı gereklidir' });
+    if (!agreements.terms || !agreements.kvkk || !agreements.membershipAgreement) {
+      const errorMsg = 'Lütfen tüm zorunlu sözleşmeleri onaylayın';
+      setErrors({ submit: errorMsg });
+      toast.error(errorMsg);
       return;
     }
 
@@ -521,43 +527,10 @@ const OyuncuOnboard = () => {
                   transition={{ duration: 0.5 }}
                 />
               </div>
-
-              {/* Ödül Sistemi */}
-              <div className='mt-3 flex items-center justify-center gap-2'>
-                {profileCompletion >= 50 && (
-                  <motion.div
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    className='flex items-center gap-1 text-xs text-green-600'
-                  >
-                    <span>🏆</span>
-                    <span>%50 - Ücretsiz rezervasyon kuponu!</span>
-                  </motion.div>
-                )}
-                {profileCompletion >= 75 && (
-                  <motion.div
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    className='flex items-center gap-1 text-xs text-green-600'
-                  >
-                    <span>🎁</span>
-                    <span>%75 - %10 indirim kodu!</span>
-                  </motion.div>
-                )}
-                {profileCompletion >= 100 && (
-                  <motion.div
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    className='flex items-center gap-1 text-xs font-bold text-orange-600'
-                  >
-                    <span>⭐</span>
-                    <span>%100 - Premium deneme + rozetler!</span>
-                  </motion.div>
-                )}
-              </div>
             </div>
           </div>
         </div>
+
 
         {/* Form Content */}
         <motion.div
@@ -593,6 +566,37 @@ const OyuncuOnboard = () => {
                   <p className='text-sm text-gray-600'>
                     Profil fotoğrafınızı ekleyin (opsiyonel)
                   </p>
+                </div>
+
+                {/* Ad Soyad */}
+                <div>
+                  <label className='mb-2 block text-sm font-medium text-gray-700'>
+                    Ad Soyad *
+                  </label>
+                  <div className='relative'>
+                    <User
+                      className='absolute top-1/2 left-3 -translate-y-1/2 transform text-gray-400'
+                      size={20}
+                    />
+                    <input
+                      type='text'
+                      value={formData.fullName}
+                      onChange={(e) => handleInputChange('fullName', e.target.value)}
+                      placeholder='Adınız ve Soyadınız'
+                      className={`w-full rounded-lg border py-3 pr-4 pl-10 transition-all duration-200 focus:border-transparent focus:ring-2 focus:ring-green-500 focus:outline-none ${
+                        errors.fullName ? 'border-red-500' : 'border-gray-300'
+                      }`}
+                    />
+                  </div>
+                  {errors.fullName && (
+                    <motion.p
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className='mt-1 text-sm text-red-500'
+                    >
+                      {errors.fullName}
+                    </motion.p>
+                  )}
                 </div>
 
                 {/* Doğum Yılı */}
@@ -1303,6 +1307,21 @@ const OyuncuOnboard = () => {
                       />
                       <span className='text-sm text-gray-700'>
                         Kampanyalar ve özel teklifler hakkında bilgi almak istiyorum.
+                      </span>
+                    </label>
+
+                    <label className='flex items-start gap-3'>
+                      <input
+                        type='checkbox'
+                        checked={agreements.membershipAgreement}
+                        onChange={(e) => handleAgreementChange('membershipAgreement', e.target.checked)}
+                        className={`mt-1 h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500 ${
+                          errors.submit && !agreements.membershipAgreement ? 'border-red-500' : ''
+                        }`}
+                        required
+                      />
+                      <span className='text-sm text-gray-700'>
+                        <span className='font-medium'>Üyelik Sözleşmesi</span>'ni okudum, onaylıyorum.
                       </span>
                     </label>
 
