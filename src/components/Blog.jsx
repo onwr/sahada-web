@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowRight, Clock, User, Loader2, BookOpen } from 'lucide-react';
+import { ArrowRight, Clock, User, Loader2, BookOpen, Activity, Heart, Zap, Star, Award, TrendingUp, Info, Globe, Users, Target, Dumbbell, Trophy, Medal } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { getBlogPosts, getBlogCategories } from '../services/firestoreService';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
@@ -94,6 +94,19 @@ const Blog = () => {
     } catch (err) {
       console.error('Listener kurulum hatası:', err);
     }
+  };
+
+  const getCategoryIcon = (categorySlug) => {
+    const category = categories.find(cat => cat.slug === categorySlug);
+    const iconName = category?.icon || 'BookOpen';
+    
+    const icons = {
+      BookOpen, Activity, Heart, Zap, Star, Award, TrendingUp, Info,
+      Globe, Users, Target, Dumbbell, Trophy, Medal
+    };
+    
+    const IconComponent = icons[iconName] || BookOpen;
+    return <IconComponent className="w-3 h-3" />;
   };
 
   const getCategoryColor = (categorySlug) => {
@@ -242,7 +255,8 @@ const Blog = () => {
                     )}
                     <div className='absolute inset-0 bg-gradient-to-t from-black/60 via-black/0 to-black/0 opacity-0 group-hover:opacity-100 transition-opacity duration-300'></div>
                     <div className='absolute top-4 left-4'>
-                      <span className={`${getCategoryColor(post.category)} text-white text-xs font-semibold px-3 py-1.5 rounded-full shadow-lg`}>
+                      <span className={`${getCategoryColor(post.category)} text-white text-xs font-semibold px-3 py-1.5 rounded-full shadow-lg flex items-center gap-1.5`}>
+                        {getCategoryIcon(post.category)}
                         {getCategoryName(post.category)}
                       </span>
                     </div>

@@ -1,16 +1,43 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { Phone, Mail } from 'lucide-react';
+import { getPlatformSettings } from '../services/firestoreService';
 
 const TopBar = () => {
   const { user } = useAuth();
-  
-  // Settings - Hardcoded for now as per request/current state
-  const settings = {
+  const location = useLocation();
+  const [settings, setSettings] = useState({
     contactPhone: '+90 (850) 123 45 67',
     contactEmail: 'info@sahada.com'
-  };
+  });
+
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const result = await getPlatformSettings();
+        if (result.success && result.data) {
+           setSettings(prev => ({
+             ...prev,
+             // Map backend settings field names if different, or assume valid
+             contactPhone: result.data.contactPhone || prev.contactPhone, 
+             contactEmail: result.data.contactEmail || prev.contactEmail,
+             // Add logo logic if it were in TopBar, but it's in Header usually. 
+             // Wait, user specifically asked 'Logo' and showed index.html context, but TopBar has hardcoded settings too.
+             // I'll stick to updating phone/email here as that's what's visible.
+           }));
+        }
+      } catch (err) {
+        console.error('TopBar settings error:', err);
+      }
+    };
+    fetchSettings();
+  }, []);
+  
+  // Show only on homepage
+  if (location.pathname !== '/') {
+    return null;
+  }
 
   return (
     <div className="hidden md:block bg-[#1a1a1a] text-white text-xs py-2">

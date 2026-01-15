@@ -1,27 +1,57 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Facebook, Twitter, Instagram, Play } from 'lucide-react';
+import { Facebook, Twitter, Instagram, Play, Linkedin } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { getPlatformSettings } from '../services/firestoreService';
 
 const Footer = () => {
-  const platformLinks = [
+  const [socialLinks, setSocialLinks] = useState({
+    facebook: '',
+    twitter: '',
+    instagram: '',
+    youtube: '',
+    linkedin: ''
+  });
+
+  const [footerMenus, setFooterMenus] = useState({
+    platform: [],
+    sahaSahipleri: [],
+    kurumsal: []
+  });
+
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const result = await getPlatformSettings();
+        if (result.success && result.data) {
+          if (result.data.socialMedia) setSocialLinks(result.data.socialMedia);
+          if (result.data.menus?.footer) setFooterMenus(result.data.menus.footer);
+        }
+      } catch (error) {
+        console.error('Footer settings error:', error);
+      }
+    };
+    fetchSettings();
+  }, []);
+
+  const defaultPlatformLinks = [
     { label: 'Nasıl Çalışır?', href: '/nasil-calisir' },
     { label: 'Tesisler', href: '/yakin-sahalar' },
     { label: 'Oyuncu Bul', href: '/oyuncu-bul' },
-    { label: 'Takım Oluştur', href: '/takim-olustur' }, // Assuming this will be created or redirects to login
-    { label: 'Turnuvalar', href: '/turnuvalar' }, // Updated to match likely route
+    { label: 'Takım Oluştur', href: '/takim-olustur' }, 
+    { label: 'Turnuvalar', href: '/turnuvalar' }, 
     { label: 'Fiyatlandırma', href: '/pricing' }
   ];
 
-  const sahaSahipleriLinks = [
+  const defaultSahaSahipleriLinks = [
     { label: 'Saha Ekle', href: '/saha-sahibi-login' },
     { label: 'Yönetim Paneli', href: '/saha-sahibi/dashboard' },
-    { label: 'Başarı Hikayeleri', href: '/hakkimizda' }, // Placeholder
+    { label: 'Başarı Hikayeleri', href: '/hakkimizda' }, 
     { label: 'Destek Merkezi', href: '/destek' },
-    { label: 'API Dokümantasyon', href: '/api-docs' } // Placeholder
+    { label: 'API Dokümantasyon', href: '/api-docs' } 
   ];
 
-  const kurumsalLinks = [
+  const defaultKurumsalLinks = [
     { label: 'Hakkımızda', href: '/hakkimizda' },
     { label: 'Blog', href: '/blog' },
     { label: 'Kariyer', href: '/kariyer' },
@@ -29,12 +59,22 @@ const Footer = () => {
     { label: 'İletişim', href: '/iletisim' }
   ];
 
-  const socialIcons = [
-    { icon: Facebook, href: '#', label: 'Facebook' },
-    { icon: Twitter, href: '#', label: 'Twitter' },
-    { icon: Instagram, href: '#', label: 'Instagram' },
-    { icon: Play, href: '#', label: 'YouTube' }
-  ];
+  const platformLinks = footerMenus.platform && footerMenus.platform.length > 0 ? footerMenus.platform : defaultPlatformLinks;
+  const sahaSahipleriLinks = footerMenus.sahaSahipleri && footerMenus.sahaSahipleri.length > 0 ? footerMenus.sahaSahipleri : defaultSahaSahipleriLinks;
+  const kurumsalLinks = footerMenus.kurumsal && footerMenus.kurumsal.length > 0 ? footerMenus.kurumsal : defaultKurumsalLinks;
+
+  // Helper to get array of active icons
+  const getSocialIcons = () => {
+     const icons = [];
+     if(socialLinks.facebook) icons.push({ icon: Facebook, href: socialLinks.facebook, label: 'Facebook' });
+     if(socialLinks.twitter) icons.push({ icon: Twitter, href: socialLinks.twitter, label: 'Twitter' });
+     if(socialLinks.instagram) icons.push({ icon: Instagram, href: socialLinks.instagram, label: 'Instagram' });
+     if(socialLinks.youtube) icons.push({ icon: Play, href: socialLinks.youtube, label: 'YouTube' });
+     if(socialLinks.linkedin) icons.push({ icon: Linkedin, href: socialLinks.linkedin, label: 'LinkedIn' });
+     return icons;
+  };
+  
+  const activeSocialIcons = getSocialIcons();
 
   return (
     <footer className='bg-[#1a1a1a] text-white py-12 lg:py-16'>
@@ -64,21 +104,27 @@ const Footer = () => {
 
             {/* Social Icons */}
             <div className='flex gap-3'>
-              {socialIcons.map((social, index) => (
-                <motion.a
-                  key={social.label}
-                  href={social.href}
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  whileInView={{ opacity: 1, scale: 1 }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 0.4, delay: index * 0.1 }}
-                  whileHover={{ scale: 1.1, y: -2 }}
-                  className='w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center hover:bg-green-500 transition-all duration-200'
-                  aria-label={social.label}
-                >
-                  <social.icon size={18} />
-                </motion.a>
-              ))}
+              {activeSocialIcons.length > 0 ? (
+                  activeSocialIcons.map((social, index) => (
+                    <motion.a
+                      key={social.label}
+                      href={social.href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      initial={{ opacity: 0, scale: 0.8 }}
+                      whileInView={{ opacity: 1, scale: 1 }}
+                      viewport={{ once: true }}
+                      transition={{ duration: 0.4, delay: index * 0.1 }}
+                      whileHover={{ scale: 1.1, y: -2 }}
+                      className='w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center hover:bg-green-500 transition-all duration-200'
+                      aria-label={social.label}
+                    >
+                      <social.icon size={18} />
+                    </motion.a>
+                  ))
+              ) : (
+                 <span className="text-gray-500 text-sm">Sosyal medya hesabı bulunamadı.</span>
+              )}
             </div>
           </motion.div>
 

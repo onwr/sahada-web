@@ -20,7 +20,9 @@ import {
   getTournamentMatches,
   getTournamentStandings,
   registerToTournament,
-  registerTeamToTournament
+  registerTeamToTournament,
+  getUserTeams,
+  createTeam
 } from '../../services/firestoreService';
 import { collection, query, onSnapshot, where } from 'firebase/firestore';
 import { db } from '../../config/firebase';
@@ -37,6 +39,13 @@ const TournamentDetail = ({ tournament, userId, userType = 'player', userData = 
   const [loading, setLoading] = useState(false);
   const [registering, setRegistering] = useState(false);
   const [isRegistered, setIsRegistered] = useState(false);
+  
+  // Team registration states
+  const [showTeamModal, setShowTeamModal] = useState(false);
+  const [userTeams, setUserTeams] = useState([]);
+  const [teamForm, setTeamForm] = useState({ name: '', members: [] });
+  const [selectedTeamId, setSelectedTeamId] = useState('');
+  const [isCreatingTeam, setIsCreatingTeam] = useState(false);
 
   // Kayıt durumu kontrolü
   const isFull = isTournamentFull(tournament, participants.length);
@@ -69,10 +78,30 @@ const TournamentDetail = ({ tournament, userId, userType = 'player', userData = 
       setupRealtimeListeners();
     }
     
+    if (userId) {
+      fetchUserTeams();
+    }
+    
     return () => {
       // Cleanup listeners will be handled by unsubscribe functions
     };
-  }, [tournament]);
+  }, [tournament, userId]);
+
+  const fetchUserTeams = async () => {
+    if (!userId) return;
+    try {
+      const result = await getUserTeams(userId);
+      if (result.success) {
+        setUserTeams(result.data);
+        // Auto-select first team if none selected
+        if (result.data.length > 0 && !selectedTeamId) {
+          setSelectedTeamId(result.data[0].id);
+        }
+      }
+    } catch (error) {
+      console.error('Takımları getirme hatası:', error);
+    }
+  };
 
   const setupRealtimeListeners = () => {
     if (!tournament?.id) return;
@@ -200,9 +229,12 @@ const TournamentDetail = ({ tournament, userId, userType = 'player', userData = 
           participantName: participantName
         });
       } else {
-        // Takım kaydı için önce takım seçimi yapılması gerekir
-        // Şimdilik hata mesajı gösterelim
-        toast.error('Takım kaydı için önce bir takım seçmelisiniz');
+        // Takım kaydı için modalı aç
+        if (userTeams.length > 0) {
+          setSelectedTeamId(userTeams[0].id); // İlk takımı varsayılan seç
+        }
+        setShowTeamModal(true);
+        setRegistering(false); // Modal açıldığı için loading'i kapat
         return;
       }
 
@@ -224,6 +256,71 @@ const TournamentDetail = ({ tournament, userId, userType = 'player', userData = 
       console.error('Kayıt hatası:', error);
       toast.error('Kayıt olurken hata oluştu');
     } finally {
+      setRegistering(false);
+    }
+  };
+
+  const handleCreateTeam = async (e) => {
+    e.preventDefault();
+    if (!teamForm.name.trim()) return;
+
+    try {
+      setRegistering(true);
+      const result = await createTeam({
+        name: teamForm.name,
+        captainId: userId,
+        captainName: userData?.fullName || userData?.displayName || 'Kaptan',
+        members: [userId], // Kaptan otomatik üye
+        sportType: tournament.sportType || 'football'
+      });
+
+      if (result.success) {
+        toast.success('Takım oluşturuldu');
+        await fetchUserTeams(); // Listeyi güncelle
+        setSelectedTeamId(result.id); // Yeni takımı seç
+        setIsCreatingTeam(false);
+        setTeamForm({ name: '', members: [] });
+      } else {
+        toast.error(result.error || 'Takım oluşturulamadı');
+      }
+    } catch (error) {
+      console.error('Takım oluşturma hatası:', error);
+      toast.error('Hata oluştu');
+    } finally {
+      setRegistering(false);
+    }
+  };
+
+  const handleTeamRegister = async () => {
+    if (!selectedTeamId) {
+      toast.error('Lütfen bir takım seçin');
+      return;
+    }
+
+    try {
+      setRegistering(true);
+      const result = await registerTeamToTournament(tournament.id, selectedTeamId, userId);
+
+      if (result.success) {
+        setShowTeamModal(false);
+        if (result.requiresPayment && tournament.registrationFee > 0) {
+          toast.success('Kayıt başarılı. Ödeme sayfasına yönlendiriliyorsunuz...');
+          if (onRegister) {
+            // Takım turnuvası için takım ID'sini, bireysel için kullanıcı ID'sini gönder
+            onRegister(tournament.id, selectedTeamId);
+          }
+        } else {
+          toast.success('Takımınız turnuvaya başarıyla kaydedildi!');
+          setIsRegistered(true);
+          loadTournamentData();
+        }
+      } else {
+        toast.error(result.error || 'Kayıt olunamadı');
+      }
+    } catch (error) {
+      console.error('Takım kayıt hatası:', error);
+      toast.error('Kayıt olurken hata oluştu');
+    } finally { 
       setRegistering(false);
     }
   };
@@ -632,6 +729,109 @@ const TournamentDetail = ({ tournament, userId, userType = 'player', userData = 
           />
         )}
       </div>
+
+
+      {/* Team Selection/Creation Modal */}
+      {showTeamModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-[60]">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold text-gray-900">
+                {isCreatingTeam ? 'Yeni Takım Oluştur' : 'Takım Seçimi'}
+              </h2>
+              <button 
+                onClick={() => setShowTeamModal(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <XCircle className="w-6 h-6" />
+              </button>
+            </div>
+
+            {!isCreatingTeam ? (
+              <div className="space-y-4">
+                {userTeams.length > 0 ? (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Takımınızı Seçin
+                    </label>
+                    <select
+                      value={selectedTeamId}
+                      onChange={(e) => setSelectedTeamId(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    >
+                      {userTeams.map(team => (
+                        <option key={team.id} value={team.id}>{team.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                ) : (
+                  <div className="text-center py-4 bg-gray-50 rounded-lg">
+                    <p className="text-gray-600 mb-2">Henüz kaptanı olduğunuz bir takım yok.</p>
+                  </div>
+                )}
+
+                <button
+                  onClick={() => setIsCreatingTeam(true)}
+                  className="w-full py-2 border-2 border-dashed border-gray-300 rounded-lg text-gray-600 hover:border-green-500 hover:text-green-600 transition-colors flex items-center justify-center space-x-2"
+                >
+                  <UserPlus className="w-4 h-4" />
+                  <span>Yeni Takım Oluştur</span>
+                </button>
+
+                {userTeams.length > 0 && (
+                  <button
+                    onClick={handleTeamRegister}
+                    disabled={registering || !selectedTeamId}
+                    className="w-full py-3 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 disabled:opacity-50 mt-4"
+                  >
+                    {registering ? 'Kaydediliyor...' : 'Seçili Takımla Katıl'}
+                  </button>
+                )}
+              </div>
+            ) : (
+              <form onSubmit={handleCreateTeam} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Takım Adı
+                  </label>
+                  <input
+                    type="text"
+                    value={teamForm.name}
+                    onChange={(e) => setTeamForm(prev => ({ ...prev, name: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    placeholder="Örn: Yıldızlar SK"
+                    required
+                  />
+                </div>
+
+                <div className="flex bg-blue-50 p-3 rounded-lg text-sm text-blue-700">
+                  <AlertCircle className="w-4 h-4 mr-2 flex-shrink-0 mt-0.5" />
+                  <p>
+                    Takımı oluşturduktan sonra diğer oyuncuları davet edebilirsiniz. Şu an sadece siz (Kaptan) ekleniyorsunuz.
+                  </p>
+                </div>
+
+                <div className="flex space-x-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsCreatingTeam(false)}
+                    className="flex-1 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+                  >
+                    İptal
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={registering}
+                    className="flex-1 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+                  >
+                    {registering ? 'Oluşturuluyor...' : 'Oluştur ve Seç'}
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

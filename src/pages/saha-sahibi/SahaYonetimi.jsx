@@ -6,6 +6,10 @@ import { uploadFacilityImage, getFacilityImages, deleteImage } from '../../servi
 import { collection, query, onSnapshot, where } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import SahaSahibiSidebar from '../../components/SahaSahibiSidebar';
+import toast from '../../utils/toast';
+import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from 'react-leaflet';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 // FreeMapPicker import'u kaldırıldı - SahaSahibiOnboard'daki harita sistemi kullanılacak
 import { 
   Plus, 
@@ -36,6 +40,60 @@ import {
   X,
   CircleAlert
 } from 'lucide-react';
+
+// Fix for Leaflet marker icons in React
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
+  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+});
+
+const DraggableMarker = ({ position, onLocationSelect }) => {
+  const markerRef = React.useRef(null);
+  const map = useMapEvents({
+    click(e) {
+      onLocationSelect(e.latlng);
+    },
+  });
+
+  useEffect(() => {
+    if (position) {
+      map.flyTo(position, 15);
+    }
+  }, [position, map]);
+
+  const eventHandlers = React.useMemo(
+    () => ({
+      dragend() {
+        const marker = markerRef.current;
+        if (marker != null) {
+          onLocationSelect(marker.getLatLng());
+        }
+      },
+    }),
+    [onLocationSelect]
+  );
+
+  return position ? (
+    <Marker
+      draggable={true}
+      eventHandlers={eventHandlers}
+      position={position}
+      ref={markerRef}
+    />
+  ) : null;
+};
+
+const RecenterMap = ({ center }) => {
+  const map = useMap();
+  useEffect(() => {
+    if (center.lat && center.lng) {
+      map.setView([center.lat, center.lng]);
+    }
+  }, [center, map]);
+  return null;
+};
 
 const SahaYonetimi = () => {
   const navigate = useNavigate();
@@ -495,7 +553,10 @@ const SahaYonetimi = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    if (!validateForm()) return;
+    if (!validateForm()) {
+      toast.error('Lütfen zorunlu alanları doldurunuz.');
+      return;
+    }
     
     setIsSubmitting(true);
     
@@ -861,6 +922,7 @@ const SahaYonetimi = () => {
                     <option value="Voleybol">Voleybol</option>
                     <option value="Badminton">Badminton</option>
                     <option value="Squash">Squash</option>
+                    <option value="Yüzme">Yüzme</option>
                   </select>
                 </div>
 
@@ -1078,64 +1140,6 @@ const SahaYonetimi = () => {
                 {errors.address && <p className="text-red-500 text-sm mt-1">{errors.address}</p>}
               </div>
 
-              {/* Saha Fotoğrafları */}
-              <div className="mt-6">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Saha Fotoğrafları *
-                </label>
-                
-                {/* Resim Yükleme */}
-                <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-                  <input
-                    type="file"
-                    multiple
-                    accept="image/*"
-                    onChange={(e) => handleImageUpload(e.target.files)}
-                    className="hidden"
-                    id="image-upload"
-                    disabled={uploadingImages}
-                  />
-                  <label
-                    htmlFor="image-upload"
-                    className={`cursor-pointer ${uploadingImages ? 'opacity-50 cursor-not-allowed' : ''}`}
-                  >
-                    <ImageIcon className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                    <p className="text-lg font-medium text-gray-700 mb-2">
-                      {uploadingImages ? 'Yükleniyor...' : 'Fotoğraf Yükle'}
-                    </p>
-                    <p className="text-sm text-gray-500">
-                      PNG, JPG, GIF, WebP (Max 10MB) • En az 1 fotoğraf
-                    </p>
-                  </label>
-                </div>
-
-                {/* Yüklenen Resimler */}
-                {sahaImages.length > 0 && (
-                  <div className="mt-4">
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                      {sahaImages.map((image, index) => (
-                        <div key={image.id || index} className="relative group">
-                          <img
-                            src={image.url}
-                            alt={`Saha ${index + 1}`}
-                            className="w-full h-32 object-cover rounded-lg"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => handleImageRemove(image.id)}
-                            className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center text-xs hover:bg-red-600"
-                          >
-                            ×
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {errors.images && <p className="text-red-500 text-sm mt-1">{errors.images}</p>}
-              </div>
-
               {/* Harita Modal */}
               {showMap && (
                 <div className="mt-4 rounded-lg border border-gray-200 bg-white p-4 shadow-lg">
@@ -1220,45 +1224,34 @@ const SahaYonetimi = () => {
                     )}
                   </div>
                   
-                  <div className="mb-3 rounded-lg border border-gray-200 overflow-hidden relative">
-                    <iframe
-                      src={`https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3010.279749111567!2d${mapCenter.lng}!3d${mapCenter.lat}!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x14cab9bd6571d149%3A0x1c515b0b4b4b4b4b!2sIstanbul!5e0!3m2!1str!2str!4v1234567890123!5m2!1str!2str`}
-                      width="100%"
-                      height="300"
-                      style={{ border: 0 }}
-                      allowFullScreen=""
-                      loading="lazy"
-                      referrerPolicy="no-referrer-when-downgrade"
-                      title="Konum Seçimi"
-                      onClick={handleMapClick}
-                    />
-                    
-                    {/* Pin Overlay */}
-                    <div 
-                      className="absolute cursor-move z-10 select-none"
-                      style={{
-                        left: `${pinPosition.x}%`,
-                        top: `${pinPosition.y}%`,
-                        transform: 'translate(-50%, -100%)'
-                      }}
-                      onMouseDown={handlePinDragStart}
-                      onMouseMove={handlePinDrag}
-                      onMouseUp={handlePinDragEnd}
-                      onMouseLeave={handlePinDragEnd}
+                  <div className="mb-3 rounded-lg border border-gray-200 overflow-hidden relative h-[300px] z-0">
+                    <MapContainer
+                      center={mapCenter.lat ? [mapCenter.lat, mapCenter.lng] : [41.0082, 28.9784]}
+                      zoom={13}
+                      scrollWheelZoom={true}
+                      style={{ height: '100%', width: '100%' }}
                     >
-                      <div className="relative">
-                        <div className={`w-8 h-8 bg-red-500 rounded-full border-4 border-white shadow-lg flex items-center justify-center transition-transform ${isDragging ? 'scale-110' : 'scale-100'}`}>
-                          <div className="w-2 h-2 bg-white rounded-full"></div>
-                        </div>
-                        <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-1">
-                          <div className="w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-red-500"></div>
-                        </div>
-                      </div>
-                    </div>
+                      <TileLayer
+                        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                      />
+                      <RecenterMap center={mapCenter} />
+                      <DraggableMarker
+                        position={
+                          selectedLocation && selectedLocation.lat
+                            ? [selectedLocation.lat, selectedLocation.lng]
+                            : (mapCenter.lat ? [mapCenter.lat, mapCenter.lng] : null)
+                        }
+                        onLocationSelect={(latlng) => {
+                          const address = `Seçilen Konum (${latlng.lat.toFixed(4)}, ${latlng.lng.toFixed(4)})`;
+                          handleLocationSelect(latlng.lat, latlng.lng, address);
+                          setMapCenter({ lat: latlng.lat, lng: latlng.lng });
+                        }}
+                      />
+                    </MapContainer>
                     
-                    {/* Pin Sürükleme Talimatı */}
-                    <div className="absolute top-2 left-2 bg-white bg-opacity-90 rounded-lg px-3 py-2 text-xs text-gray-600 shadow-sm">
-                      📍 Pin'i sürükleyerek konum seçin
+                    <div className="absolute top-2 right-2 bg-white bg-opacity-90 rounded-lg px-3 py-2 text-xs text-gray-600 shadow-sm z-[1000]">
+                      📍 Pini sürükleyerek veya haritaya tıklayarak konum seçin
                     </div>
                   </div>
                   
@@ -1292,6 +1285,66 @@ const SahaYonetimi = () => {
                   </div>
                 </div>
               )}
+
+              {/* Saha Fotoğrafları */}
+              <div className="mt-6">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Saha Fotoğrafları *
+                </label>
+                
+                {/* Resim Yükleme */}
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                  <input
+                    type="file"
+                    multiple
+                    accept="image/*"
+                    onChange={(e) => handleImageUpload(e.target.files)}
+                    className="hidden"
+                    id="image-upload"
+                    disabled={uploadingImages}
+                  />
+                  <label
+                    htmlFor="image-upload"
+                    className={`cursor-pointer ${uploadingImages ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  >
+                    <ImageIcon className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                    <p className="text-lg font-medium text-gray-700 mb-2">
+                      {uploadingImages ? 'Yükleniyor...' : 'Fotoğraf Yükle'}
+                    </p>
+                    <p className="text-sm text-gray-500">
+                      PNG, JPG, GIF, WebP (Max 10MB) • En az 1 fotoğraf
+                    </p>
+                  </label>
+                </div>
+
+                {/* Yüklenen Resimler */}
+                {sahaImages.length > 0 && (
+                  <div className="mt-4">
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                      {sahaImages.map((image, index) => (
+                        <div key={image.id || index} className="relative group">
+                          <img
+                            src={image.url}
+                            alt={`Saha ${index + 1}`}
+                            className="w-full h-32 object-cover rounded-lg"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleImageRemove(image.id)}
+                            className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center text-xs hover:bg-red-600"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {errors.images && <p className="text-red-500 text-sm mt-1">{errors.images}</p>}
+              </div>
+
+
 
               {/* Açıklama */}
               <div className="mt-6">

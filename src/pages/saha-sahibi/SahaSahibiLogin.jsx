@@ -22,7 +22,7 @@ import {
   loginWithFacebook,
   resetPassword 
 } from '../../services/authService';
-import { getAuthPageContent } from '../../services/firestoreService';
+import { getAuthPageContent, checkUserExists } from '../../services/firestoreService';
 import { useAuth } from '../../contexts/AuthContext';
 
 const SahaSahibiLogin = () => {
@@ -121,6 +121,19 @@ const SahaSahibiLogin = () => {
       if (activeTab === 'login') {
         result = await loginUser(formData.email, formData.password);
       } else {
+        // Kayıt öncesi duplicate kontrolü
+        const duplicateCheck = await checkUserExists(formData.email, formData.phone);
+        if (duplicateCheck.success && duplicateCheck.exists) {
+          const newErrors = {};
+          duplicateCheck.errors.forEach(err => {
+             if(err.type === 'email') newErrors.email = err.message;
+             if(err.type === 'phone') newErrors.phone = err.message;
+          });
+          setErrors(newErrors);
+          setIsLoading(false);
+          return;
+        }
+
         result = await registerUser({
           ...formData,
           userType: 'owner', // Explicitly set as owner
@@ -221,7 +234,10 @@ const SahaSahibiLogin = () => {
     <div className="min-h-screen flex bg-gray-50">
       {/* ... Left Side remains same ... */}
       <div className="hidden lg:flex lg:w-1/2 relative bg-green-900 overflow-hidden">
-        <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1522778119026-d647f0565c6d?ixlib=rb-4.0.3&auto=format&fit=crop&w=2070&q=80')] bg-cover bg-center opacity-20 mix-blend-overlay"></div>
+        <div 
+          className="absolute inset-0 bg-cover bg-center opacity-20 mix-blend-overlay"
+          style={{ backgroundImage: `url('${pageContent.backgroundImage || "https://images.unsplash.com/photo-1522778119026-d647f0565c6d?ixlib=rb-4.0.3&auto=format&fit=crop&w=2070&q=80"}')` }}
+        ></div>
         <div className="absolute inset-0 bg-gradient-to-br from-green-900/90 to-green-800/90"></div>
         
         <div className="relative z-10 flex flex-col justify-center px-16 text-white h-full">

@@ -12,7 +12,6 @@ import {
   getTournamentStandings,
   generateRoundRobinMatches,
   verifyMatchScore,
-  getTesisler,
   distributeTournamentPrizes
 } from '../../services/firestoreService';
 import { collection, query, onSnapshot, where, orderBy } from 'firebase/firestore';
@@ -176,7 +175,6 @@ const Turnuvalar = () => {
     if (!user) return;
     
     loadTournamentData();
-    loadTesisler();
     const cleanup = setupRealtimeListener();
     
     return () => {
@@ -184,16 +182,7 @@ const Turnuvalar = () => {
     };
   }, [user, selectedTournament]);
 
-  const loadTesisler = async () => {
-    try {
-      const result = await getTesisler(user.uid);
-      if (result.success) {
-        setTesisler(result.data);
-      }
-    } catch (error) {
-      console.error('Tesisler yükleme hatası:', error);
-    }
-  };
+
 
   const setupRealtimeListener = () => {
     if (!user) return;
@@ -230,6 +219,21 @@ const Turnuvalar = () => {
       loadTournamentData();
     });
     unsubscribeFunctions.push(unsubscribeTournaments);
+
+    // Tesisler için real-time listener
+    const tesislerQuery = query(
+      collection(db, 'tesisler'),
+      where('ownerId', '==', user.uid)
+    );
+
+    const unsubscribeTesisler = onSnapshot(tesislerQuery, (snapshot) => {
+      const tesislerData = [];
+      snapshot.forEach((doc) => {
+        tesislerData.push({ id: doc.id, ...doc.data() });
+      });
+      setTesisler(tesislerData);
+    });
+    unsubscribeFunctions.push(unsubscribeTesisler);
 
     // Seçili turnuva için takımlar ve maçlar için real-time listener
     if (selectedTournament) {

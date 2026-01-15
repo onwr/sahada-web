@@ -16,6 +16,10 @@ import {
   Venus,
   CircleAlert,
   Loader2,
+  ChevronRight,
+  ChevronLeft,
+  Check,
+  X,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { updateUserData } from '../../services/authService';
@@ -26,6 +30,63 @@ import {
 } from '../../services/cdnService';
 import ImageUploader from '../ImageUploader';
 import ProfileImageUploader from '../ProfileImageUploader';
+import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from 'react-leaflet';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+
+// Fix for Leaflet marker icons in React
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
+  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+});
+
+const DraggableMarker = ({ position, onLocationSelect }) => {
+  const markerRef = React.useRef(null);
+  const map = useMapEvents({
+    click(e) {
+      onLocationSelect(e.latlng);
+    },
+  });
+
+  useEffect(() => {
+    if (position) {
+      map.flyTo(position, 15);
+    }
+  }, [position, map]);
+
+  const eventHandlers = React.useMemo(
+    () => ({
+      dragend() {
+        const marker = markerRef.current;
+        if (marker != null) {
+          onLocationSelect(marker.getLatLng());
+        }
+      },
+    }),
+    [onLocationSelect]
+  );
+
+  return position ? (
+    <Marker
+      draggable={true}
+      eventHandlers={eventHandlers}
+      position={position}
+      ref={markerRef}
+    />
+  ) : null;
+};
+
+const RecenterMap = ({ center }) => {
+  const map = useMap();
+  useEffect(() => {
+    if (center.lat && center.lng) {
+      map.setView([center.lat, center.lng]);
+    }
+  }, [center, map]);
+  return null;
+};
 
 const SahaSahibiOnboard = () => {
   const navigate = useNavigate();
@@ -102,24 +163,24 @@ const SahaSahibiOnboard = () => {
   const [mapCenter, setMapCenter] = useState({ lat: 41.0082, lng: 28.9784 });
   const [isDragging, setIsDragging] = useState(false);
   const [pinPosition, setPinPosition] = useState({ x: 50, y: 50 });
-  const [districts, setDistricts] = useState([]);
 
-  // Effect to update districts when city changes
-  useEffect(() => {
-    if (formData.city) {
-      // Find city ID from name
-      const cityEntry = Object.entries(citiesData).find(([id, name]) => name === formData.city);
-      if (cityEntry) {
-        const cityId = cityEntry[0];
-        // Filter districts - ilceler.json structure: [header, db, table_data]
-        // We need index 2 for the data
-        const cityDistricts = districtsData[2]?.data?.filter(d => d.il_id === cityId) || [];
-        setDistricts(cityDistricts);
-      } else {
-        setDistricts([]);
-      }
-    } else {
-      setDistricts([]);
+
+  // Optimize district filtering
+  const districts = React.useMemo(() => {
+    if (!formData.city) return [];
+    
+    // Find city ID from name
+    const cityEntry = Object.entries(citiesData).find(([id, name]) => name === formData.city);
+    if (!cityEntry) return [];
+
+    const cityId = cityEntry[0];
+    // Filter districts safely
+    try {
+        const dataTable = districtsData.find(item => item.type === 'table' && item.name === 'ilce');
+        return dataTable?.data?.filter(d => d.il_id === cityId) || [];
+    } catch (err) {
+        console.error("Districts data error:", err);
+        return [];
     }
   }, [formData.city]);
 
@@ -303,7 +364,25 @@ const SahaSahibiOnboard = () => {
   const handleInputChange = (field, value) => {
     let formattedValue = value;
 
-    if (field === 'taxNumber') {
+    if (field === 'businessPhone') {
+        const numbers = value.replace(/\D/g, '');
+        
+        let formatted = '';
+        if (numbers.length > 0) {
+            formatted += '(' + numbers.substring(0, 3);
+        }
+        if (numbers.length >= 3) {
+            formatted += ') ' + numbers.substring(3, 6);
+        }
+        if (numbers.length >= 6) {
+            formatted += ' ' + numbers.substring(6, 8);
+        }
+        if (numbers.length >= 8) {
+            formatted += ' ' + numbers.substring(8, 10);
+        }
+        
+        formattedValue = formatted;
+    } else if (field === 'taxNumber') {
       // Şahıs şirketi ise 11, değilse 10 karakter
       const limit = formData.companyType === 'individual' ? 11 : 10;
       formattedValue = value.replace(/\D/g, '').slice(0, limit);
@@ -589,54 +668,7 @@ const SahaSahibiOnboard = () => {
     handleLocationSelect(result.lat, result.lng, result.address);
   };
 
-  const handleMapClick = (event) => {
-    // Harita tıklamasından koordinat al (basit örnek)
-    const lat = mapCenter.lat + (Math.random() - 0.5) * 0.01;
-    const lng = mapCenter.lng + (Math.random() - 0.5) * 0.01;
-    const address = `Seçilen Konum (${lat.toFixed(4)}, ${lng.toFixed(4)})`;
-    
-    setSelectedLocation({ lat, lng, address });
-    handleLocationSelect(lat, lng, address);
-  };
 
-  const handlePinDragStart = (event) => {
-    setIsDragging(true);
-    event.preventDefault();
-  };
-
-  const handlePinDrag = (event) => {
-    if (!isDragging) return;
-    
-    const rect = event.currentTarget.parentElement.getBoundingClientRect();
-    const x = ((event.clientX - rect.left) / rect.width) * 100;
-    const y = ((event.clientY - rect.top) / rect.height) * 100;
-    
-    // Sınırları kontrol et
-    const clampedX = Math.max(0, Math.min(100, x));
-    const clampedY = Math.max(0, Math.min(100, y));
-    
-    setPinPosition({ x: clampedX, y: clampedY });
-    
-    // Koordinatları hesapla
-    const lat = mapCenter.lat + (0.5 - clampedY / 100) * 0.01;
-    const lng = mapCenter.lng + (clampedX / 100 - 0.5) * 0.01;
-    const address = `Seçilen Konum (${lat.toFixed(4)}, ${lng.toFixed(4)})`;
-    
-    setSelectedLocation({ lat, lng, address });
-  };
-
-  const handlePinDragEnd = (event) => {
-    if (!isDragging) return;
-    
-    setIsDragging(false);
-    
-    // Son konumu kaydet
-    const lat = mapCenter.lat + (0.5 - pinPosition.y / 100) * 0.01;
-    const lng = mapCenter.lng + (pinPosition.x / 100 - 0.5) * 0.01;
-    const address = `Seçilen Konum (${lat.toFixed(4)}, ${lng.toFixed(4)})`;
-    
-    handleLocationSelect(lat, lng, address);
-  };
 
   // Profil fotoğrafı değişikliği
   const handleProfileImageChange = (imageData) => {
@@ -979,11 +1011,17 @@ const SahaSahibiOnboard = () => {
                         className='absolute top-1/2 left-3 -translate-y-1/2 transform text-gray-400'
                         size={20}
                       />
-                      <input
-                        type='tel'
-                        value={formData.businessPhone}
-                        onChange={(e) => handleInputChange('businessPhone', e.target.value)}
-                        placeholder='(212) XXX XX XX'
+                        <input
+                          type='tel'
+                          value={formData.businessPhone}
+                          onChange={(e) => {
+                              const val = e.target.value;
+                              // Sadece max karakter kontrolü (15 karakter: (555) 555 55 55)
+                              if (val.length <= 15) {
+                                handleInputChange('businessPhone', val);
+                              }
+                          }}
+                          placeholder='(555) 555 55 55'
                         className={`w-full rounded-lg border py-3 pr-4 pl-10 transition-all duration-200 focus:border-transparent focus:ring-2 focus:ring-green-500 focus:outline-none ${
                           errors.businessPhone ? 'border-red-500' : 'border-gray-300'
                         }`}
@@ -1233,51 +1271,38 @@ const SahaSahibiOnboard = () => {
                           )}
                         </div>
                         
-                        <div className='mb-3 rounded-lg border border-gray-200 overflow-hidden relative'>
-                          <iframe
-                            src={`https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3010.279749111567!2d${mapCenter.lng}!3d${mapCenter.lat}!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x14cab9bd6571d149%3A0x1c515b0b4b4b4b4b!2sIstanbul!5e0!3m2!1str!2str!4v1234567890123!5m2!1str!2str`}
-                            width="100%"
-                            height="300"
-                            style={{ border: 0 }}
-                            allowFullScreen=""
-                            loading="lazy"
-                            referrerPolicy="no-referrer-when-downgrade"
-                            title="Konum Seçimi"
-                            onClick={handleMapClick}
-                          />
-                          
-                          {/* Pin Overlay */}
-                          <div 
-                            className='absolute cursor-move z-10 select-none'
-                            style={{
-                              left: `${pinPosition.x}%`,
-                              top: `${pinPosition.y}%`,
-                              transform: 'translate(-50%, -100%)'
-                            }}
-                            onMouseDown={handlePinDragStart}
-                            onMouseMove={handlePinDrag}
-                            onMouseUp={handlePinDragEnd}
-                            onMouseLeave={handlePinDragEnd}
+                        <div className='mb-3 rounded-lg border border-gray-200 overflow-hidden relative h-[300px] z-0'>
+                          <MapContainer
+                            center={mapCenter.lat ? [mapCenter.lat, mapCenter.lng] : [41.0082, 28.9784]}
+                            zoom={13}
+                            scrollWheelZoom={true}
+                            style={{ height: '100%', width: '100%' }}
                           >
-                            <div className='relative'>
-                              <div className={`w-8 h-8 bg-red-500 rounded-full border-4 border-white shadow-lg flex items-center justify-center transition-transform ${isDragging ? 'scale-110' : 'scale-100'}`}>
-                                <div className='w-2 h-2 bg-white rounded-full'></div>
-                              </div>
-                              <div className='absolute top-full left-1/2 transform -translate-x-1/2 mt-1'>
-                                <div className='w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-red-500'></div>
-                              </div>
-                            </div>
-                          </div>
+                            <TileLayer
+                              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                            />
+                            <RecenterMap center={mapCenter} />
+                            <DraggableMarker
+                              position={
+                                formData.businessLocation.lat && formData.businessLocation.lng
+                                  ? [formData.businessLocation.lat, formData.businessLocation.lng]
+                                  : null
+                              }
+                              onLocationSelect={(latlng) => {
+                                handleInputChange('businessLocation', { lat: latlng.lat, lng: latlng.lng });
+                              }}
+                            />
+                          </MapContainer>
                           
-                          {/* Pin Sürükleme Talimatı */}
-                          <div className='absolute top-2 left-2 bg-white bg-opacity-90 rounded-lg px-3 py-2 text-xs text-gray-600 shadow-sm'>
-                            📍 Pin'i sürükleyerek konum seçin
+                          <div className='absolute top-2 right-2 bg-white bg-opacity-90 rounded-lg px-3 py-2 text-xs text-gray-600 shadow-sm z-[1000]'>
+                            📍 Haritaya tıklayın veya pini sürükleyin
                           </div>
                         </div>
                         
                         <div className='space-y-2'>
                           <p className='text-sm text-gray-600'>
-                            Adres arama kutusuna yazarak konum arayabilir veya harita üzerindeki pin'i sürükleyerek konum seçebilirsiniz
+                            Adres arama kutusuna yazarak konum arayabilir, haritaya tıklayabilir veya pini sürükleyerek konum seçebilirsiniz
                           </p>
                           
                           {/* Seçilen Konum Gösterimi */}
@@ -1298,7 +1323,7 @@ const SahaSahibiOnboard = () => {
                               <CircleAlert size={16} className='text-blue-600 mt-0.5' />
                               <div className='text-xs text-blue-700'>
                                 <p className='font-medium'>İpucu:</p>
-                                <p>Adres arama kutusuna "İstanbul" gibi anahtar kelimeler yazarak arama yapabilir veya harita üzerindeki kırmızı pin'i sürükleyerek konum seçebilirsiniz.</p>
+                                <p>Adres arama kutusuna "İstanbul" gibi anahtar kelimeler yazarak arama yapabilir veya harita üzerine tıklayarak konum seçebilirsiniz.</p>
                               </div>
                             </div>
                           </div>

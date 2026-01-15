@@ -2,10 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { getPlatformSettings, updatePlatformSettings, logAdminAction, searchUsers } from '../../services/firestoreService';
 import { useAuth } from '../../contexts/AuthContext';
 import AdminSidebar from '../../components/AdminSidebar';
+import { uploadImage } from '../../services/cdnService';
 import { 
   Settings, Save, AlertCircle, CheckCircle, Globe, Percent, 
   Share2, Users, Shield, Plus, Trash2, Layout, Lock, Code, Image,
-  CreditCard, Search, UserCheck, Banknote
+  CreditCard, Search, UserCheck, Banknote, Upload, Loader2, List, Link as LinkIcon
 } from 'lucide-react';
 
 const Ayarlar = () => {
@@ -32,15 +33,6 @@ const Ayarlar = () => {
       youtube: ''
     },
 
-    // Integrations
-    integrations: {
-      googleAnalyticsId: '',
-      googleAdsId: '',
-      tiktokPixelId: '',
-      searchConsoleCode: '',
-      facebookPixelId: ''
-    },
-
     // Commission System (Advanced)
     commission: {
       baseRate: 5, // Default %
@@ -63,8 +55,19 @@ const Ayarlar = () => {
 
     // Admins (Mock User Management for now)
     admins: [
+
       { id: 1, name: 'Admin User', email: 'admin@sahada.com', role: 'super_admin', addedAt: new Date().toISOString() }
-    ]
+    ],
+
+    // Menu Management
+    menus: {
+      header: [],
+      footer: {
+        platform: [],
+        sahaSahipleri: [],
+        kurumsal: []
+      }
+    }
   });
 
   const [error, setError] = useState(null);
@@ -101,7 +104,15 @@ const Ayarlar = () => {
           commission: { ...prev.commission, ...result.data.commission },
           membership: { ...prev.membership, ...result.data.membership },
           specialRules: result.data.specialRules || prev.specialRules,
-          admins: result.data.admins || prev.admins
+          admins: result.data.admins || prev.admins,
+          menus: {
+            header: result.data.menus?.header || [],
+            footer: {
+              platform: result.data.menus?.footer?.platform || [],
+              sahaSahipleri: result.data.menus?.footer?.sahaSahipleri || [],
+              kurumsal: result.data.menus?.footer?.kurumsal || []
+            }
+          }
         }));
       }
     } catch (err) {
@@ -247,6 +258,109 @@ const Ayarlar = () => {
     });
   };
 
+  // Menu Handlers
+  const [newHeaderItem, setNewHeaderItem] = useState({ label: '', href: '', icon: 'Circle' });
+  const [newFooterItem, setNewFooterItem] = useState({ label: '', href: '', column: 'platform' });
+
+  const addHeaderItem = () => {
+    if (!newHeaderItem.label || !newHeaderItem.href) return;
+    setSettings({
+      ...settings,
+      menus: {
+        ...settings.menus,
+        header: [...settings.menus.header, { ...newHeaderItem, id: Date.now() }]
+      }
+    });
+    setNewHeaderItem({ label: '', href: '', icon: 'Circle' });
+  };
+
+  const removeHeaderItem = (id) => {
+    setSettings({
+      ...settings,
+      menus: {
+        ...settings.menus,
+        header: settings.menus.header.filter(item => item.id !== id)
+      }
+    });
+  };
+
+  const addFooterItem = () => {
+    if (!newFooterItem.label || !newFooterItem.href) return;
+    const column = newFooterItem.column;
+    setSettings({
+      ...settings,
+      menus: {
+        ...settings.menus,
+        footer: {
+          ...settings.menus.footer,
+          [column]: [...settings.menus.footer[column], { 
+            label: newFooterItem.label, 
+            href: newFooterItem.href,
+            id: Date.now() 
+          }]
+        }
+      }
+    });
+    setNewFooterItem({ label: '', href: '', column });
+  };
+
+  const removeFooterItem = (column, id) => {
+    setSettings({
+      ...settings,
+      menus: {
+        ...settings.menus,
+        footer: {
+          ...settings.menus.footer,
+          [column]: settings.menus.footer[column].filter(item => item.id !== id)
+        }
+      }
+    });
+  };
+
+  // Image Upload Logic
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [uploadingFavicon, setUploadingFavicon] = useState(false);
+
+  const handleImageUpload = async (e, type) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (type === 'logo') setUploadingLogo(true);
+    else setUploadingFavicon(true);
+
+    try {
+      // Use 'system' category for site assets
+      const result = await uploadImage(file, 'system', user?.uid || 'admin_settings');
+      
+      if (result.success) {
+        // Handle potential different response structures from cdnService
+        const url = result.data?.url || result.data || (typeof result.data === 'string' ? result.data : '');
+        
+        if (url) {
+             setSettings(prev => ({
+              ...prev,
+              [type === 'logo' ? 'logoUrl' : 'faviconUrl']: url
+            }));
+            setSuccess(`${type === 'logo' ? 'Logo' : 'Favicon'} başarıyla yüklendi.`);
+            setTimeout(() => setSuccess(null), 3000);
+        } else {
+             throw new Error('Upload başarılı ama URL alınamadı');
+        }
+      } else {
+        setError('Resim yüklenirken hata oluştu: ' + (result.error || 'Bilinmeyen hata'));
+      }
+    } catch (err) {
+      console.error('Upload Error:', err);
+      setError('Resim yükleme hatası: ' + err.message);
+    } finally {
+      if (type === 'logo') setUploadingLogo(false);
+      else setUploadingFavicon(false);
+      
+      // Reset input
+      e.target.value = '';
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex h-screen bg-gray-50 items-center justify-center">
@@ -259,7 +373,7 @@ const Ayarlar = () => {
     { id: 'general', label: 'Genel Ayarlar', icon: Globe },
     { id: 'commission', label: 'Komisyon Sistemi', icon: Percent },
     { id: 'payment_offers', label: 'Ödemeler & Teklifler', icon: CreditCard },
-    { id: 'integrations', label: 'Entegrasyonlar & SEO', icon: Code },
+    { id: 'menus', label: 'Menü Yönetimi', icon: List },
     { id: 'admins', label: 'Yöneticiler', icon: Shield },
   ];
 
@@ -307,64 +421,29 @@ const Ayarlar = () => {
           </div>
         </div>
 
-        {/* Content Area */}
-        <div className="flex-1 overflow-y-auto p-8">
-          {error && (
-            <div className="mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg flex items-center">
-              <AlertCircle className="w-5 h-5 mr-2" />
-              {error}
-            </div>
-          )}
-          {success && (
-            <div className="mb-6 bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg flex items-center">
-              <CheckCircle className="w-5 h-5 mr-2" />
-              {success}
-            </div>
-          )}
-
-          <div className="max-w-5xl mx-auto space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-            
-            {/* --- GENERAL TAB --- */}
-            {activeTab === 'general' && (
-              <>
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-                  <h3 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2">
-                    <Layout size={20} className="text-blue-500" />
-                    Site Kimliği & SEO
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="col-span-2">
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Site Başlığı (Title)</label>
-                      <input 
-                        type="text" 
-                        className="w-full border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 p-2.5 border"
-                        value={settings.siteTitle}
-                        onChange={(e) => setSettings({...settings, siteTitle: e.target.value})}
-                      />
+                {/* Content Area */}
+                <div className="flex-1 overflow-y-auto p-8">
+                  {error && (
+                    <div className="mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg flex items-center">
+                      <AlertCircle className="w-5 h-5 mr-2" />
+                      {error}
                     </div>
-                    <div className="col-span-2">
-                       <label className="block text-sm font-medium text-gray-700 mb-1">Meta Açıklama (Description)</label>
-                       <textarea 
-                        rows={3}
-                        className="w-full border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 p-2.5 border"
-                        value={settings.siteDescription}
-                        onChange={(e) => setSettings({...settings, siteDescription: e.target.value})}
-                       />
+                  )}
+                  {success && (
+                    <div className="mb-6 bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg flex items-center">
+                      <CheckCircle className="w-5 h-5 mr-2" />
+                      {success}
                     </div>
-                    <div className="col-span-2">
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Anahtar Kelimeler (Keywords)</label>
-                      <input 
-                        type="text" 
-                        className="w-full border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 p-2.5 border"
-                        placeholder="Virgül ile ayırın"
-                        value={settings.metaKeywords}
-                        onChange={(e) => setSettings({...settings, metaKeywords: e.target.value})}
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                  )}
+        
+                  <div className="max-w-5xl mx-auto space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                    
+                    {/* --- GENERAL TAB --- */}
+                    {activeTab === 'general' && (
+                      <>
+                        {/* SEO Section Moved to Marketing.jsx */}
+        
+                        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
                    <h3 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2">
                     <Image size={20} className="text-purple-500" />
                     Görseller ve Medya
@@ -372,23 +451,71 @@ const Ayarlar = () => {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Logo URL</label>
-                      <input 
-                        type="text" 
-                        className="w-full border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 p-2.5 border"
-                        placeholder="https://..."
-                        value={settings.logoUrl}
-                        onChange={(e) => setSettings({...settings, logoUrl: e.target.value})}
-                      />
+                      <div className="flex gap-2">
+                          <input 
+                            type="text" 
+                            className="flex-1 border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 p-2.5 border"
+                            placeholder="https://..."
+                            value={settings.logoUrl}
+                            onChange={(e) => setSettings({...settings, logoUrl: e.target.value})}
+                          />
+                          <div className="relative">
+                            <input
+                                type="file"
+                                id="logo-upload"
+                                className="hidden"
+                                accept="image/*"
+                                onChange={(e) => handleImageUpload(e, 'logo')}
+                                disabled={uploadingLogo}
+                            />
+                            <label 
+                                htmlFor="logo-upload"
+                                className={`flex items-center justify-center w-11 h-11 rounded-lg border border-gray-300 bg-white cursor-pointer hover:bg-gray-50 transition-colors ${uploadingLogo ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                title="Bilgisayardan Yükle"
+                            >
+                                {uploadingLogo ? <Loader2 className="w-5 h-5 animate-spin text-green-600" /> : <Upload className="w-5 h-5 text-gray-600" />}
+                            </label>
+                           </div>
+                      </div>
+                      {settings.logoUrl && (
+                        <div className="mt-2 p-2 bg-gray-50 rounded border border-gray-100 inline-block">
+                           <img src={settings.logoUrl} alt="Logo Preview" className="h-8 object-contain" />
+                        </div>
+                      )}
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Favicon URL</label>
-                      <input 
-                        type="text" 
-                        className="w-full border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 p-2.5 border"
-                        placeholder="https://..."
-                        value={settings.faviconUrl}
-                        onChange={(e) => setSettings({...settings, faviconUrl: e.target.value})}
-                      />
+                      <div className="flex gap-2">
+                          <input 
+                            type="text" 
+                            className="flex-1 border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 p-2.5 border"
+                            placeholder="https://..."
+                            value={settings.faviconUrl}
+                            onChange={(e) => setSettings({...settings, faviconUrl: e.target.value})}
+                          />
+                          <div className="relative">
+                            <input
+                                type="file"
+                                id="favicon-upload"
+                                className="hidden"
+                                accept="image/*"
+                                onChange={(e) => handleImageUpload(e, 'favicon')}
+                                disabled={uploadingFavicon}
+                            />
+                            <label 
+                                htmlFor="favicon-upload"
+                                className={`flex items-center justify-center w-11 h-11 rounded-lg border border-gray-300 bg-white cursor-pointer hover:bg-gray-50 transition-colors ${uploadingFavicon ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                title="Bilgisayardan Yükle"
+                            >
+                                {uploadingFavicon ? <Loader2 className="w-5 h-5 animate-spin text-green-600" /> : <Upload className="w-5 h-5 text-gray-600" />}
+                            </label>
+                           </div>
+                      </div>
+                      {settings.faviconUrl && (
+                         <div className="mt-2 p-2 bg-gray-50 rounded border border-gray-100 inline-block">
+                             <img src={settings.faviconUrl} alt="Favicon Preview" className="w-8 h-8 object-contain" />
+                         </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -417,6 +544,171 @@ const Ayarlar = () => {
                   </div>
                 </div>
               </>
+            )}
+
+
+
+            {/* --- MENUS TAB --- */}
+            {activeTab === 'menus' && (
+              <div className="space-y-6">
+                {/* Header Menu */}
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                  <h3 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2">
+                    <Layout size={20} className="text-blue-500" />
+                    Header Menüsü
+                  </h3>
+                  
+                  <div className="flex gap-4 mb-6 items-end bg-gray-50 p-4 rounded-lg">
+                    <div className="flex-1">
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Etiket</label>
+                      <input 
+                        type="text"
+                        placeholder="Örn: Hakkımızda"
+                        className="w-full border border-gray-300 rounded-lg p-2"
+                        value={newHeaderItem.label}
+                        onChange={(e) => setNewHeaderItem({...newHeaderItem, label: e.target.value})}
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Link (Href)</label>
+                      <input 
+                        type="text"
+                         placeholder="Örn: /hakkimizda"
+                        className="w-full border border-gray-300 rounded-lg p-2"
+                        value={newHeaderItem.href}
+                        onChange={(e) => setNewHeaderItem({...newHeaderItem, href: e.target.value})}
+                      />
+                    </div>
+                    <div className="w-1/4">
+                      <label className="block text-xs font-medium text-gray-500 mb-1">İkon (Lucide)</label>
+                      <input 
+                        type="text"
+                        placeholder="Örn: Users"
+                        className="w-full border border-gray-300 rounded-lg p-2"
+                        value={newHeaderItem.icon}
+                        onChange={(e) => setNewHeaderItem({...newHeaderItem, icon: e.target.value})}
+                      />
+                    </div>
+                    <button 
+                      onClick={addHeaderItem}
+                      className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors h-[42px] flex items-center justify-center"
+                    >
+                      <Plus size={20} />
+                    </button>
+                  </div>
+
+                  <div className="border rounded-lg overflow-hidden">
+                    <table className="w-full text-left">
+                      <thead className="bg-gray-50 border-b">
+                        <tr>
+                          <th className="px-6 py-3 text-xs font-bold text-gray-500 uppercase">Etiket</th>
+                          <th className="px-6 py-3 text-xs font-bold text-gray-500 uppercase">Link</th>
+                          <th className="px-6 py-3 text-xs font-bold text-gray-500 uppercase">İkon</th>
+                          <th className="px-6 py-3 text-xs font-bold text-gray-500 uppercase text-right">İşlem</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {settings.menus.header.map((item) => (
+                          <tr key={item.id} className="group hover:bg-gray-50">
+                            <td className="px-6 py-3 font-medium text-gray-900">{item.label}</td>
+                            <td className="px-6 py-3 text-blue-600 font-mono text-sm">{item.href}</td>
+                            <td className="px-6 py-3 text-gray-500 text-sm">{item.icon}</td>
+                            <td className="px-6 py-3 text-right">
+                              <button 
+                                onClick={() => removeHeaderItem(item.id)}
+                                className="text-red-400 hover:text-red-600 p-2 hover:bg-red-50 rounded-full"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                        {settings.menus.header.length === 0 && (
+                          <tr><td colSpan="4" className="text-center py-4 text-gray-400 italic">Menü öğesi bulunmuyor.</td></tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Footer Menus */}
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                  <h3 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2">
+                    <LinkIcon size={20} className="text-purple-500" />
+                    Footer Linkleri
+                  </h3>
+                  
+                  <div className="flex gap-4 mb-6 items-end bg-gray-50 p-4 rounded-lg">
+                    <div className="w-1/4">
+                       <label className="block text-xs font-medium text-gray-500 mb-1">Kolon</label>
+                       <select
+                        className="w-full border border-gray-300 rounded-lg p-2"
+                        value={newFooterItem.column}
+                        onChange={(e) => setNewFooterItem({...newFooterItem, column: e.target.value})}
+                       >
+                         <option value="platform">Platform</option>
+                         <option value="sahaSahipleri">Saha Sahipleri</option>
+                         <option value="kurumsal">Kurumsal</option>
+                       </select>
+                    </div>
+                    <div className="flex-1">
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Etiket</label>
+                      <input 
+                        type="text"
+                        placeholder="Link Adı"
+                        className="w-full border border-gray-300 rounded-lg p-2"
+                        value={newFooterItem.label}
+                        onChange={(e) => setNewFooterItem({...newFooterItem, label: e.target.value})}
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Link (Href)</label>
+                      <input 
+                        type="text"
+                        placeholder="/link-adresi"
+                        className="w-full border border-gray-300 rounded-lg p-2"
+                        value={newFooterItem.href}
+                        onChange={(e) => setNewFooterItem({...newFooterItem, href: e.target.value})}
+                      />
+                    </div>
+                    <button 
+                      onClick={addFooterItem}
+                      className="bg-purple-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-purple-700 transition-colors h-[42px] flex items-center justify-center"
+                    >
+                      <Plus size={20} />
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    {['platform', 'sahaSahipleri', 'kurumsal'].map((col) => (
+                       <div key={col} className="border rounded-lg overflow-hidden">
+                          <div className="bg-gray-100 px-4 py-2 border-b font-bold text-gray-700 capitalize">
+                            {col === 'sahaSahipleri' ? 'Saha Sahipleri' : col}
+                          </div>
+                          <div className="divide-y divide-gray-100">
+                            {settings.menus.footer[col].map((item) => (
+                              <div key={item.id} className="flex justify-between items-center p-3 hover:bg-gray-50 group">
+                                <div>
+                                  <p className="text-sm font-medium text-gray-900">{item.label}</p>
+                                  <p className="text-xs text-blue-500">{item.href}</p>
+                                </div>
+                                <button 
+                                  onClick={() => removeFooterItem(col, item.id)}
+                                  className="text-red-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              </div>
+                            ))}
+                            {settings.menus.footer[col].length === 0 && (
+                                <p className="text-center py-4 text-gray-400 text-xs italic">Link yok.</p>
+                            )}
+                          </div>
+                       </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
             )}
 
             {/* --- COMMISSION TAB --- */}
@@ -786,68 +1078,7 @@ const Ayarlar = () => {
               </>
             )}
 
-            {/* --- INTEGRATIONS TAB --- */}
-            {activeTab === 'integrations' && (
-              <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 space-y-6">
-                 <h3 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2">
-                    <Code size={20} className="text-indigo-500" />
-                    Kod Entegrasyonları
-                  </h3>
-                  
-                  <div className="grid grid-cols-1 gap-6">
-                    <div>
-                      <label className="flex text-sm font-medium text-gray-700 mb-1 items-center gap-2">
-                        Google Analytics ID <span className="text-xs text-gray-400 font-normal">(G-XXXXXXXXXX)</span>
-                      </label>
-                      <input 
-                        type="text" 
-                        className="w-full border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 p-2.5 border"
-                        value={settings.integrations.googleAnalyticsId}
-                        onChange={(e) => setSettings({...settings, integrations: {...settings.integrations, googleAnalyticsId: e.target.value}})}
-                      />
-                    </div>
-                    <div>
-                      <label className="flex text-sm font-medium text-gray-700 mb-1 items-center gap-2">
-                        Google Ads ID <span className="text-xs text-gray-400 font-normal">(AW-XXXXXXXXXX)</span>
-                      </label>
-                      <input 
-                        type="text" 
-                        className="w-full border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 p-2.5 border"
-                        value={settings.integrations.googleAdsId}
-                        onChange={(e) => setSettings({...settings, integrations: {...settings.integrations, googleAdsId: e.target.value}})}
-                      />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Google Search Console (Meta Tag Doğrulama Kodu)</label>
-                        <input 
-                          type="text" 
-                          className="w-full border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 p-2.5 border"
-                          placeholder='<meta name="google-site-verification" content="..." />'
-                          value={settings.integrations.searchConsoleCode}
-                          onChange={(e) => setSettings({...settings, integrations: {...settings.integrations, searchConsoleCode: e.target.value}})}
-                        />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">TikTok Pixel ID</label>
-                      <input 
-                        type="text" 
-                        className="w-full border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 p-2.5 border"
-                        value={settings.integrations.tiktokPixelId}
-                        onChange={(e) => setSettings({...settings, integrations: {...settings.integrations, tiktokPixelId: e.target.value}})}
-                      />
-                    </div>
-                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Facebook Pixel ID</label>
-                      <input 
-                        type="text" 
-                        className="w-full border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 p-2.5 border"
-                        value={settings.integrations.facebookPixelId}
-                        onChange={(e) => setSettings({...settings, integrations: {...settings.integrations, facebookPixelId: e.target.value}})}
-                      />
-                    </div>
-                  </div>
-              </div>
-            )}
+
 
             {/* --- ADMINS TAB --- */}
             {activeTab === 'admins' && (

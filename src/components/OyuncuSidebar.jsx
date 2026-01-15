@@ -132,7 +132,7 @@ const OyuncuSidebar = () => {
     },
     {
       name: 'Oyuncu Bul',
-      href: '/oyuncu/oyuncu-bul',
+      href: '/oyuncu/oyuncu-bul?tab=player',
       icon: Search,
       current: location.pathname === '/oyuncu/oyuncu-bul'
     },
@@ -374,7 +374,7 @@ const OyuncuSidebar = () => {
             ) : (
               <>
                 <LogOut className="w-4 h-4" />
-                <span>Çıkış Yap</span>
+                <span>Çıkış</span>
               </>
             )}
           </button>

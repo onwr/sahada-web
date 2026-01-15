@@ -12,8 +12,7 @@ import {
   setDefaultPaymentMethod,
   getUserData
 } from '../../services/firestoreService';
-import { storage } from '../../config/firebase';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { uploadProfileImage } from '../../services/cdnService';
 import { updateProfile } from 'firebase/auth';
 import { updatePassword, reauthenticateWithCredential, EmailAuthProvider } from 'firebase/auth';
 import { doc, onSnapshot, collection, query, where, getDoc } from 'firebase/firestore';
@@ -539,20 +538,29 @@ const Profil = () => {
       };
       reader.readAsDataURL(file);
       
-      const storageRef = ref(storage, `profiles/${user.uid}/${Date.now()}_${file.name}`);
-      await uploadBytes(storageRef, file);
-      const downloadURL = await getDownloadURL(storageRef);
+      // Use CDN Service to bypass Firebase Storage CORS issues
+      const result = await uploadProfileImage(file, user.uid);
       
-      await updatePlayerProfile(user.uid, { photoURL: downloadURL });
-      
-      await updateProfile(user, {
-        photoURL: downloadURL
-      });
-      
-      toast.success('Profil fotoğrafı başarıyla yüklendi');
+      if (result.success) {
+           // cdnService returns data which might be the URL or contain it
+           const downloadURL = result.data.url || result.data;
+           
+           await updatePlayerProfile(user.uid, { photoURL: downloadURL });
+           
+           await updateProfile(user, {
+              photoURL: downloadURL
+           });
+           
+           toast.success('Profil fotoğrafı başarıyla yüklendi');
+      } else {
+           console.error('Fotoğraf yükleme hatası:', result.error);
+           toast.error('Yükleme başarısız: ' + (result.error || 'Bilinmeyen hata'));
+           // Revert preview if failed? keeping it is fine as visual feedback of attempt
+      }
+
     } catch (err) {
-      console.error('Fotoğraf yükleme hatası:', err);
-      toast.error('Fotoğraf yüklenirken hata oluştu');
+      console.error('Genel hata:', err);
+      toast.error('Bir hata oluştu: ' + err.message);
     } finally {
       setUploadingPhoto(false);
     }
@@ -878,8 +886,8 @@ const Profil = () => {
 
           {/* Tabs */}
           {isViewingOwnProfile && (
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-2 mb-6">
-            <div className="flex space-x-2">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-2 mb-6 overflow-x-auto custom-scrollbar">
+            <div className="flex space-x-2 min-w-max md:min-w-0 md:w-full">
               <button
                 onClick={() => setActiveTab('profile')}
                 className={`flex-1 px-4 py-2 rounded-lg font-medium transition-colors ${

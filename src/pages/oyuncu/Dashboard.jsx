@@ -3,7 +3,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { getPlayerStats, getPlayerReservations, getPlayerTeams, getAllTesisler, getUserOpenMatchesList, getTesis } from '../../services/firestoreService';
-import { collection, query, onSnapshot, where } from 'firebase/firestore';
+import { collection, query, onSnapshot, where, or } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import OyuncuSidebar from '../../components/OyuncuSidebar';
 import DashboardHeader from '../../components/DashboardHeader';
@@ -91,7 +91,10 @@ const Dashboard = () => {
     // Rezervasyonlar için listener
     const reservationsQuery = query(
       collection(db, 'rezervasyonlar'),
-      where('userId', '==', user.uid)
+      or(
+        where('userId', '==', user.uid),
+        where('playerIds', 'array-contains', user.uid)
+      )
     );
 
     const unsubscribeReservations = onSnapshot(reservationsQuery, (snapshot) => {
@@ -430,7 +433,7 @@ const Dashboard = () => {
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4 mt-8">
               {[
                 { icon: Search, label: 'Saha Ara', href: '/oyuncu/sahalar' },
-                { icon: Users, label: 'Oyuncu Bul', href: '/oyuncu/oyuncu-bul' },
+                { icon: Users, label: 'Oyuncu Bul', href: '/oyuncu/oyuncu-bul?tab=player' },
                 { icon: Plus, label: 'Maç Oluştur', href: '/oyuncu/mac-olustur' },
                 { icon: Users, label: 'Ekip Yönetimi', href: '/oyuncu/ekip' },
                 { icon: Trophy, label: 'Turnuvalar', href: '/oyuncu/turnuvalar' },
@@ -441,7 +444,7 @@ const Dashboard = () => {
                   whileHover={{ scale: 1.05, y: -2 }}
                   whileTap={{ scale: 0.95 }}
                   onClick={() => navigate(item.href)}
-                  className="bg-white/10 backdrop-blur-md border border-white/20 rounded-xl p-3 sm:p-4 text-white hover:bg-white/20 transition-all flex flex-col items-center justify-center gap-2 min-h-[90px] group"
+                  className="bg-white/20 backdrop-blur-md border border-white/40 rounded-xl p-3 sm:p-4 text-white hover:bg-white/30 transition-all flex flex-col items-center justify-center gap-2 min-h-[90px] group shadow-sm"
                 >
                   <div className="p-2 bg-white/20 rounded-lg group-hover:bg-white/30 transition-colors">
                     <item.icon className="w-5 h-5 sm:w-6 sm:h-6" />

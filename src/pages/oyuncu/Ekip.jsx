@@ -36,9 +36,11 @@ const Ekip = () => {
   const [teamMembers, setTeamMembers] = useState([]);
   const [teamMatches, setTeamMatches] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [creating, setCreating] = useState(false);
   const [loadingMembers, setLoadingMembers] = useState(false);
   const fileInputRef = useRef(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [showAddMemberModal, setShowAddMemberModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [memberEmail, setMemberEmail] = useState('');
@@ -131,9 +133,13 @@ const Ekip = () => {
         toast.error("Lütfen bir takım fotoğrafı seçiniz.");
         return;
     }
+
+    if (creating) return;
+    setCreating(true);
     
     try {
       const result = await createTeam({
+        // ... (same content)
         name: teamForm.name,
         description: teamForm.description,
         captainId: user.uid,
@@ -149,41 +155,14 @@ const Ekip = () => {
       });
       
       if (result.success) {
-        let photoURL = 'https://via.placeholder.com/200x200?text=TEAM'; // Default/Fallback
+        let photoURL = 'https://via.placeholder.com/200x200?text=TEAM'; 
         
         if (teamImageFile) {
             toast.loading('Takım resmi yükleniyor...');
             const uploadResult = await uploadTeamImage(teamImageFile, result.id);
             if (uploadResult.success) {
-                // cdnService returns { success: true, data: { url: ... } } usually, but let's check what uploadImage returns.
-                // It returns { success: true, data: result.data }. result.data usually contains 'url' or 'file_path'.
-                // Waiting to verify return structure.
-                // Looking at cdnService.js:
-                // return { success: true, data: result.data };
-                // BUT previous usage in Ekip.jsx assumed: uploadResult.url
-                // Let's check Onboard.jsx usage? Or Profil.jsx?
-                // Profil.jsx used uploadBytes directly.
-                // Onboard.jsx calls handleProfileImageChange(imageData).
-                // Let's assume cdnService returns data with 'url' property.
-                
-                // If the cdnService return structure is { success: true, data: { url: ... } }, then we need uploadResult.data.url
-                
-                // However, let's look at cdnService.js code I saw earlier:
-                // const result = await response.json();
-                // return { success: true, data: result.data };
-                
-                // So uploadResult.data holds the response data.
-                // If result.data is the URL string, then uploadResult.data is the URL.
-                // If result.data is an object { url: ... }, then uploadResult.data.url.
-                
-                // Let's be safe and log or handle both.
-                // But better yet, I should check what 'result.data' is from the API.
-                // Assuming it returns an object with url.
-                
                 const imageUrl = uploadResult.data?.url || uploadResult.data;
                 photoURL = imageUrl;
-                
-                // Also update the doc with this URL
                 await updateDoc(doc(db, 'teams', result.id), { photoURL: imageUrl });
             } else {
                  toast.error("Resim yüklenemedi: " + uploadResult.error);
@@ -203,6 +182,8 @@ const Ekip = () => {
     } catch (err) {
       console.error('Ekip oluşturma hatası:', err);
       toast.error('Ekip oluşturulurken hata oluştu');
+    } finally {
+        setCreating(false);
     }
   };
 
@@ -388,18 +369,22 @@ const Ekip = () => {
   const handleDeleteTeam = async () => {
     if (!selectedTeam) return;
 
+    // Double check confirmation even though modal handles it
+    if (!window.confirm(`"${selectedTeam.name}" ekibini kalıcı olarak silmek istediğinizden emin misiniz?`)) return;
+
     try {
       const result = await deleteTeam(selectedTeam.id);
       if (result.success) {
         setShowDeleteModal(false);
         setSelectedTeam(null);
         loadTeams();
+        toast.success('Ekip başarıyla silindi');
       } else {
-        alert(result.error || 'Ekip silinemedi');
+        toast.error(result.error || 'Ekip silinemedi');
       }
     } catch (err) {
       console.error('Ekip silme hatası:', err);
-      alert('Hata oluştu');
+      toast.error('Ekip silinirken hata oluştu');
     }
   };
 
@@ -444,6 +429,50 @@ const Ekip = () => {
         console.error('Resim güncelleme hatası:', error);
         toast.dismiss();
         toast.error('Hata oluştu');
+    }
+  };
+
+
+
+  const handleEditClick = () => {
+    if (!selectedTeam) return;
+    setTeamForm({
+      name: selectedTeam.name || '',
+      description: selectedTeam.description || '',
+      sport: selectedTeam.sport || 'football',
+      maxMembers: selectedTeam.maxMembers || 22
+    });
+    setShowEditModal(true);
+  };
+
+  const handleUpdateTeam = async () => {
+    if (!selectedTeam || !teamForm.name) {
+      toast.error("Lütfen takım adı giriniz.");
+      return;
+    }
+
+    try {
+      const teamRef = doc(db, 'teams', selectedTeam.id);
+      
+      const updateData = {
+        name: teamForm.name,
+        description: teamForm.description,
+        sport: teamForm.sport,
+        maxMembers: parseInt(teamForm.maxMembers),
+        updatedAt: new Date()
+      };
+
+      await updateDoc(teamRef, updateData);
+      
+      // Update local state
+      setSelectedTeam(prev => ({ ...prev, ...updateData }));
+      setTeams(prev => prev.map(t => t.id === selectedTeam.id ? { ...t, ...updateData } : t));
+      
+      toast.success('Takım bilgileri güncellendi');
+      setShowEditModal(false);
+    } catch (error) {
+      console.error('Takım güncelleme hatası:', error);
+      toast.error('Güncelleme sırasında hata oluştu');
     }
   };
 
@@ -641,6 +670,7 @@ const Ekip = () => {
                     <span>Üye Ekle</span>
                   </button>
                   <button 
+                    onClick={handleEditClick}
                     className="w-full px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 mb-2"
                   >
                     Düzenle
@@ -872,6 +902,7 @@ const Ekip = () => {
                     <option value="basketball">Basketbol</option>
                     <option value="volleyball">Voleybol</option>
                     <option value="tennis">Tenis</option>
+                    <option value="swimming">Yüzme</option>
                   </select>
                 </div>
                 
@@ -934,6 +965,91 @@ const Ekip = () => {
                   </button>
                   <button
                     onClick={() => setShowCreateModal(false)}
+                    className="px-4 py-2 text-gray-600 hover:bg-gray-50 rounded-lg"
+                  >
+                    İptal
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Edit Team Modal */}
+        {showEditModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl p-6 max-w-md w-full max-h-[90vh] overflow-y-auto">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-xl font-bold text-gray-900">Ekibi Düzenle</h3>
+                <button onClick={() => setShowEditModal(false)} className="text-gray-400 hover:text-gray-600">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Ekip Adı</label>
+                  <input
+                    type="text"
+                    name="name"
+                    value={teamForm.name}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                    placeholder="Örn: Şampiyonlar Takımı"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Spor Türü</label>
+                  <select
+                    name="sport"
+                    value={teamForm.sport}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                  >
+                    <option value="football">Futbol</option>
+                    <option value="basketball">Basketbol</option>
+                    <option value="volleyball">Voleybol</option>
+                    <option value="tennis">Tenis</option>
+                    <option value="swimming">Yüzme</option>
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Maksimum Üye Sayısı</label>
+                  <input
+                    type="number"
+                    name="maxMembers"
+                    value={teamForm.maxMembers}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                    min="2"
+                    max="50"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Açıklama</label>
+                  <textarea
+                    name="description"
+                    value={teamForm.description}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                    rows={3}
+                    placeholder="Ekip hakkında bilgi..."
+                  />
+                </div>
+                
+                <div className="flex space-x-3 pt-4">
+                  <button
+                    onClick={handleUpdateTeam}
+                    className="flex-1 flex items-center justify-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                  >
+                    <Save className="w-4 h-4" />
+                    <span>Güncelle</span>
+                  </button>
+                  <button
+                    onClick={() => setShowEditModal(false)}
                     className="px-4 py-2 text-gray-600 hover:bg-gray-50 rounded-lg"
                   >
                     İptal

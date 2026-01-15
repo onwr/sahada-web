@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getTesis, toggleFavoriteTesis } from '../services/firestoreService';
+import { getTesis, toggleFavoriteTesis, addReview, getTesisReviews, deleteReview, checkCanUserReview } from '../services/firestoreService';
 import { useAuth } from '../contexts/AuthContext';
 import { 
   ArrowLeft, 
@@ -32,11 +32,92 @@ const SahaDetay = () => {
   const [showImageModal, setShowImageModal] = useState(false);
   const [isFavorite, setIsFavorite] = useState(false);
   const [favLoading, setFavLoading] = useState(false);
+  const [reviews, setReviews] = useState([]);
+  const [showReviewModal, setShowReviewModal] = useState(false);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
+  const [reviewForm, setReviewForm] = useState({ 
+    rating: 5, 
+    comment: '',
+    surface: 5,
+    lighting: 5,
+    service: 5
+  });
+  const [submittingReview, setSubmittingReview] = useState(false);
+  const [canReview, setCanReview] = useState(false);
+  const [checkingPermission, setCheckingPermission] = useState(true);
 
   // Saha verilerini yükle
   useEffect(() => {
     loadSahaData();
+    loadReviews();
   }, [id]);
+
+  const loadReviews = async () => {
+    if (!id) return;
+    setReviewsLoading(true);
+    const result = await getTesisReviews(id);
+    if (result.success) {
+      setReviews(result.data);
+    }
+    setReviewsLoading(false);
+  };
+
+  const handleReviewSubmit = async (e) => {
+    e.preventDefault();
+    if (!user) return;
+
+    setSubmittingReview(true);
+    try {
+      const reviewData = {
+        userId: user.uid,
+        userName: userData?.fullName || user.displayName || 'Kullanıcı',
+        userAvatar: userData?.photoURL || user.photoURL || null,
+        rating: reviewForm.rating,
+        comment: reviewForm.comment,
+        details: {
+          surface: reviewForm.surface,
+          lighting: reviewForm.lighting,
+          service: reviewForm.service
+        }
+      };
+
+      const result = await addReview(id, reviewData);
+      
+      if (result.success) {
+        setShowReviewModal(false);
+        setReviewForm({ rating: 5, comment: '', surface: 5, lighting: 5, service: 5 });
+        // Firestore indexing için çok kısa bir bekleme ve update
+        setTimeout(() => {
+          loadReviews();
+          loadSahaData();
+        }, 800);
+        alert('Değerlendirmeniz başarıyla eklendi!');
+      } else {
+        alert('Değerlendirme eklenirken bir hata oluştu.');
+      }
+    } catch (error) {
+      console.error(error);
+      alert('Hata oluştu.');
+    } finally {
+      setSubmittingReview(false);
+    }
+  };
+
+  const handleDeleteReview = async (reviewId, rating) => {
+    if (!window.confirm('Bu değerlendirmeyi silmek istediğinizden emin misiniz?')) return;
+
+    try {
+      const result = await deleteReview(reviewId, id, rating);
+      if (result.success) {
+        loadReviews();
+        loadSahaData();
+        toast.success('Değerlendirmeniz silindi.');
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error('Silme işlemi sırasında bir hata oluştu.');
+    }
+  };
 
   // Favori durumunu kontrol et
   useEffect(() => {
@@ -57,6 +138,14 @@ const SahaDetay = () => {
         setSahaData(result.data);
       } else {
         setError(result.error);
+      }
+
+      // Değerlendirme izni kontrolü
+      if (user) {
+        setCheckingPermission(true);
+        const permResult = await checkCanUserReview(user.uid, id);
+        setCanReview(permResult.canReview);
+        setCheckingPermission(false);
       }
     } catch (err) {
       setError('Saha verileri yüklenirken hata oluştu');
@@ -186,7 +275,7 @@ const SahaDetay = () => {
               </button>
               <div>
                 <h1 className="text-xl font-bold text-gray-900">{sahaData.name}</h1>
-                <p className="text-sm text-gray-600">{sahaData.location}</p>
+                <p className="text-sm text-gray-600">{sahaData.location || sahaData.address || 'Konum bilgisi yok'}</p>
               </div>
             </div>
             <div className="flex items-center space-x-2">
@@ -310,7 +399,9 @@ const SahaDetay = () => {
                     </div>
                     <div>
                       <p className="text-sm text-gray-600">Konum</p>
-                      <p className="font-semibold text-gray-900">{sahaData.location}</p>
+                      <p className="font-semibold text-gray-900 leading-tight">
+                        {sahaData.location || sahaData.address || 'Konum bilgisi yok'}
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -342,14 +433,22 @@ const SahaDetay = () => {
             <div className="bg-white rounded-xl p-6 shadow-sm">
               <h2 className="text-2xl font-bold text-gray-900 mb-4">İletişim Bilgileri</h2>
               <div className="space-y-4">
-                <div className="flex items-center space-x-3">
-                  <Phone className="w-5 h-5 text-gray-400" />
-                  <span className="text-gray-700">{sahaData.phone}</span>
+                <div className="flex items-start space-x-3">
+                  <MapPin className="w-5 h-5 text-gray-400 mt-1" />
+                  <span className="text-gray-700">{sahaData.address || sahaData.location || 'Konum bilgisi yok'}</span>
                 </div>
-                <div className="flex items-center space-x-3">
-                  <Mail className="w-5 h-5 text-gray-400" />
-                  <span className="text-gray-700">{sahaData.email}</span>
-                </div>
+                {sahaData.phone && (
+                  <div className="flex items-center space-x-3">
+                    <Phone className="w-5 h-5 text-gray-400" />
+                    <span className="text-gray-700">{sahaData.phone}</span>
+                  </div>
+                )}
+                {sahaData.email && (
+                  <div className="flex items-center space-x-3">
+                    <Mail className="w-5 h-5 text-gray-400" />
+                    <span className="text-gray-700">{sahaData.email}</span>
+                  </div>
+                )}
                 {sahaData.website && (
                   <div className="flex items-center space-x-3">
                     <Globe className="w-5 h-5 text-gray-400" />
@@ -361,6 +460,139 @@ const SahaDetay = () => {
                     >
                       {sahaData.website}
                     </a>
+                  </div>
+                )}
+              </div>
+            </div>
+            {/* Değerlendirmeler */}
+            <div className="bg-white rounded-xl p-6 shadow-sm">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900">Değerlendirmeler</h2>
+                  <div className="flex items-center mt-1">
+                    <Star className="w-5 h-5 text-yellow-500 fill-current" />
+                    <span className="ml-1 font-bold text-gray-900">{sahaData.rating || 0}</span>
+                    <span className="mx-1 text-gray-400">•</span>
+                    <span className="text-gray-600">{sahaData.ratingCount || 0} değerlendirme</span>
+                  </div>
+                </div>
+                {!user ? (
+                   <button 
+                     onClick={() => navigate('/login')}
+                     className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-medium"
+                   >
+                     Yorum Yapmak İçin Giriş Yap
+                   </button>
+                ) : (
+                  <div className="flex flex-col items-end gap-1">
+                    <button 
+                      onClick={() => setShowReviewModal(true)}
+                      disabled={!canReview || checkingPermission}
+                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                        canReview 
+                          ? 'bg-green-600 text-white hover:bg-green-700' 
+                          : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                      }`}
+                    >
+                      {checkingPermission ? 'Kontrol ediliyor...' : 'Değerlendir'}
+                    </button>
+                    {!canReview && !checkingPermission && (
+                      <span className="text-[10px] text-gray-500 max-w-[150px] text-right">
+                        Sadece bu sahada maç yapmış oyuncular yorum yapabilir. Maç saatiniz geçince değerlendirme yapabilirsiniz.
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-6">
+                {reviewsLoading ? (
+                  <div className="text-center py-8">
+                    <Loader2 className="w-8 h-8 animate-spin mx-auto text-green-600" />
+                  </div>
+                ) : reviews.length > 0 ? (
+                  <div className="divide-y divide-gray-100">
+                    {reviews.map((review) => (
+                      <div key={review.id} className="py-6 first:pt-0 last:pb-0">
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="flex items-center space-x-3">
+                            <div className="w-10 h-10 bg-gray-100 rounded-full overflow-hidden shrink-0">
+                               {review.userAvatar && (
+                                 <img 
+                                   src={review.userAvatar} 
+                                   alt={review.userName} 
+                                   className="w-full h-full object-cover"
+                                   onError={(e) => {
+                                     e.target.style.display = 'none';
+                                     const placeholder = e.target.nextSibling;
+                                     if (placeholder) placeholder.style.display = 'flex';
+                                   }}
+                                 />
+                               )}
+                               <div 
+                                 className="w-full h-full items-center justify-center bg-green-50 text-green-600 font-bold"
+                                 style={{ display: review.userAvatar ? 'none' : 'flex' }}
+                               >
+                                 {review.userName?.charAt(0).toUpperCase()}
+                               </div>
+                            </div>
+                            <div className="min-w-0">
+                              <p className="font-semibold text-gray-900 truncate">{review.userName}</p>
+                              <p className="text-xs text-gray-500">
+                                {review.createdAt?.toDate ? review.createdAt.toDate().toLocaleDateString('tr-TR') : 'Yeni'}
+                              </p>
+                            </div>
+                          </div>
+                          
+                          <div className="flex items-center gap-3">
+                            <div className="flex bg-yellow-50 px-2 py-1 rounded-lg">
+                              {[...Array(5)].map((_, i) => (
+                                <Star 
+                                  key={i} 
+                                  className={`w-3.5 h-3.5 ${i < review.rating ? 'text-yellow-400 fill-current' : 'text-gray-300'}`} 
+                                />
+                              ))}
+                            </div>
+                            
+                            {user && (user.uid === review.userId || userData?.role === 'admin') && (
+                              <button
+                                onClick={() => handleDeleteReview(review.id, review.rating)}
+                                className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                title="Yorumu Sil"
+                              >
+                                <X size={16} />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        {review.comment && (
+                          <p className="text-gray-700 text-sm leading-relaxed ml-13">
+                            {review.comment}
+                          </p>
+                        )}
+                        
+                        {/* Detaylı Puanlar (Opsiyonel Görüntüleme) */}
+                        {review.details && (
+                          <div className="flex gap-4 mt-2 ml-13">
+                            {review.details.surface && (
+                              <span className="text-[10px] text-gray-500 bg-gray-50 px-2 py-0.5 rounded">Zemin: {review.details.surface}/5</span>
+                            )}
+                            {review.details.lighting && (
+                              <span className="text-[10px] text-gray-500 bg-gray-50 px-2 py-0.5 rounded">Işık: {review.details.lighting}/5</span>
+                            )}
+                            {review.details.service && (
+                              <span className="text-[10px] text-gray-500 bg-gray-50 px-2 py-0.5 rounded">Hizmet: {review.details.service}/5</span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-10 text-gray-500 bg-gray-50 rounded-xl border border-dashed border-gray-200">
+                    <p className="font-medium">Henüz değerlendirme yapılmamış.</p>
+                    <p className="text-sm mt-1">Bu saha hakkındaki ilk yorumu siz yapın!</p>
                   </div>
                 )}
               </div>
@@ -443,6 +675,123 @@ const SahaDetay = () => {
                 ))}
               </div>
             )}
+          </div>
+        </div>
+      )}
+      {/* Review Modal */}
+      {showReviewModal && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4 transition-all duration-300">
+          <div className="bg-white rounded-2xl p-8 w-full max-w-lg shadow-2xl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-bold text-gray-900">Değerlendir</h3>
+              <button 
+                onClick={() => setShowReviewModal(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <form onSubmit={handleReviewSubmit}>
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Puanınız</label>
+                <div className="flex gap-2">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <button
+                      key={star}
+                      type="button"
+                      onClick={() => setReviewForm(prev => ({ ...prev, rating: star }))}
+                      className="focus:outline-none transition-transform hover:scale-110"
+                    >
+                      <Star 
+                        className={`w-8 h-8 ${
+                          star <= reviewForm.rating 
+                            ? 'text-yellow-400 fill-current' 
+                            : 'text-gray-300'
+                        }`} 
+                      />
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Detaylı Puanlama */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 pt-4 border-t border-gray-100">
+                {/* Zemin */}
+                <div className="space-y-1">
+                  <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Zemin</span>
+                  <div className="flex gap-1">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <button
+                        key={star}
+                        type="button"
+                        onClick={() => setReviewForm(prev => ({ ...prev, surface: star }))}
+                      >
+                        <Star className={`w-4 h-4 ${star <= reviewForm.surface ? 'text-green-500 fill-current' : 'text-gray-300'}`} />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Işık */}
+                <div className="space-y-1">
+                  <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Işık</span>
+                  <div className="flex gap-1">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <button
+                        key={star}
+                        type="button"
+                        onClick={() => setReviewForm(prev => ({ ...prev, lighting: star }))}
+                      >
+                        <Star className={`w-4 h-4 ${star <= reviewForm.lighting ? 'text-yellow-500 fill-current' : 'text-gray-300'}`} />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Hizmet */}
+                <div className="space-y-1">
+                  <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Hizmet</span>
+                  <div className="flex gap-1">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <button
+                        key={star}
+                        type="button"
+                        onClick={() => setReviewForm(prev => ({ ...prev, service: star }))}
+                      >
+                        <Star className={`w-4 h-4 ${star <= reviewForm.service ? 'text-blue-500 fill-current' : 'text-gray-300'}`} />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Yorumunuz</label>
+                <textarea
+                  value={reviewForm.comment}
+                  onChange={(e) => setReviewForm(prev => ({ ...prev, comment: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 min-h-[100px]"
+                  placeholder="Saha hakkındaki düşüncelerinizi paylaşın..."
+                  required
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={submittingReview}
+                className="w-full bg-green-600 text-white py-3 rounded-lg font-semibold hover:bg-green-700 disabled:opacity-50 flex items-center justify-center"
+              >
+                {submittingReview ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin mr-2" />
+                    Gönderiliyor...
+                  </>
+                ) : (
+                  'Değerlendir'
+                )}
+              </button>
+            </form>
           </div>
         </div>
       )}

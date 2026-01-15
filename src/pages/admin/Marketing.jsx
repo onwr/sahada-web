@@ -2,17 +2,21 @@ import React, { useState, useEffect } from 'react';
 import { updateSystemSettings, getSystemSettings } from '../../services/firestoreService';
 import AdminSidebar from '../../components/AdminSidebar';
 import { 
-    BarChart3, Globe, Facebook, Video, Save,
-    CheckCircle, XCircle, Eye, ExternalLink, RefreshCw, AlertTriangle
+    BarChart3, Globe, Facebook, Video, Save, Search, Megaphone,
+    CheckCircle, XCircle, Eye, ExternalLink, RefreshCw, AlertTriangle, Tag, Layout
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const Marketing = () => {
     // States
     const [settings, setSettings] = useState({
+        seo: { title: '', description: '', keywords: '' },
         googleAnalytics: { enabled: false, id: '' },
-        metaPixel: { enabled: false, id: '' },
-        tiktokPixel: { enabled: false, id: '' },
+        googleTagManager: { enabled: false, id: '' },
+        googleAds: { enabled: false, id: '', conversionLabel: '' },
+        searchConsole: { verificationCode: '' },
+        metaPixel: { enabled: false, id: '', accessToken: '' },
+        tiktokPixel: { enabled: false, id: '', accessToken: '' },
     });
     const [loading, setLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
@@ -32,7 +36,14 @@ const Marketing = () => {
                 // Merge with defaults to ensure structure
                 setSettings(prev => ({
                     ...prev,
-                    ...result.data
+                    ...result.data,
+                    // Ensure nested objects exist
+                    seo: { ...prev.seo, ...result.data.seo },
+                    googleTagManager: { ...prev.googleTagManager, ...result.data.googleTagManager },
+                    googleAds: { ...prev.googleAds, ...(result.data.googleAds || {}) },
+                    searchConsole: { ...prev.searchConsole, ...(result.data.searchConsole || {}) },
+                    metaPixel: { ...prev.metaPixel, ...result.data.metaPixel },
+                    tiktokPixel: { ...prev.tiktokPixel, ...result.data.tiktokPixel }
                 }));
             }
         } catch (err) {
@@ -95,7 +106,7 @@ const Marketing = () => {
                         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
                             <div>
                                 <h1 className="text-2xl font-black text-gray-900">Marketing & Analytics</h1>
-                                <p className="text-sm text-gray-500 mt-1">Pixel ve analitik entegrasyonlarını yönetin</p>
+                                <p className="text-sm text-gray-500 mt-1">SEO, Pixel, Tag Manager ve reklam entegrasyonlarını yönetin</p>
                             </div>
                             <button
                                 onClick={handleSave}
@@ -121,6 +132,176 @@ const Marketing = () => {
                             </div>
                         )}
 
+                         {/* SEO Settings */}
+                         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden hover:shadow-md transition-shadow">
+                            <div className="p-6 border-b border-gray-100">
+                                <div className="flex items-center gap-4">
+                                    <div className="p-3 bg-purple-50 rounded-xl">
+                                        <Layout size={24} className="text-purple-600" />
+                                    </div>
+                                    <div className="flex-1">
+                                        <h3 className="font-bold text-gray-900 text-lg">Site Kimliği ve SEO</h3>
+                                        <p className="text-sm text-gray-500">Arama motorları için temel site ayarları</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="p-6 bg-gray-50/50">
+                                <div className="grid grid-cols-1 gap-4">
+                                    <div>
+                                        <label className="block text-sm font-bold text-gray-700 mb-2">Site Başlığı (Title)</label>
+                                        <input
+                                            type="text"
+                                            value={settings.seo?.title || ''}
+                                            onChange={(e) => updateSetting('seo', 'title', e.target.value)}
+                                            placeholder="Sahada.com - Halı Saha Kiralama"
+                                            className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 font-medium"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-bold text-gray-700 mb-2">Meta Açıklama (Description)</label>
+                                        <textarea
+                                            value={settings.seo?.description || ''}
+                                            onChange={(e) => updateSetting('seo', 'description', e.target.value)}
+                                            placeholder="Türkiye'nin en büyük halı saha kiralama platformu..."
+                                            rows={2}
+                                            className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 font-medium"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-bold text-gray-700 mb-2">Anahtar Kelimeler (Keywords)</label>
+                                        <input
+                                            type="text"
+                                            value={settings.seo?.keywords || ''}
+                                            onChange={(e) => updateSetting('seo', 'keywords', e.target.value)}
+                                            placeholder="halı saha, maç, futbol, kiralama"
+                                            className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 font-medium"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Google Tag Manager & Search Console */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {/* GTM */}
+                            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden hover:shadow-md transition-shadow">
+                                <div className="p-6 border-b border-gray-100">
+                                    <div className="flex items-center gap-4">
+                                        <div className="p-3 bg-blue-50 rounded-xl">
+                                            <Tag size={24} className="text-blue-600" />
+                                        </div>
+                                        <div className="flex-1">
+                                            <h3 className="font-bold text-gray-900 text-lg">Tag Manager</h3>
+                                        </div>
+                                        <label className="relative inline-flex items-center cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                checked={settings.googleTagManager.enabled}
+                                                onChange={(e) => updateSetting('googleTagManager', 'enabled', e.target.checked)}
+                                                className="sr-only peer"
+                                            />
+                                            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-100 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                                        </label>
+                                    </div>
+                                </div>
+                                {settings.googleTagManager.enabled && (
+                                    <div className="p-6 bg-gray-50/50 animate-in slide-in-from-top-2 duration-200">
+                                        <label className="block text-sm font-bold text-gray-700 mb-2">
+                                            Container ID (GTM-XXXXXXX)
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={settings.googleTagManager.id}
+                                            onChange={(e) => updateSetting('googleTagManager', 'id', e.target.value)}
+                                            placeholder="GTM-XXXXXXX"
+                                            className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 font-medium"
+                                        />
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Search Console */}
+                            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden hover:shadow-md transition-shadow">
+                                <div className="p-6 border-b border-gray-100">
+                                    <div className="flex items-center gap-4">
+                                        <div className="p-3 bg-amber-50 rounded-xl">
+                                            <Search size={24} className="text-amber-600" />
+                                        </div>
+                                        <div className="flex-1">
+                                            <h3 className="font-bold text-gray-900 text-lg">Search Console</h3>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="p-6 bg-gray-50/50">
+                                    <label className="block text-sm font-bold text-gray-700 mb-2">
+                                        HTML Tag Verification Code
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={settings.searchConsole?.verificationCode || ''}
+                                        onChange={(e) => updateSetting('searchConsole', 'verificationCode', e.target.value)}
+                                        placeholder='<meta name="google-site-verification" ... />'
+                                        className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/20 font-medium text-xs font-mono"
+                                    />
+                                    <p className="text-xs text-gray-500 mt-2">Düz kod veya sadece content değerini girebilirsiniz.</p>
+                                </div>
+                            </div>
+                        </div>
+
+                         {/* Google Ads */}
+                         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden hover:shadow-md transition-shadow">
+                            <div className="p-6 border-b border-gray-100">
+                                <div className="flex items-center gap-4">
+                                    <div className="p-3 bg-blue-50 rounded-xl">
+                                        <Megaphone size={24} className="text-blue-600" />
+                                    </div>
+                                    <div className="flex-1">
+                                        <h3 className="font-bold text-gray-900 text-lg">Google Ads</h3>
+                                        <p className="text-sm text-gray-500">Google Ads dönüşüm takibi ve remarketing</p>
+                                    </div>
+                                    <label className="relative inline-flex items-center cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            checked={settings.googleAds.enabled}
+                                            onChange={(e) => updateSetting('googleAds', 'enabled', e.target.checked)}
+                                            className="sr-only peer"
+                                        />
+                                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-100 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                                    </label>
+                                </div>
+                            </div>
+                            {settings.googleAds.enabled && (
+                                <div className="p-6 bg-gray-50/50 animate-in slide-in-from-top-2 duration-200">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-sm font-bold text-gray-700 mb-2">
+                                                Ads ID (AW-XXXXXXXXXX)
+                                            </label>
+                                            <input
+                                                type="text"
+                                                value={settings.googleAds.id}
+                                                onChange={(e) => updateSetting('googleAds', 'id', e.target.value)}
+                                                placeholder="AW-XXXXXXXXXX"
+                                                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 font-medium"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-bold text-gray-700 mb-2">
+                                                Default Conversion Label (Optional)
+                                            </label>
+                                            <input
+                                                type="text"
+                                                value={settings.googleAds.conversionLabel}
+                                                onChange={(e) => updateSetting('googleAds', 'conversionLabel', e.target.value)}
+                                                placeholder="AbC_xYz..."
+                                                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 font-medium"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
                         {/* Google Analytics */}
                         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden hover:shadow-md transition-shadow">
                             <div className="p-6 border-b border-gray-100">
@@ -139,7 +320,7 @@ const Marketing = () => {
                                             onChange={(e) => updateSetting('googleAnalytics', 'enabled', e.target.checked)}
                                             className="sr-only peer"
                                         />
-                                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-100 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
+                                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-orange-100 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-600"></div>
                                     </label>
                                 </div>
                             </div>
@@ -155,7 +336,7 @@ const Marketing = () => {
                                                 value={settings.googleAnalytics.id}
                                                 onChange={(e) => updateSetting('googleAnalytics', 'id', e.target.value)}
                                                 placeholder="G-XXXXXXXXXX"
-                                                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500/20 font-medium"
+                                                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500/20 font-medium"
                                             />
                                         </div>
                                         <div className="flex items-end">
@@ -174,7 +355,7 @@ const Marketing = () => {
                             )}
                         </div>
 
-                        {/* Meta Pixel */}
+                        {/* Meta Pixel & CAPI */}
                         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden hover:shadow-md transition-shadow">
                             <div className="p-6 border-b border-gray-100">
                                 <div className="flex items-center gap-4">
@@ -182,8 +363,8 @@ const Marketing = () => {
                                         <Facebook size={24} className="text-blue-600" />
                                     </div>
                                     <div className="flex-1">
-                                        <h3 className="font-bold text-gray-900 text-lg">Meta Pixel (Facebook)</h3>
-                                        <p className="text-sm text-gray-500">Facebook ve Instagram reklamlarınızın performansını ölçün</p>
+                                        <h3 className="font-bold text-gray-900 text-lg">Meta Pixel & CAPI</h3>
+                                        <p className="text-sm text-gray-500">Facebook/Instagram Pixel ve Conversions API Entegrasyonu</p>
                                     </div>
                                     <label className="relative inline-flex items-center cursor-pointer">
                                         <input
@@ -198,7 +379,7 @@ const Marketing = () => {
                             </div>
                             {settings.metaPixel.enabled && (
                                 <div className="p-6 bg-gray-50/50 animate-in slide-in-from-top-2 duration-200">
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="grid grid-cols-1 gap-4">
                                         <div>
                                             <label className="block text-sm font-bold text-gray-700 mb-2">
                                                 Pixel ID
@@ -211,24 +392,39 @@ const Marketing = () => {
                                                 className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 font-medium"
                                             />
                                         </div>
-                                        <div className="flex items-end gap-2">
+                                        <div>
+                                            <label className="text-sm font-bold text-gray-700 mb-2 flex items-center gap-2">
+                                                Conversions API Access Token
+                                                <span className="text-xs font-normal text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">Server-Side Tracking</span>
+                                            </label>
+                                            <textarea
+                                                value={settings.metaPixel.accessToken || ''}
+                                                onChange={(e) => updateSetting('metaPixel', 'accessToken', e.target.value)}
+                                                placeholder="EAAG..."
+                                                rows={3}
+                                                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 font-medium font-mono text-xs"
+                                            />
+                                            <p className="text-xs text-gray-500 mt-1">
+                                                Daha doğru veri takibi için Events Manager'dan alacağınız Access Token'ı buraya girin.
+                                            </p>
+                                        </div>
+                                        <div className="flex justify-end pt-2">
                                             <a
                                                 href="https://business.facebook.com/events_manager"
                                                 target="_blank"
                                                 rel="noopener noreferrer"
-                                                className="px-4 py-3 border border-gray-200 rounded-xl text-sm font-bold text-gray-700 hover:bg-gray-100 transition-colors flex items-center gap-2 bg-white w-full md:w-auto justify-center"
+                                                className="px-4 py-2 border border-gray-200 rounded-xl text-sm font-bold text-gray-700 hover:bg-gray-100 transition-colors flex items-center gap-2 bg-white"
                                             >
-                                                <ExternalLink size={16} />
+                                                <ExternalLink size={14} />
                                                 Events Manager
                                             </a>
                                         </div>
                                     </div>
-                             
                                 </div>
                             )}
                         </div>
 
-                        {/* TikTok Pixel */}
+                        {/* TikTok Pixel & Events API */}
                         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden hover:shadow-md transition-shadow">
                             <div className="p-6 border-b border-gray-100">
                                 <div className="flex items-center gap-4">
@@ -236,8 +432,8 @@ const Marketing = () => {
                                         <Video size={24} className="text-white" />
                                     </div>
                                     <div className="flex-1">
-                                        <h3 className="font-bold text-gray-900 text-lg">TikTok Pixel</h3>
-                                        <p className="text-sm text-gray-500">TikTok reklamlarınızın dönüşümlerini takip edin</p>
+                                        <h3 className="font-bold text-gray-900 text-lg">TikTok Pixel & Events API</h3>
+                                        <p className="text-sm text-gray-500">TikTok reklamlarınızın dönüşümlerini hem browser hem server üzerinden takip edin</p>
                                     </div>
                                     <label className="relative inline-flex items-center cursor-pointer">
                                         <input
@@ -252,7 +448,7 @@ const Marketing = () => {
                             </div>
                             {settings.tiktokPixel.enabled && (
                                 <div className="p-6 bg-gray-50/50 animate-in slide-in-from-top-2 duration-200">
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="grid grid-cols-1 gap-4">
                                         <div>
                                             <label className="block text-sm font-bold text-gray-700 mb-2">
                                                 Pixel ID
@@ -265,14 +461,30 @@ const Marketing = () => {
                                                 className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-gray-500/20 font-medium"
                                             />
                                         </div>
-                                        <div className="flex items-end">
+                                        <div>
+                                            <label className="text-sm font-bold text-gray-700 mb-2 flex items-center gap-2">
+                                                Events API Access Token
+                                                <span className="text-xs font-normal text-gray-600 bg-gray-200 px-2 py-0.5 rounded-full">Server-Side Tracking</span>
+                                            </label>
+                                            <textarea
+                                                value={settings.tiktokPixel.accessToken || ''}
+                                                onChange={(e) => updateSetting('tiktokPixel', 'accessToken', e.target.value)}
+                                                placeholder="Access Token..."
+                                                rows={3}
+                                                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-gray-500/20 font-medium font-mono text-xs"
+                                            />
+                                            <p className="text-xs text-gray-500 mt-1">
+                                                TikTok Events Manager'dan oluşturduğunuz Access Token.
+                                            </p>
+                                        </div>
+                                        <div className="flex justify-end pt-2">
                                             <a
                                                 href="https://ads.tiktok.com/marketing_api/apps"
                                                 target="_blank"
                                                 rel="noopener noreferrer"
-                                                className="px-4 py-3 border border-gray-200 rounded-xl text-sm font-bold text-gray-700 hover:bg-gray-100 transition-colors flex items-center gap-2 bg-white w-full md:w-auto justify-center"
+                                                className="px-4 py-2 border border-gray-200 rounded-xl text-sm font-bold text-gray-700 hover:bg-gray-100 transition-colors flex items-center gap-2 bg-white"
                                             >
-                                                <ExternalLink size={16} />
+                                                <ExternalLink size={14} />
                                                 TikTok Ads Manager
                                             </a>
                                         </div>
@@ -287,30 +499,75 @@ const Marketing = () => {
                                 <Globe size={18} />
                                 Entegrasyon Durumu
                             </h4>
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                {/* GTM */}
+                                <div className="flex items-center gap-2 bg-white/60 p-3 rounded-lg border border-green-100">
+                                    {settings.googleTagManager.enabled && settings.googleTagManager.id ? (
+                                        <CheckCircle size={18} className="text-green-600" />
+                                    ) : (
+                                        <XCircle size={18} className="text-gray-400" />
+                                    )}
+                                    <span className={`text-sm font-medium ${settings.googleTagManager.enabled ? 'text-green-800' : 'text-gray-500'}`}>GTM</span>
+                                </div>
+                                {/* Analytics */}
                                 <div className="flex items-center gap-2 bg-white/60 p-3 rounded-lg border border-green-100">
                                     {settings.googleAnalytics.enabled && settings.googleAnalytics.id ? (
                                         <CheckCircle size={18} className="text-green-600" />
                                     ) : (
                                         <XCircle size={18} className="text-gray-400" />
                                     )}
-                                    <span className={`text-sm font-medium ${settings.googleAnalytics.enabled ? 'text-green-800' : 'text-gray-500'}`}>Google Analytics</span>
+                                    <span className={`text-sm font-medium ${settings.googleAnalytics.enabled ? 'text-green-800' : 'text-gray-500'}`}>Analytics</span>
                                 </div>
+                                {/* Ads */}
+                                <div className="flex items-center gap-2 bg-white/60 p-3 rounded-lg border border-green-100">
+                                    {settings.googleAds.enabled && settings.googleAds.id ? (
+                                        <CheckCircle size={18} className="text-green-600" />
+                                    ) : (
+                                        <XCircle size={18} className="text-gray-400" />
+                                    )}
+                                    <span className={`text-sm font-medium ${settings.googleAds.enabled ? 'text-green-800' : 'text-gray-500'}`}>Ads</span>
+                                </div>
+                                {/* Search Console */}
+                                <div className="flex items-center gap-2 bg-white/60 p-3 rounded-lg border border-green-100">
+                                    {settings.searchConsole.verificationCode ? (
+                                        <CheckCircle size={18} className="text-green-600" />
+                                    ) : (
+                                        <XCircle size={18} className="text-gray-400" />
+                                    )}
+                                    <span className={`text-sm font-medium ${settings.searchConsole.verificationCode ? 'text-green-800' : 'text-gray-500'}`}>Search Console</span>
+                                </div>
+                                {/* Meta */}
                                 <div className="flex items-center gap-2 bg-white/60 p-3 rounded-lg border border-green-100">
                                     {settings.metaPixel.enabled && settings.metaPixel.id ? (
                                         <CheckCircle size={18} className="text-green-600" />
                                     ) : (
                                         <XCircle size={18} className="text-gray-400" />
                                     )}
-                                    <span className={`text-sm font-medium ${settings.metaPixel.enabled ? 'text-green-800' : 'text-gray-500'}`}>Meta Pixel</span>
+                                    <div className="flex flex-col">
+                                        <span className={`text-sm font-medium ${settings.metaPixel.enabled ? 'text-green-800' : 'text-gray-500'}`}>Meta</span>
+                                        {settings.metaPixel.accessToken && <span className="text-[10px] text-green-600 font-bold">+API</span>}
+                                    </div>
                                 </div>
+                                {/* TikTok */}
                                 <div className="flex items-center gap-2 bg-white/60 p-3 rounded-lg border border-green-100">
                                     {settings.tiktokPixel.enabled && settings.tiktokPixel.id ? (
                                         <CheckCircle size={18} className="text-green-600" />
                                     ) : (
                                         <XCircle size={18} className="text-gray-400" />
                                     )}
-                                    <span className={`text-sm font-medium ${settings.tiktokPixel.enabled ? 'text-green-800' : 'text-gray-500'}`}>TikTok Pixel</span>
+                                     <div className="flex flex-col">
+                                        <span className={`text-sm font-medium ${settings.tiktokPixel.enabled ? 'text-green-800' : 'text-gray-500'}`}>TikTok</span>
+                                        {settings.tiktokPixel.accessToken && <span className="text-[10px] text-green-600 font-bold">+API</span>}
+                                    </div>
+                                </div>
+                                {/* SEO */}
+                                <div className="flex items-center gap-2 bg-white/60 p-3 rounded-lg border border-green-100">
+                                    {settings.seo.title && settings.seo.description ? (
+                                        <CheckCircle size={18} className="text-green-600" />
+                                    ) : (
+                                        <XCircle size={18} className="text-gray-400" />
+                                    )}
+                                     <span className={`text-sm font-medium ${settings.seo.title ? 'text-green-800' : 'text-gray-500'}`}>SEO</span>
                                 </div>
                             </div>
                         </div>

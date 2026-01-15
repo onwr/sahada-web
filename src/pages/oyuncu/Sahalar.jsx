@@ -130,7 +130,7 @@ const Sahalar = () => {
       <div className="flex-1 flex flex-col">
         {/* Header */}
         <header className="bg-white shadow-sm border-b px-6 py-4">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between pl-12 lg:pl-0">
             <div>
               <h1 className="text-2xl font-bold text-gray-900">Sahalar</h1>
               <p className="text-gray-600 mt-1">

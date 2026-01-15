@@ -17,6 +17,7 @@ const MacDetay = () => {
     const [match, setMatch] = useState(null);
     const [loading, setLoading] = useState(true);
     const [joining, setJoining] = useState(false);
+    const [showShareMenu, setShowShareMenu] = useState(false);
 
     useEffect(() => {
         loadMatch();
@@ -294,10 +295,74 @@ const MacDetay = () => {
                                 </button>
                             )}
 
-                            <button className="w-full py-3 mt-3 rounded-xl border border-gray-200 text-gray-600 font-medium hover:bg-gray-50 transition-colors flex items-center justify-center gap-2">
-                                <Share2 size={18} />
-                                Arkadaşlarınla Paylaş
-                            </button>
+                            <div className="relative">
+                                <button 
+                                    onClick={() => setShowShareMenu(!showShareMenu)}
+                                    className="w-full py-3 mt-3 rounded-xl border border-gray-200 text-gray-600 font-medium hover:bg-gray-50 transition-colors flex items-center justify-center gap-2"
+                                >
+                                    <Share2 size={18} />
+                                    Arkadaşlarınla Paylaş
+                                </button>
+                                
+                                {showShareMenu && (
+                                    <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-xl border border-gray-100 p-3 z-50 animate-in fade-in slide-in-from-top-2">
+                                        <div className="space-y-2">
+                                            <button 
+                                                onClick={() => {
+                                                    const url = window.location.href;
+                                                    window.open(`https://wa.me/?text=${encodeURIComponent('Bu maça gelmelisin! ⚽ ' + url)}`, '_blank');
+                                                }}
+                                                className="w-full flex items-center gap-3 p-2 hover:bg-green-50 rounded-lg text-left text-sm font-medium text-gray-700 hover:text-green-700 transition-colors"
+                                            >
+                                                <div className="w-8 h-8 rounded-full bg-[#25D366] text-white flex items-center justify-center">
+                                                    <Share2 size={16} /> {/* WhatsApp color placeholder */}
+                                                </div>
+                                                WhatsApp ile Paylaş
+                                            </button>
+
+                                            <button 
+                                                onClick={() => {
+                                                    const url = window.location.href;
+                                                    window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`, '_blank');
+                                                }}
+                                                className="w-full flex items-center gap-3 p-2 hover:bg-blue-50 rounded-lg text-left text-sm font-medium text-gray-700 hover:text-blue-700 transition-colors"
+                                            >
+                                                <div className="w-8 h-8 rounded-full bg-[#1877F2] text-white flex items-center justify-center">
+                                                    <Share2 size={16} /> {/* Facebook color placeholder */}
+                                                </div>
+                                                Facebook'ta Paylaş
+                                            </button>
+
+                                            <button 
+                                                onClick={() => {
+                                                    const url = window.location.href;
+                                                    window.open(`mailto:?subject=${encodeURIComponent('Maça Davet: ' + (match.tesisName || 'Saha Maçı'))}&body=${encodeURIComponent('Selam, bu maça katılmak isteyebilirsin: ' + url)}`);
+                                                }}
+                                                className="w-full flex items-center gap-3 p-2 hover:bg-gray-50 rounded-lg text-left text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors"
+                                            >
+                                                <div className="w-8 h-8 rounded-full bg-gray-500 text-white flex items-center justify-center">
+                                                    <Share2 size={16} />
+                                                </div>
+                                                E-posta Gönder
+                                            </button>
+
+                                            <button 
+                                                onClick={() => {
+                                                    navigator.clipboard.writeText(window.location.href);
+                                                    toast.success('Link kopyalandı!');
+                                                    setShowShareMenu(false);
+                                                }}
+                                                className="w-full flex items-center gap-3 p-2 hover:bg-gray-50 rounded-lg text-left text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors border-t border-gray-100 mt-1 pt-3"
+                                            >
+                                                <div className="w-8 h-8 rounded-full bg-orange-500 text-white flex items-center justify-center">
+                                                    <Share2 size={16} />
+                                                </div>
+                                                Linki Kopyala
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     </div>
                 </div>

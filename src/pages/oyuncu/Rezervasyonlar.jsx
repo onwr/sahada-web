@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { getPlayerReservations, cancelReservation, getInvoice, getTesis } from '../../services/firestoreService';
-import { collection, query, onSnapshot, where } from 'firebase/firestore';
+import { collection, query, onSnapshot, where, or } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import OyuncuSidebar from '../../components/OyuncuSidebar';
 import DashboardHeader from '../../components/DashboardHeader';
@@ -72,7 +72,10 @@ const Rezervasyonlar = () => {
 
     const reservationsQuery = query(
       collection(db, 'rezervasyonlar'),
-      where('userId', '==', user.uid)
+      or(
+        where('userId', '==', user.uid),
+        where('playerIds', 'array-contains', user.uid)
+      )
     );
 
     const unsubscribe = onSnapshot(reservationsQuery, (snapshot) => {
@@ -342,62 +345,67 @@ Durum: ${getStatusText(invoice.status)}
         </DashboardHeader>
 
         {/* Filters */}
-        <div className="bg-white border-b px-6 py-4">
-          <div className="flex flex-wrap items-center gap-4">
-            <div className="relative flex-1 min-w-64">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+        <div className="bg-white border-b px-4 sm:px-6 py-4">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
               <input
                 type="text"
-                placeholder="Saha ara..."
+                placeholder="Saha adı ile ara..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-all"
               />
             </div>
 
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
-            >
-              <option value="all">Tüm Durumlar</option>
-              <option value="pending">Beklemede</option>
-              <option value="confirmed">Onaylandı</option>
-              <option value="completed">Tamamlandı</option>
-              <option value="cancelled">İptal</option>
-            </select>
+            <div className="flex items-center gap-2">
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="flex-1 sm:flex-none px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 outline-none bg-white text-sm"
+              >
+                <option value="all">Tüm Durumlar</option>
+                <option value="confirmed">Onaylandı</option>
+                <option value="pending">Bekliyor</option>
+                <option value="cancelled">İptal Edildi</option>
+              </select>
 
-            <div className="flex bg-gray-100 rounded-lg p-1">
-              <button
-                onClick={() => setViewMode('list')}
-                className={`p-2 rounded ${viewMode === 'list' ? 'bg-white shadow-sm' : ''}`}
-                title="Liste Görünümü"
-              >
-                <List className="w-4 h-4" />
-              </button>
-              <button
-                onClick={() => setViewMode('calendar')}
-                className={`p-2 rounded ${viewMode === 'calendar' ? 'bg-white shadow-sm' : ''}`}
-                title="Takvim Görünümü"
-              >
-                <CalendarDays className="w-4 h-4" />
-              </button>
-              <button
-                onClick={() => setViewMode('grid')}
-                className={`p-2 rounded ${viewMode === 'grid' ? 'bg-white shadow-sm' : ''}`}
-                title="Grid Görünümü"
-              >
-                <Grid3X3 className="w-4 h-4" />
-              </button>
+              <div className="flex bg-gray-100 rounded-xl p-1">
+                <button
+                  onClick={() => setViewMode('list')}
+                  className={`p-2 rounded-lg transition-all ${viewMode === 'list' ? 'bg-white shadow-sm text-green-600' : 'text-gray-500 hover:text-gray-700'}`}
+                >
+                  <List size={20} />
+                </button>
+                <button
+                  onClick={() => setViewMode('grid')}
+                  className={`p-2 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-white shadow-sm text-green-600' : 'text-gray-500 hover:text-gray-700'}`}
+                >
+                  <Grid3X3 size={20} />
+                </button>
+                <button
+                  onClick={() => setViewMode('calendar')}
+                  className={`p-2 rounded-lg transition-all ${viewMode === 'calendar' ? 'bg-white shadow-sm text-green-600' : 'text-gray-500 hover:text-gray-700'}`}
+                >
+                  <CalendarDays size={20} />
+                </button>
+              </div>
             </div>
           </div>
         </div>
 
         {/* Content */}
-        <div className="flex-1 p-6 overflow-y-auto">
+        <div className="flex-1 p-4 sm:p-6 overflow-y-auto">
+          <div className="mb-6 flex items-center gap-3 bg-blue-50 border border-blue-100 p-4 rounded-xl text-blue-800 text-sm shadow-sm">
+            <Info size={20} className="text-blue-500 shrink-0" />
+            <p className="font-medium">
+              Saha değerlendirmelerini maç saatiniz geçtikten sonra ilgili sahanın detay sayfasından yapabilirsiniz. Keyifli maçlar!
+            </p>
+          </div>
           {viewMode === 'list' && (
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100">
-              <div className="overflow-x-auto">
+            <div className="space-y-4">
+              {/* Desktop Tabela Görünümü */}
+              <div className="hidden lg:block bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                 <table className="w-full">
                   <thead className="bg-gray-50">
                     <tr>
@@ -516,6 +524,87 @@ Durum: ${getStatusText(invoice.status)}
                     )}
                   </tbody>
                 </table>
+              </div>
+
+              {/* Mobil Kart Görünümü */}
+              <div className="lg:hidden space-y-4">
+                {filteredReservations.length > 0 ? (
+                  filteredReservations.map((reservation) => (
+                    <div 
+                      key={reservation.id} 
+                      className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex flex-col gap-4"
+                      onClick={() => handleViewDetail(reservation)}
+                    >
+                      <div className="flex justify-between items-start">
+                        <div className="flex items-center gap-3">
+                          <div className="w-12 h-12 bg-green-50 rounded-xl flex items-center justify-center text-green-600">
+                            <Calendar size={24} />
+                          </div>
+                          <div>
+                            <h3 className="font-bold text-gray-900">{reservation.tesisName || 'Bilinmeyen Saha'}</h3>
+                            <div className="flex items-center text-xs text-gray-500 mt-0.5">
+                              <Clock size={12} className="mr-1" />
+                              {formatDate(reservation.date)} • {reservation.timeSlot}
+                            </div>
+                          </div>
+                        </div>
+                        <span className={`px-2 py-1 text-[10px] font-bold rounded-full uppercase ${getStatusColor(reservation.status)}`}>
+                          {getStatusText(reservation.status)}
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3 py-3 border-y border-gray-50">
+                        <div className="flex items-center gap-2">
+                          <Users size={16} className="text-gray-400" />
+                          <span className="text-sm text-gray-700 font-medium">{reservation.totalPlayers || 0} Oyuncu</span>
+                        </div>
+                        <div className="flex items-center gap-2 justify-end">
+                          <span className="text-sm font-bold text-gray-900">₺{(reservation.totalAmount || reservation.price || 0).toLocaleString('tr-TR')}</span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between gap-2">
+                        <span className={`text-[10px] font-medium px-2 py-1 rounded-lg ${
+                          reservation.paymentStatus === 'completed' || reservation.paymentStatus === 'paid'
+                            ? 'bg-green-100 text-green-700'
+                            : 'bg-yellow-100 text-yellow-700'
+                        }`}>
+                          {reservation.paymentStatus === 'completed' || reservation.paymentStatus === 'paid' ? 'Ödendi' : 'Ödeme Bekliyor'}
+                        </span>
+                        
+                        <div className="flex gap-2">
+                           <button
+                            onClick={(e) => { e.stopPropagation(); handleViewDetail(reservation); }}
+                            className="p-2 text-blue-600 bg-blue-50 rounded-xl"
+                          >
+                            <Eye size={20} />
+                          </button>
+                          {canRate(reservation) && (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleRateMatch(reservation); }}
+                              className="p-2 text-yellow-600 bg-yellow-50 rounded-xl"
+                            >
+                              <CheckCircle size={20} />
+                            </button>
+                          )}
+                          {canCancel(reservation) && (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleCancel(reservation.id); }}
+                              className="p-2 text-red-600 bg-red-50 rounded-xl"
+                            >
+                              <Trash2 size={20} />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="p-12 text-center bg-white rounded-2xl border border-dashed border-gray-200">
+                    <Calendar className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                    <p className="text-gray-500">Kayıtlı rezervasyon bulunamadı.</p>
+                  </div>
+                )}
               </div>
             </div>
           )}

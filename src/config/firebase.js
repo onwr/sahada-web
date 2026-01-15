@@ -19,6 +19,7 @@ const app = initializeApp(firebaseConfig);
 
 // Auth, Firestore ve Storage servislerini export et
 export const auth = getAuth(app);
+auth.languageCode = 'tr'; // E-postaların Türkçe gitmesi için
 export const db = getFirestore(app);
 export const storage = getStorage(app);
 

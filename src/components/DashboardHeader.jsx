@@ -14,7 +14,8 @@ import {
 import { collection, query, onSnapshot, where, orderBy, limit, updateDoc, doc, writeBatch } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { formatDate } from '../utils/dateUtils'; // Assuming you have this or similar
-import moment from 'moment'; // Or use native date
+// moment removed
+
 
 const DashboardHeader = ({ title, showMenuButton, onMenuClick, children, variant = 'default' }) => {
   const { userData, user, logout } = useAuth();
@@ -131,7 +132,7 @@ const DashboardHeader = ({ title, showMenuButton, onMenuClick, children, variant
       <div className="flex items-center justify-between">
         
         {/* Left Section: Mobile Menu & Title */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 pl-12 lg:pl-0">
             {showMenuButton && (
                 <button 
                     onClick={onMenuClick}

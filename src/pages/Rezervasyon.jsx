@@ -2,7 +2,7 @@
 import { useAuth } from '../contexts/AuthContext';
 import { useParams, useNavigate } from 'react-router-dom';
 import OyuncuSidebar from '../components/OyuncuSidebar';
-import { getTesis, searchUsers, checkAvailability, createRezervasyon, createRezervasyonWithTransaction, getPlatformSettings } from '../services/firestoreService';
+import { getTesis, searchUsers, checkAvailability, createRezervasyon, createRezervasyonWithTransaction, getPlatformSettings, getUserTeams, getUserData } from '../services/firestoreService';
 import { processPayment, checkPaymentStatus, refundPayment, createPaymentForm, retrieveCheckoutForm } from '../services/paymentApiService';
 import { motion, AnimatePresence } from 'framer-motion';
 import jsPDF from 'jspdf';
@@ -356,21 +356,74 @@ const Rezervasyon = ({ inPanel = false }) => {
     loadPlatformSettings();
   }, [id]);
 
-  // Organizatörü otomatik ekle
   useEffect(() => {
     if (user && userData) {
       const organizerName = userData.fullName || userData.displayName || userData.name || user.displayName || user.email?.split('@')[0] || 'Organizatör';
       const organizerPhone = userData.phone || userData.businessPhone || '';
       const organizerAvatar = organizerName.split(' ').map(n => n[0]).join('').toUpperCase() || 'O';
       
-      setOyuncular([{
+      const organizer = {
         id: user.uid,
         name: organizerName,
         phone: organizerPhone,
         status: 'organizator',
         paymentStatus: 'odenecek',
         avatar: organizerAvatar
-      }]);
+      };
+      
+      setOyuncular([organizer]);
+
+      // Kullanıcının takımını yükle
+      const fetchUserTeam = async () => {
+        try {
+          const result = await getUserTeams(user.uid);
+          if (result.success && result.data && result.data.length > 0) {
+            const team = result.data[0]; // İlk takımı al
+            if (team && team.members && team.members.length > 0) {
+              const membersPromises = team.members
+                .filter(memberId => memberId !== user.uid) // Organizatörü çıkar
+                .map(async (memberId) => {
+                  try {
+                    const memberData = await getUserData(memberId);
+                    if (memberData.success && memberData.data) {
+                        const m = memberData.data;
+                        const fullName = m.fullName || m.displayName || m.name || m.email?.split('@')[0] || 'Oyuncu';
+                        const avatar = fullName.split(' ').map(n => n[0]).join('').toUpperCase();
+                        return {
+                            id: m.uid || memberId,
+                            name: fullName,
+                            phone: m.phone || m.phoneNumber || '',
+                            status: 'oyuncu',
+                            paymentStatus: 'odenecek',
+                            avatar: m.photoURL || avatar
+                        };
+                    }
+                    return null;
+                  } catch (e) {
+                    console.error('Üye detayları çekilemedi:', memberId, e);
+                    return null;
+                  }
+                });
+
+              const membersDetails = await Promise.all(membersPromises);
+              const validMembers = membersDetails.filter(m => m !== null);
+              
+              if (validMembers.length > 0) {
+                  setOyuncular(prev => {
+                      // Mevcut oyuncuları koru, duplicate ekleme
+                      const currentIds = new Set(prev.map(p => p.id));
+                      const newMembers = validMembers.filter(m => !currentIds.has(m.id));
+                      return [...prev, ...newMembers];
+                  });
+              }
+            }
+          }
+        } catch (err) {
+            console.error('Takım yükleme hatası:', err);
+        }
+      };
+      
+      fetchUserTeam();
     }
   }, [user, userData]);
 
@@ -486,8 +539,6 @@ const Rezervasyon = ({ inPanel = false }) => {
         setError(result.error);
       }
     } catch (err) {
-      setError('Saha verileri yüklenirken hata oluştu');
-      console.error('Saha yükleme hatası:', err);
       setError('Saha verileri yüklenirken hata oluştu');
       console.error('Saha yükleme hatası:', err);
     } finally {
@@ -1272,6 +1323,42 @@ const Rezervasyon = ({ inPanel = false }) => {
       setIsPaymentProcessing(false); // Her durumda loading overlay'i kapat
     }
   };
+  
+
+  
+  const handlePaymentSubmit = async () => {
+    if (selectedPaymentMethod === 'sahada-odeme') {
+        // Sahada ödeme için direkt rezervasyon oluştur
+        const currentData = {
+            selectedDate: selectedDate,
+            selectedTime: selectedTime,
+            sahaData: sahaData,
+            oyuncular: oyuncular,
+            invoiceData: invoiceData,
+            splitPaymentEnabled: false, // Sahada ödemede split olmaz
+            splitPaymentData: splitPaymentData,
+            selectedPaymentMethod: 'sahada-odeme',
+            selectedPrice: selectedPrice > 0 ? selectedPrice : Number(sahaData.price),
+            user: user
+        };
+
+        setIsPaymentProcessing(true);
+        try {
+            await handleCreateReservation({
+                status: 'pending_payment_at_facility',
+                id: 'PAY_AT_FACILITY_' + Date.now(),
+                data: currentData
+            });
+        } catch (error) {
+            console.error('Sahada ödeme hatası:', error);
+            alert('İşlem sırasında hata oluştu.');
+            setIsPaymentProcessing(false);
+        }
+    } else {
+        // Kredi kartı ödemesi - Popup/Iframe aç
+        handlePopupPayment();
+    }
+  };
 
   // Split payment toggle
   const handleSplitPaymentToggle = (enabled) => {
@@ -1742,9 +1829,9 @@ const Rezervasyon = ({ inPanel = false }) => {
                              onClick={() => setSelectedDate(dateStr)}
                              whileHover={{ scale: 1.05 }}
                              whileTap={{ scale: 0.95 }}
-                             className={`min-w-[85px] p-4 rounded-2xl flex flex-col items-center justify-center border-2 transition-all cursor-pointer snap-start ${
+                             className={`min-w-[85px] w-[85px] h-[110px] p-2 rounded-2xl flex flex-col items-center justify-center border-2 transition-all cursor-pointer snap-start flex-shrink-0 ${
                                isSelected 
-                                 ? 'bg-green-600 border-green-600 text-white shadow-xl shadow-green-200 ring-2 ring-green-200 ring-offset-2' 
+                                 ? 'bg-green-600 border-green-600 text-white shadow-xl shadow-green-200 ring-2 ring-green-200 ring-offset-2 scale-105' 
                                  : 'bg-white border-gray-100 text-gray-400 hover:border-green-200 hover:text-green-600 hover:shadow-md'
                              }`}
                            >
@@ -1785,8 +1872,8 @@ const Rezervasyon = ({ inPanel = false }) => {
                                 : 'border-gray-200 bg-gray-100 cursor-not-allowed opacity-50'
                             }`}
                           >
-                            <div className="font-medium text-gray-900">{slot.time}</div>
-                            <div className="text-sm text-gray-600">{slot.price}</div>
+                            <div className="font-bold text-gray-900 text-lg mb-1">{slot.time}</div>
+                            <div className={`text-base font-bold ${selectedTime === slot.time ? 'text-green-700' : 'text-gray-600'}`}>{slot.price}</div>
                             {!slot.available && (
                               <div className="text-xs text-red-600 mt-1">Dolu</div>
                             )}
@@ -1868,7 +1955,9 @@ const Rezervasyon = ({ inPanel = false }) => {
                                   <span className="ml-2 text-xs text-green-600">(Sen)</span>
                                 )}
                               </p>
-                              <p className="text-sm text-gray-600">{oyuncu.phone}</p>
+                              {oyuncu.status === 'organizator' && (
+                                <p className="text-sm text-gray-600">{oyuncu.phone}</p>
+                              )}
                             </div>
                           </div>
                           <div className="flex items-center space-x-2">
@@ -1953,17 +2042,36 @@ const Rezervasyon = ({ inPanel = false }) => {
                       </div>
                     </label>
                     
-                    <label className="flex items-center space-x-3">
-                      <input
-                        type="radio"
-                        name="paymentOption"
-                        checked={splitPaymentEnabled}
-                        onChange={() => handleSplitPaymentToggle(true)}
-                        className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300"
-                      />
+                      <label className={`flex items-center space-x-3 cursor-pointer ${splitPaymentEnabled ? 'ring-2 ring-green-600 rounded-lg p-2 bg-green-50' : 'p-2'}`}>
+                        <input
+                          type="radio"
+                          name="paymentOption"
+                          checked={splitPaymentEnabled}
+                          onChange={() => handleSplitPaymentToggle(true)}
+                          className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300"
+                        />
                       <div>
                         <span className="text-sm font-medium text-gray-700">Bölünmüş Ödeme</span>
                         <p className="text-xs text-gray-500">Organizatör ve oyuncular ayrı ayrı ödeyebilir</p>
+                      </div>
+                    </label>
+
+
+                    {/* Sahada Ödeme Seçeneği */}
+                    <label className={`flex items-center space-x-3 cursor-pointer ${selectedPaymentMethod === 'sahada-odeme' && !splitPaymentEnabled ? 'ring-2 ring-green-600 rounded-lg p-2 bg-green-50' : 'p-2'}`}>
+                      <input
+                        type="radio"
+                        name="paymentOption" // paymentMethod ile çakışabilir mi? Hayır, bu UI sadece
+                        checked={selectedPaymentMethod === 'sahada-odeme' && !splitPaymentEnabled}
+                        onChange={() => {
+                            setSelectedPaymentMethod('sahada-odeme');
+                            setSplitPaymentEnabled(false);
+                        }}
+                        className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300"
+                      />
+                      <div>
+                        <span className="text-sm font-medium text-gray-700">Sahada Ödeme</span>
+                        <p className="text-xs text-gray-500">Ödemeyi tesiste yapın</p>
                       </div>
                     </label>
                   </div>
@@ -2000,6 +2108,7 @@ const Rezervasyon = ({ inPanel = false }) => {
                     </motion.div>
                   )}
                 </div>
+
 
                 {/* Ödeme Bilgileri */}
                   <div className="bg-white rounded-xl p-6 shadow-sm">
@@ -2331,7 +2440,7 @@ const Rezervasyon = ({ inPanel = false }) => {
 
                   {/* Ödeme Butonu */}
                   <button
-                    onClick={handlePopupPayment}
+                    onClick={handlePaymentSubmit}
                     disabled={
                       !acceptTerms || 
                       isPaymentProcessing
@@ -2343,7 +2452,7 @@ const Rezervasyon = ({ inPanel = false }) => {
                         : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                     }`}
                   >
-                    {isPaymentProcessing ? 'Ödeme İşleniyor...' : 'Kredi Kartı ile Ödeme Yap'}
+                    {isPaymentProcessing ? 'İşleniyor...' : (selectedPaymentMethod === 'sahada-odeme' ? 'Rezervasyonu Tamamla' : 'Kredi Kartı ile Ödeme Yap')}
                   </button>
 
                   {/* Güvenlik Mesajı */}

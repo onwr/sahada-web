@@ -272,36 +272,69 @@ const Mesajlar = () => {
     setLoading(true);
     setShowNewConversationModal(false);
     try {
-      // Oyuncu ise 'pending', saha sahibi ise 'accepted' (varsayılan) olabilir. 
-      // Ancak prompt "oyuncu davet gönderecek" diyor.
-      const initialStatus = 'pending'; // Oyuncular için varsayılan
+      // Önce diğer kullanıcının bilgilerini alalım
+      // Saha sahipleriyle (owner) konuşmalar direkt kabul edilsin
+      // Oyuncular arası (player) konuşmalar davet gerektirsin
+      let initialStatus = 'pending'; 
+      let fetchedOtherUser = null;
+
+      const userResult = await getUserData(otherUserId);
+      if (userResult.success) {
+          fetchedOtherUser = userResult.data;
+          // Eğer karşı taraf saha sahibi ise (owner) veya kullanıcı tipi owner ise direkt kabul et
+          if (fetchedOtherUser.userType === 'owner') {
+              initialStatus = 'accepted';
+          }
+      }
 
       const result = await createOrGetConversation(user.uid, otherUserId, initialStatus);
       if (result.success) {
         const conversation = result.data;
         
+        // Eğer mevcut bir konuşma varsa ve 'pending' durumundaysa, ama karşı taraf 'owner' ise
+        // Bunu 'accepted' durumuna güncellemeliyiz (Eski yanlış durumları düzeltmek için)
+        if (conversation.status === 'pending' && fetchedOtherUser?.userType === 'owner') {
+            try {
+                const convRef = doc(db, 'conversations', conversation.id);
+                await updateDoc(convRef, { status: 'accepted', updatedAt: serverTimestamp() });
+                conversation.status = 'accepted';
+                toast.success('Konuşma başlatıldı');
+            } catch (err) {
+                console.error("Durum güncelleme hatası:", err);
+            }
+        } 
         // Eğer yeni oluşturulduysa ve pending ise davet gönder
-        if (result.isNew && initialStatus === 'pending') {
+        else if (result.isNew && initialStatus === 'pending') {
              await sendChatInvitation(user.uid, otherUserId);
-             toast.success('Davet gönderildi');
+             toast.success('Mesajlaşma isteği gönderildi');
         } else if (result.isNew) {
-             toast.success('Konuşma başlatıldı');
+             toast.success('Sohbet başlatıldı');
         }
 
-        // Diğer kullanıcının bilgilerini getir
-        const userResult = await getUserData(otherUserId);
-        if (userResult.success) {
-          setOtherUserData(userResult.data);
+        // Diğer kullanıcının bilgilerini ayarla
+        if (fetchedOtherUser) {
+          setOtherUserData(fetchedOtherUser);
           setSelectedConversation({
             ...conversation,
-            otherUser: userResult.data,
+            otherUser: fetchedOtherUser,
             otherUserId
           });
         } else {
-          setSelectedConversation({
-            ...conversation,
-            otherUserId
-          });
+          // Fallback if fetch failed earlier but create succeeded (unlikely but safe)
+           const retryUserResult = await getUserData(otherUserId);
+           if (retryUserResult.success) {
+             setOtherUserData(retryUserResult.data);
+             setSelectedConversation({
+                ...conversation,
+                otherUser: retryUserResult.data,
+                otherUserId
+              });
+           } else {
+             setSelectedConversation({
+                ...conversation,
+                otherUserId
+              });
+           }
         }
         
         setShowMobileConversationList(false);
@@ -339,8 +372,11 @@ const Mesajlar = () => {
       );
 
       if (result.success) {
-        setMessageText('');
-        setAttachments([]);
+        // Use timeout to ensure state update happens after potential batching or conflicts
+        setTimeout(() => {
+            setMessageText('');
+            setAttachments([]);
+        }, 10);
         scrollToBottom();
       } else {
         toast.error(result.error || 'Mesaj gönderilemedi');
@@ -546,7 +582,7 @@ const Mesajlar = () => {
               <MessageSquare size={48} className="mb-4 text-gray-300" />
               <p className="text-center">Henüz konuşmanız yok</p>
               <button
-                onClick={() => navigate('/oyuncu/oyuncu-bul')}
+                onClick={() => navigate('/oyuncu/oyuncu-bul?tab=player')}
                 className="mt-4 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
               >
                 Yeni Konuşma Başlat
@@ -613,7 +649,7 @@ const Mesajlar = () => {
         {selectedConversation ? (
           <>
             {/* Header */}
-            <div className="p-4 border-b border-gray-200 bg-white flex items-center justify-between">
+            <div className="p-4 border-b border-gray-200 bg-white flex items-center justify-between pl-12 lg:pl-4">
               <div className="flex items-center space-x-3">
                 <button
                   onClick={() => setShowMobileConversationList(true)}
@@ -647,10 +683,10 @@ const Mesajlar = () => {
                             if (!selectedConversation || sending) return;
                             if (confirm('Maça davet mesajı gönderilsin mi?')) {
                                 setSending(true);
-                                await sendMessage(selectedConversation.id, user.uid, selectedConversation.otherUserId, '👋 Seni bir maça davet etmek istiyorum! Müsait misin?', []);
-                                setSending(false);
-                                toast.success('Davet gönderildi');
-                            }
+                                 await sendMessage(selectedConversation.id, user.uid, selectedConversation.otherUserId, '👋 Seni bir maça davet etmek istiyorum! Müsait misin?', []);
+                                 setSending(false);
+                                 toast.success('Maça davet mesajı gönderildi');
+                             }
                         }}
                         className="p-2 bg-green-100 text-green-700 hover:bg-green-200 rounded-lg text-sm font-medium flex items-center gap-1"
                    >
@@ -667,9 +703,9 @@ const Mesajlar = () => {
                         <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
                             <Clock className="w-8 h-8 text-yellow-600" />
                         </div>
-                        <h3 className="text-xl font-bold text-gray-900 mb-2">Davet Gönderildi</h3>
+                        <h3 className="text-xl font-bold text-gray-900 mb-2">Sohbet İsteği Bekleniyor</h3>
                         <p className="text-gray-600 mb-4">
-                            {otherUserData?.displayName} davetinizi kabul ettiğinde mesajlaşmaya başlayabilirsiniz.
+                            {otherUserData?.displayName} mesaj isteğinizi kabul ettiğinde mesajlaşmaya başlayabilirsiniz.
                         </p>
                     </div>
                 </div>

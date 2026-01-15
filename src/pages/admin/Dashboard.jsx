@@ -237,8 +237,8 @@ const Dashboard = () => {
             <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-shadow duration-200">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">AKTİF KULLANICI</p>
-                  <p className="text-3xl font-bold text-gray-900">{stats.activeUsers.total}</p>
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">TOPLAM KULLANICI</p>
+                  <p className="text-3xl font-bold text-gray-900">{stats.activeUsers.all}</p>
                   <div className="flex items-center mt-2 text-xs text-gray-600">
                     <Users className="w-3.5 h-3.5 mr-1.5" />
                     <span>{stats.activeUsers.players} Oyuncu • {stats.activeUsers.owners} Sahi</span>

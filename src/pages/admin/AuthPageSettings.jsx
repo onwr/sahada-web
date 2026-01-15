@@ -2,8 +2,59 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Save, Plus, Trash2, Loader2, CheckCircle2 } from 'lucide-react';
 import { getAuthPageContent, saveAuthPageContent } from '../../services/firestoreService';
+import { uploadImage } from '../../services/cdnService';
 import { toast } from 'react-hot-toast';
+import { Image, Upload, X } from 'lucide-react';
 import AdminSidebar from '../../components/AdminSidebar';
+
+const ImageUploadField = ({ label, type, value, onRemove, onUpload }) => (
+    <div className="mb-4">
+      <label className="block text-sm font-medium text-gray-700 mb-2">{label}</label>
+      <div className="flex items-start gap-4">
+        {value ? (
+          <div className="relative group">
+            <img 
+              src={value} 
+              alt={label} 
+              className="w-32 h-32 object-cover rounded-lg border border-gray-200"
+            />
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onRemove(type);
+              }}
+              className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity shadow-sm hover:bg-red-600"
+            >
+              <X size={14} />
+            </button>
+          </div>
+        ) : (
+          <div className="w-32 h-32 bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center text-gray-400">
+            <Image size={24} />
+            <span className="text-xs mt-1">Görsel Yok</span>
+          </div>
+        )}
+        
+        <div className="flex-1">
+          <label className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+            <Upload size={16} />
+            {value ? 'Görseli Değiştir' : 'Görsel Yükle'}
+            <input
+              type="file"
+              className="hidden"
+              accept="image/*"
+              onChange={(e) => onUpload(e, type)}
+            />
+          </label>
+          <p className="text-xs text-gray-500 mt-2">
+            PNG, JPG veya WEBP formatında, maksimum 5MB.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
 
 const AuthPageSettings = () => {
   const [activeTab, setActiveTab] = useState('player'); // 'player' or 'owner'
@@ -116,6 +167,40 @@ const AuthPageSettings = () => {
     }
   };
 
+  const handleImageUpload = async (e, type) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const loadingId = toast.loading('Resim yükleniyor...');
+    try {
+      const result = await uploadImage(file, 'auth_assets', 'admin');
+      
+      if (result.success) {
+        const url = result.data.url;
+        
+        if (activeTab === 'player') {
+          setPlayerContent(prev => ({ ...prev, [type]: url }));
+        } else {
+          setOwnerContent(prev => ({ ...prev, [type]: url }));
+        }
+        toast.success('Resim yüklendi', { id: loadingId });
+      } else {
+        throw new Error(result.error);
+      }
+    } catch (error) {
+      console.error('Upload error:', error);
+      toast.error('Resim yüklenemedi', { id: loadingId });
+    }
+  };
+
+  const removeImage = (type) => {
+    if (activeTab === 'player') {
+      setPlayerContent(prev => ({ ...prev, [type]: '' }));
+    } else {
+      setOwnerContent(prev => ({ ...prev, [type]: '' }));
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex h-screen bg-gray-50 items-center justify-center">
@@ -185,6 +270,29 @@ const AuthPageSettings = () => {
                     exit={{ opacity: 0, y: -10 }}
                     className="space-y-6"
                   >
+                    <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 mb-6">
+                      <h3 className="font-medium text-gray-900 mb-4 flex items-center gap-2">
+                        <Image size={18} />
+                        Görseller
+                      </h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <ImageUploadField 
+                          label="Arkaplan Görseli" 
+                          type="backgroundImage" 
+                          value={playerContent.backgroundImage} 
+                          onRemove={removeImage}
+                          onUpload={handleImageUpload}
+                        />
+                        <ImageUploadField 
+                          label="Side Görseli (Opsiyonel)" 
+                          type="sideImage" 
+                          value={playerContent.sideImage} 
+                          onRemove={removeImage}
+                          onUpload={handleImageUpload}
+                        />
+                      </div>
+                    </div>
+
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">Başlık</label>
                       <input
@@ -240,6 +348,29 @@ const AuthPageSettings = () => {
                     exit={{ opacity: 0, y: -10 }}
                     className="space-y-6"
                   >
+                    <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 mb-6">
+                      <h3 className="font-medium text-gray-900 mb-4 flex items-center gap-2">
+                        <Image size={18} />
+                        Görseller
+                      </h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <ImageUploadField 
+                          label="Arkaplan Görseli" 
+                          type="backgroundImage" 
+                          value={ownerContent.backgroundImage} 
+                          onRemove={removeImage}
+                          onUpload={handleImageUpload}
+                        />
+                        <ImageUploadField 
+                          label="Side Görseli (Opsiyonel)" 
+                          type="sideImage" 
+                          value={ownerContent.sideImage} 
+                          onRemove={removeImage}
+                          onUpload={handleImageUpload}
+                        />
+                      </div>
+                    </div>
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">Üst Başlık (Küçük)</label>

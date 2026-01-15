@@ -202,8 +202,8 @@ const OyuncuBulPreview = () => {
 
                   {/* Price */}
                   <div className="flex items-center text-sm text-gray-600 mb-3">
-                    <DollarSign className="w-4 h-4 mr-1" />
-                    <span>
+                    {/* <DollarSign className="w-4 h-4 mr-1" /> */}
+                    <span className="font-medium">
                       {isFree ? 'Ücretsiz' : `₺${match.pricePerPlayer}/kişi`}
                     </span>
                   </div>

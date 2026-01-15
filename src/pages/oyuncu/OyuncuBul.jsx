@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { getOpenMatches, joinOpenMatch, leaveOpenMatch, getUserOpenMatches, updateOpenMatch, deleteOpenMatch, getAllTesisler, getPlayers } from '../../services/firestoreService';
 import { collection, query, onSnapshot, where } from 'firebase/firestore';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { db } from '../../config/firebase';
 import OyuncuSidebar from '../../components/OyuncuSidebar';
 import LocationSelectorModal from '../../components/LocationSelectorModal';
@@ -104,7 +104,8 @@ const userLocationIcon = new DivIcon({
 
 const OyuncuBul = () => {
   const { user } = useAuth();
-  const [searchType, setSearchType] = useState('match'); // 'match' or 'player'
+  const [searchParams] = useSearchParams();
+  const [searchType, setSearchType] = useState(searchParams.get('tab') === 'player' ? 'player' : 'match'); // 'match' or 'player'
   const [allPlayers, setAllPlayers] = useState([]); // Master list
   const [players, setPlayers] = useState([]); // Filtered display list
   const [activeTab, setActiveTab] = useState('all'); // 'all', 'organized', 'joined'
@@ -157,6 +158,14 @@ const OyuncuBul = () => {
     level: 'mixed',
     format: 'football'
   });
+
+  // URL'den gelen tab parametresini izle
+  useEffect(() => {
+    const tab = searchParams.get('tab');
+    if (tab === 'player' || tab === 'match') {
+      setSearchType(tab);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     if (showEditModal && selectedMatch) {
@@ -709,7 +718,7 @@ const OyuncuBul = () => {
       
       <div className="flex-1 p-6 md:p-8">
         {/* Header */}
-        <div className="mb-8">
+        <div className="mb-8 mt-10 lg:mt-0">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
             <div>
               <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2">
@@ -1051,37 +1060,64 @@ const OyuncuBul = () => {
                       position={[tesis.latitude, tesis.longitude]}
                       icon={sportIcons['default']} // Tesis ikonunu özelleştirebiliriz
                     >
-                      <Popup>
-                        <div className="p-2 min-w-[200px]">
-                          <h3 className="font-bold text-gray-900 mb-1">{tesis.name}</h3>
-                          <p className="text-sm text-gray-600 mb-2">{tesis.district}, {tesis.city}</p>
-                          <div className="flex items-center gap-1 text-xs font-medium text-yellow-600 mb-3">
-                            <Star size={12} fill="currentColor" />
-                            <span>{tesis.rating} ({tesis.ratingCount})</span>
-                          </div>
-                          
-                          {/* Bu tesisteki maçları listele */}
-                          {matches.filter(m => m.tesisId === tesis.id).length > 0 ? (
-                            <div className="space-y-2">
-                               <p className="text-xs font-bold text-green-600 uppercase mb-1">Açık Maçlar</p>
-                               {matches.filter(m => m.tesisId === tesis.id).slice(0,3).map(m => (
-                                   <div key={m.id} className="text-xs bg-gray-50 p-2 rounded border border-gray-100">
-                                       <div className="font-medium">{formatDate(m.date)} - {m.timeSlot}</div>
-                                       <div>{m.currentPlayers}/{m.maxPlayers} Oyuncu</div>
+                  <Popup>
+                    <div className="p-2 min-w-[240px]">
+                      {tesis.images && tesis.images.length > 0 && (
+                        <div className="w-full h-32 rounded-lg bg-gray-100 mb-3 overflow-hidden text-center">
+                            <img 
+                                src={tesis.images[0].optimized_url || tesis.images[0].url} 
+                                alt={tesis.name} 
+                                className="w-full h-full object-cover"
+                            />
+                        </div>
+                      )}
+                      <h3 className="font-bold text-gray-900 mb-1 text-base">{tesis.name}</h3>
+                      <p className="text-sm text-gray-600 mb-2">{tesis.district}, {tesis.city}</p>
+                      <div className="flex items-center gap-1 text-xs font-medium text-yellow-600 mb-3">
+                        <Star size={14} fill="currentColor" />
+                        <span>{tesis.rating} ({tesis.ratingCount} Değerlendirme)</span>
+                      </div>
+                      
+                      {/* Bu tesisteki maçları listele */}
+                      {matches.filter(m => m.tesisId === tesis.id).length > 0 ? (
+                        <div className="space-y-3">
+                           <p className="text-xs font-bold text-green-600 uppercase border-b border-green-100 pb-1">Açık Maçlar</p>
+                           {matches.filter(m => m.tesisId === tesis.id).slice(0,3).map(m => (
+                               <div key={m.id} className="bg-gray-50 p-2 rounded border border-gray-100">
+                                   <div className="flex justify-between items-center mb-1">
+                                      <div className="font-semibold text-xs text-gray-900">{formatDate(m.date)}</div>
+                                      <div className="text-xs font-bold text-green-600">{m.timeSlot}</div>
+                                   </div>
+                                   
+                                   {/* Players Preview */}
+                                   <div className="flex items-center gap-1 mb-2">
+                                       {m.players && m.players.slice(0, 5).map((pid, idx) => (
+                                           <div key={idx} className="w-5 h-5 rounded-full bg-green-100 border border-white flex items-center justify-center text-[8px] text-green-800 font-bold">
+                                               {(pid === m.organizerId ? '👑' : 'User').charAt(0)}
+                                           </div>
+                                       ))}
+                                       {(m.players?.length || 0) > 5 && (
+                                           <span className="text-[10px] text-gray-500">+{m.players.length - 5}</span>
+                                       )}
+                                   </div>
+                                   
+                                   <div className="flex justify-between items-center gap-2">
+                                       <span className="text-[10px] text-gray-500">{m.currentPlayers}/{m.maxPlayers} Oyuncu</span>
                                        <button 
                                           onClick={() => { setSelectedMatch(m); setShowJoinModal(true); }}
-                                          className="mt-1 w-full bg-green-600 text-white py-1 rounded text-[10px]"
+                                          className="bg-green-600 text-white px-3 py-1 rounded text-[10px] font-bold hover:bg-green-700"
                                        >
                                            İncele
                                        </button>
                                    </div>
-                               ))}
-                            </div>
-                          ) : (
-                              <p className="text-xs text-gray-500 italic">Bu sahada açık maç yok.</p>
-                          )}
+                               </div>
+                           ))}
                         </div>
-                      </Popup>
+                      ) : (
+                          <p className="text-xs text-gray-500 italic p-2 text-center bg-gray-50 rounded">Bu sahada açık maç bulunmuyor.</p>
+                      )}
+                    </div>
+                  </Popup>
                     </Marker>
                   ))
               ) : (
@@ -1233,8 +1269,8 @@ const OyuncuBul = () => {
 
                       {/* Price */}
                       <div className="flex items-center text-sm text-gray-600 mb-3">
-                        <DollarSign className="w-4 h-4 mr-1" />
-                        <span>{isFree ? 'Ücretsiz' : `₺${match.pricePerPlayer}/kişi`}</span>
+                        {/* <DollarSign className="w-4 h-4 mr-1" /> Icon removed as per user request */}
+                        <span className="font-medium">{isFree ? 'Ücretsiz' : `₺${match.pricePerPlayer}/kişi`}</span>
                       </div>
 
                       {/* Level */}
@@ -1483,71 +1519,88 @@ const OyuncuBul = () => {
           </div>
               )) : (
                 players.length > 0 ? (
-                  <div className={viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' : 'space-y-4'}>
+                  <div className={viewMode === 'grid' ? 'grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4' : 'space-y-4'}>
                      {players.map(player => (
-                        <div key={player.uid || player.id} className={`bg-white rounded-xl shadow-sm border border-gray-200 p-5 hover:shadow-md transition-shadow ${viewMode === 'list' ? 'flex items-center gap-6' : ''}`}>
-                             <div className={`flex items-center gap-4 ${viewMode === 'grid' ? 'flex-col text-center' : ''}`}>
+                        <div 
+                          key={player.uid || player.id} 
+                          className={`bg-white rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-all duration-300 group overflow-hidden ${viewMode === 'list' ? 'p-4 flex items-center gap-6' : 'p-3 flex flex-col h-full text-center'}`}
+                        >
+                             <div className={`flex items-center gap-4 ${viewMode === 'grid' ? 'flex-col' : ''}`}>
                                 <div 
-                                    className="w-20 h-20 rounded-full bg-gray-200 overflow-hidden flex-shrink-0 cursor-pointer hover:opacity-90 transition-opacity"
+                                    className={`relative rounded-full bg-gray-100 overflow-hidden flex-shrink-0 cursor-pointer transition-transform group-hover:scale-105 ${viewMode === 'grid' ? 'w-16 h-16 md:w-20 md:h-20' : 'w-16 h-16'}`}
                                     onClick={() => { setSelectedPlayer(player); setShowPlayerDetailModal(true); }}
                                 >
                                     {player.profilePhoto?.url ? (
                                         <img src={player.profilePhoto.url} alt={player.displayName} className="w-full h-full object-cover" />
                                     ) : (
                                         <div className="w-full h-full flex items-center justify-center bg-gray-100 text-gray-400">
-                                            <div className="w-10 h-10"><User size={40} /></div>
+                                            <User size={viewMode === 'grid' ? 32 : 24} />
                                         </div>
                                     )}
+                                    {/* Online indicator mock */}
+                                    <div className="absolute bottom-1 right-1 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></div>
                                 </div>
+
                                 <div className={viewMode === 'grid' ? 'w-full' : 'flex-1'}>
                                     <h3 
-                                        className="font-bold text-gray-900 text-lg cursor-pointer hover:text-green-600 transition-colors"
+                                        className="font-bold text-gray-900 text-sm md:text-base cursor-pointer hover:text-green-600 transition-colors line-clamp-1"
                                         onClick={() => { setSelectedPlayer(player); setShowPlayerDetailModal(true); }}
                                     >
                                         {player.displayName}
                                     </h3>
-                                    <p className="text-green-600 font-medium">{player.position || 'Mevki Yok'}</p>
+                                    <p className="text-green-600 text-xs md:text-sm font-semibold">{player.position || 'Forvet'}</p>
                                     
-                                    <div className={`flex items-center gap-2 mt-2 text-sm text-gray-600 ${viewMode === 'grid' ? 'justify-center' : ''}`}>
-                                        <Star size={14} className="text-yellow-500 fill-yellow-500" />
+                                    <div className={`flex items-center gap-1.5 mt-1 text-[10px] md:text-xs text-gray-500 font-medium ${viewMode === 'grid' ? 'justify-center' : ''}`}>
+                                        <Star size={12} className="text-yellow-500 fill-yellow-500" />
                                         <span>
                                           {player.skillLevel === 'beginner' ? 'Başlangıç' : 
                                            player.skillLevel === 'intermediate' ? 'Orta' : 
                                            player.skillLevel === 'good' ? 'İyi' : 
                                            player.skillLevel === 'advanced' ? 'İleri' : 
                                            player.skillLevel === 'pro' ? 'Profesyonel' : 
-                                           (player.skillLevel || 'Seviye Yok')}
+                                           'Orta'}
                                         </span>
                                     </div>
                                     
                                     {player.distance && (
-                                        <div className={`flex items-center gap-1 mt-1 text-xs text-gray-500 ${viewMode === 'grid' ? 'justify-center' : ''}`}>
-                                            <MapPin size={12} />
-                                            <span>{Math.round(player.distance)} km uzakta</span>
+                                        <div className={`flex items-center gap-1 mt-0.5 text-[10px] text-gray-400 ${viewMode === 'grid' ? 'justify-center' : ''}`}>
+                                            <MapPin size={10} />
+                                            <span>{Math.round(player.distance)} km</span>
                                         </div>
                                     )}
 
                                     {viewMode === 'grid' && (
-                                        <div className="mt-4">
+                                        <div className="mt-4 flex flex-col gap-2">
                                             <button 
-                                                className="w-full py-2 bg-blue-50 text-blue-600 rounded-lg text-sm font-medium hover:bg-blue-100 transition-colors"
+                                                className="w-full py-1.5 bg-blue-600 text-white rounded-lg text-xs font-bold hover:bg-blue-700 transition-colors shadow-sm"
                                                 onClick={() => navigate('/oyuncu/mesajlar', { state: { recipient: player } })}
                                             >
-                                                Mesaj
+                                                Mesaj Gönder
+                                            </button>
+                                            <button 
+                                                className="w-full py-1.5 bg-gray-50 text-gray-600 rounded-lg text-xs font-bold hover:bg-gray-100 transition-colors"
+                                                onClick={() => { setSelectedPlayer(player); setShowPlayerDetailModal(true); }}
+                                            >
+                                                Profil
                                             </button>
                                         </div>
                                     )}
                                 </div>
+
                                 {viewMode === 'list' && (
                                      <div className="flex gap-2">
-                                     <div className="flex gap-2">
                                          <button 
-                                            className="px-4 py-2 bg-blue-50 text-blue-600 rounded-lg text-sm font-medium hover:bg-blue-100 transition-colors"
+                                            className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold hover:bg-blue-700 transition-colors"
                                             onClick={() => navigate('/oyuncu/mesajlar', { state: { recipient: player } })}
                                         >
                                             Mesaj Gönder
                                         </button>
-                                    </div>
+                                         <button 
+                                            className="px-4 py-2 bg-gray-50 text-gray-600 rounded-lg text-sm font-bold hover:bg-gray-100 transition-colors"
+                                            onClick={() => { setSelectedPlayer(player); setShowPlayerDetailModal(true); }}
+                                        >
+                                            Profil
+                                        </button>
                                     </div>
                                 )}
                              </div>

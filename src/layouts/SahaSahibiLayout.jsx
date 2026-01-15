@@ -88,8 +88,9 @@ const SahaSahibiLayout = () => {
 
           const isProfileIncomplete = missingFields.length > 0;
           const isOnSettingsPage = location.pathname.startsWith('/saha-sahibi/ayarlar');
+          const isOnboardingPage = location.pathname.includes('/onboarding');
 
-          if (isProfileIncomplete && !isOnSettingsPage) {
+          if (isProfileIncomplete && !isOnSettingsPage && !isOnboardingPage) {
             return (
               <div className="fixed inset-0 z-[101] flex items-center justify-center p-4">
                 {/* Backdrop Blur */}

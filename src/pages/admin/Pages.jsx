@@ -5,10 +5,11 @@ import {
     deletePage, 
     togglePagePublish 
 } from '../../services/firestoreService';
+import { uploadImage } from '../../services/cdnService';
 import AdminSidebar from '../../components/AdminSidebar';
 import {
     FileText, Plus, Edit, Trash2, Save, X, Globe,
-    Search, ExternalLink, EyeOff, Clock, Loader2, CheckCircle
+    Search, ExternalLink, EyeOff, Clock, Loader2, CheckCircle, Image, Upload, Link
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -313,9 +314,12 @@ const PageEditor = ({ page, onClose, onSave }) => {
         content: '',
         metaTitle: '',
         metaDescription: '',
+        keywords: '', // SEO Keywords
+        image: '', // Hero/Featured Image
         isPublished: false,
     });
     const [activeTab, setActiveTab] = useState('content');
+    const [uploadingImage, setUploadingImage] = useState(false);
 
     const generateSlug = (title) => {
         return title
@@ -332,6 +336,28 @@ const PageEditor = ({ page, onClose, onSave }) => {
             .trim();
     };
 
+    const handleImageUpload = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        setUploadingImage(true);
+        try {
+            const result = await uploadImage(file, 'pages', 'admin');
+             if (result.success) {
+                const url = result.data?.url || result.data;
+                setFormData(prev => ({ ...prev, image: url }));
+                toast.success("Görsel yüklendi");
+             } else {
+                 toast.error("Görsel yüklenemedi: " + result.error);
+             }
+        } catch (error) {
+            console.error(error);
+            toast.error("Yükleme hatası");
+        } finally {
+            setUploadingImage(false);
+        }
+    };
+
     return (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
             <div className="bg-white rounded-2xl max-w-5xl w-full max-h-[90vh] overflow-hidden flex flex-col shadow-2xl animate-in zoom-in-95 duration-200">
@@ -341,7 +367,7 @@ const PageEditor = ({ page, onClose, onSave }) => {
                         <h2 className="text-xl font-bold text-gray-900">
                             {page ? 'Sayfayı Düzenle' : 'Yeni Sayfa Oluştur'}
                         </h2>
-                        <p className="text-xs text-gray-500 mt-0.5">İçerik ve SEO ayarlarını buradan yönetebilirsiniz.</p>
+                        <p className="text-xs text-gray-500 mt-0.5">İçerik, görsel ve SEO ayarlarını buradan yönetebilirsiniz.</p>
                     </div>
                     <button onClick={onClose} className="p-2 hover:bg-gray-200 rounded-lg text-gray-500 transition-colors">
                         <X size={20} />
@@ -354,7 +380,7 @@ const PageEditor = ({ page, onClose, onSave }) => {
                         onClick={() => setActiveTab('content')}
                         className={`px-6 py-4 text-sm font-bold border-b-2 transition-colors ${activeTab === 'content' ? 'border-green-600 text-green-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
                     >
-                        İçerik Editörü
+                        İçerik & Görsel
                     </button>
                     <button
                         onClick={() => setActiveTab('seo')}
@@ -384,10 +410,10 @@ const PageEditor = ({ page, onClose, onSave }) => {
                                     />
                                 </div>
                                 <div>
-                                    <label className="text-sm font-bold text-gray-700 block mb-2">URL Slug (Adresi)</label>
+                                    <label className="text-sm font-bold text-gray-700 block mb-2">Sayfa Linki (Slug)</label>
                                     <div className="flex group">
-                                        <span className="px-4 py-3 bg-gray-100 border border-r-0 border-gray-200 rounded-l-xl text-gray-500 text-sm font-medium">
-                                            /
+                                        <span className="px-4 py-3 bg-gray-100 border border-r-0 border-gray-200 rounded-l-xl text-gray-500 text-sm font-medium flex items-center gap-1">
+                                            <Link size={14} /> /
                                         </span>
                                         <input
                                             type="text"
@@ -397,6 +423,51 @@ const PageEditor = ({ page, onClose, onSave }) => {
                                             placeholder="page-url"
                                         />
                                     </div>
+                                </div>
+                            </div>
+
+                            {/* Image Upload */}
+                             <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+                                <label className="text-sm font-bold text-gray-700 mb-4 flex items-center gap-2">
+                                    <Image size={18} className="text-purple-500" />
+                                    Öne Çıkan Görsel (Featured Image)
+                                </label>
+                                <div className="flex items-start gap-6">
+                                    <div className="flex-1">
+                                        <div className="relative group">
+                                            <input 
+                                                type="text" 
+                                                value={formData.image || ''}
+                                                onChange={(e) => setFormData({ ...formData, image: e.target.value })}
+                                                className="w-full px-4 py-3 pl-10 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 text-sm text-gray-600 mb-3"
+                                                placeholder="https://..."
+                                            />
+                                            <Link className="absolute left-3 top-3.5 text-gray-400" size={16} />
+                                        </div>
+                                        <label className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg cursor-pointer transition-colors w-fit text-sm font-medium">
+                                            {uploadingImage ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
+                                            {uploadingImage ? 'Yükleniyor...' : 'Bilgisayardan Yükle'}
+                                            <input 
+                                                type="file" 
+                                                className="hidden" 
+                                                accept="image/*"
+                                                onChange={handleImageUpload}
+                                                disabled={uploadingImage}
+                                            />
+                                        </label>
+                                        <p className="text-xs text-gray-400 mt-2">Bu görsel sayfa başlığında arka plan veya sosyal medya paylaşımlarında kullanılabilir.</p>
+                                    </div>
+                                    {formData.image && (
+                                        <div className="w-32 h-20 bg-gray-100 rounded-lg border border-gray-200 overflow-hidden relative shrink-0">
+                                            <img src={formData.image} alt="Preview" className="w-full h-full object-cover" />
+                                            <button 
+                                                onClick={() => setFormData({ ...formData, image: '' })}
+                                                className="absolute top-1 right-1 bg-white/80 p-1 rounded-full text-red-500 hover:bg-white"
+                                            >
+                                                <X size={12} />
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
 
@@ -460,6 +531,18 @@ const PageEditor = ({ page, onClose, onSave }) => {
                                     <span>Arama sonuçlarında başlığın altında çıkan açıklama.</span>
                                     <span className={`${(formData.metaDescription?.length || 0) > 160 ? 'text-red-500' : ''}`}>{(formData.metaDescription?.length || 0)}/160</span>
                                 </div>
+                            </div>
+
+                            <div>
+                                <label className="text-sm font-bold text-gray-700 block mb-2">Anahtar Kelimeler (Keywords)</label>
+                                <input
+                                    type="text"
+                                    value={formData.keywords || ''}
+                                    onChange={(e) => setFormData({ ...formData, keywords: e.target.value })}
+                                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500/20 bg-white"
+                                    placeholder="halı saha, kiralama, istanbul, futbol (Virgül ile ayırın)"
+                                />
+                                <p className="text-xs text-gray-400 mt-1">SEO uyumluluğu için sayfayla ilgili anahtar kelimeleri virgülle ayırarak girin.</p>
                             </div>
 
                             {/* Google Preview */}

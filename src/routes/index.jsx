@@ -45,7 +45,7 @@ const AppRoutes = () => {
       <Route path="/turnuvalar" element={<Turnuvalar />} />
       <Route path="/test" element={<TestPanel />} />
       <Route path="/market/product/:id" element={<ProductDetail />} />
-      <Route path="/community" element={<Community />} />
+      <Route path="/meydan" element={<Community />} />
       <Route path="/page/:slug" element={<DynamicPage />} />
       <Route path="/:slug" element={<DynamicPage />} />
       <Route 

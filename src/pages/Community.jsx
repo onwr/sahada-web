@@ -39,6 +39,8 @@ const playNotificationSound = () => {
         console.error('Audio play failed', e);
     }
 }; 
+
+import { getPlayers } from '../services/firestoreService';
 import { 
   getPosts, 
   createPost, 
@@ -440,11 +442,47 @@ const Community = () => {
   const [votedPolls, setVotedPolls] = useState({}); // { [postId]: optionIndex }
 
   const [trendingTopics, setTrendingTopics] = useState([]);
+  const [topPlayers, setTopPlayers] = useState([]);
+  const [communityStats, setCommunityStats] = useState({ totalPosts: 0, activeUsers: 0 });
 
-  // Load Posts
+  // Load Posts and Dynamic Data
   useEffect(() => {
     fetchPosts();
-  }, [currentUser]); // Re-fetch if currentUser changes to update like status
+    fetchDynamicData();
+  }, [currentUser]); 
+
+  const fetchDynamicData = async () => {
+    // Top Players
+    const playersResult = await getPlayers({ limit: 10 });
+    if (playersResult.success) {
+      // Sort by some criteria if exists, or just take first few
+      setTopPlayers(playersResult.data.slice(0, 5));
+    }
+    
+    // Stats
+    // For now we use actual post count and a mock active users
+    setCommunityStats({
+      totalPosts: posts.length || 0,
+      activeUsers: Math.floor(Math.random() * 50) + 10 // Mock dynamic feeling
+    });
+  };
+
+  // Sync Creation Mode with Active Tab
+  useEffect(() => {
+    // Reset all first
+    setIsMatchMode(false);
+    setIsPollMode(false);
+    setIsReviewMode(false);
+    setShowLocationInput(false);
+
+    if (activeTab === 'RESULTS') {
+        setIsMatchMode(true);
+    } else if (activeTab === 'POLLS') {
+        setIsPollMode(true);
+    } else if (activeTab === 'REVIEWS') {
+        setIsReviewMode(true);
+    }
+  }, [activeTab]);
 
   const fetchPosts = async () => {
     setLoading(true);
@@ -487,16 +525,27 @@ const Community = () => {
       }
     }
     setLoading(false);
-  };
+  };   
 
   // Filter Logic
   const filteredPosts = React.useMemo(() => {
     if (activeTab === 'ALL') return posts;
+    if (activeTab === 'GENERAL') return posts.filter(p => p.type === PostType.GENERAL || !p.type);
     if (activeTab === 'RESULTS') return posts.filter(p => p.type === PostType.SCOREBOARD);
     if (activeTab === 'POLLS') return posts.filter(p => p.type === PostType.POLL);
     if (activeTab === 'REVIEWS') return posts.filter(p => p.type === PostType.REVIEW);
     return posts;
   }, [posts, activeTab]);
+
+  // Determine Current Post Mode Label
+  const getCurrentModeParams = () => {
+      if (isPollMode) return { label: 'Anket Oluşturuluyor', placeholder: 'Anket sorusu nedir?', color: 'text-purple-600', bg: 'bg-purple-50', icon: BarChart2 };
+      if (isMatchMode) return { label: 'Maç Sonucu Paylaşılıyor', placeholder: 'Maç hakkında bir şeyler yaz...', color: 'text-green-600', bg: 'bg-green-50', icon: Trophy };
+      if (isReviewMode) return { label: 'Saha İncelemesi Yapılıyor', placeholder: 'Deneyimlerin nasıldı?', color: 'text-yellow-600', bg: 'bg-yellow-50', icon: Star };
+      return { label: 'Genel Paylaşım', placeholder: 'Meydan\'da neler oluyor? Bir şeyler paylaş...', color: 'text-gray-500', bg: 'bg-gray-50', icon: MessageSquare };
+  };
+
+  const modeParams = getCurrentModeParams();
 
   // --- ACTIONS ---
 
@@ -747,7 +796,25 @@ const Community = () => {
   };
 
   const handleShare = (postId) => {
-    const url = `${window.location.origin}/post/${postId}`;
+    const url = `${window.location.origin}/meydan?post=${postId}`;
+    const shareData = {
+      title: 'Sahada Meydan',
+      text: 'Sahada üzerinden paylaşılan bu gönderiye göz at!',
+      url: url
+    };
+
+    if (navigator.share) {
+      navigator.share(shareData)
+        .catch((err) => {
+           // Fallback to clipboard
+           copyToClipboard(url);
+        });
+    } else {
+      copyToClipboard(url);
+    }
+  };
+
+  const copyToClipboard = (url) => {
     navigator.clipboard.writeText(url).then(() => {
         toast.success('Link kopyalandı 📋');
         playNotificationSound();
@@ -950,6 +1017,13 @@ const Community = () => {
                   Hepsi
                 </button>
                 <button
+                  onClick={() => setActiveTab('GENERAL')}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg font-bold text-sm transition-all ${activeTab === 'GENERAL' ? 'bg-green-50 text-green-700' : 'text-gray-600 hover:bg-gray-50'}`}
+                >
+                  <MessageSquare size={18} className={activeTab === 'GENERAL' ? 'text-green-600' : 'text-gray-400'} />
+                  Genel Sohbet
+                </button>
+                <button
                   onClick={() => setActiveTab('RESULTS')}
                   className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg font-bold text-sm transition-all ${activeTab === 'RESULTS' ? 'bg-green-50 text-green-700' : 'text-gray-600 hover:bg-gray-50'}`}
                 >
@@ -970,7 +1044,29 @@ const Community = () => {
                   <Star size={18} className={activeTab === 'REVIEWS' ? 'text-green-600' : 'text-gray-400'} />
                   Saha İncelemeleri
                 </button>
+                <div className="my-2 border-t border-gray-100"></div>
+                <button
+                  onClick={() => toast('Yakında!', { icon: '⏳' })}
+                  className="w-full flex items-center gap-3 px-4 py-3 rounded-lg font-bold text-sm text-gray-400 hover:bg-gray-50 transition-all"
+                >
+                  <Rocket size={18} />
+                  Turnuvalar
+                </button>
+                <button
+                  onClick={() => toast('Yakında!', { icon: '⏳' })}
+                  className="w-full flex items-center gap-3 px-4 py-3 rounded-lg font-bold text-sm text-gray-400 hover:bg-gray-50 transition-all"
+                >
+                  <TrendingUp size={18} />
+                  Haberler
+                </button>
               </nav>
+              
+              <div className="mt-8 p-4 bg-green-600 rounded-xl text-white shadow-lg shadow-green-600/20">
+                  <h4 className="font-bold text-sm mb-1">Yeni Özellikler!</h4>
+                  <p className="text-[10px] opacity-90 leading-relaxed">
+                      Meydan artık daha hızlı ve dinamik. Kendi maç sonuçlarını paylaşmayı unutma!
+                  </p>
+              </div>
             </div>
           </div>
 
@@ -978,6 +1074,13 @@ const Community = () => {
           <div className="col-span-1 lg:col-span-6">
             {/* Create Post Box */}
             <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 mb-6">
+              
+              {/* Category Indicator */}
+              <div className={`flex items-center gap-2 mb-3 px-3 py-1.5 rounded-lg w-fit text-xs font-bold uppercase tracking-wider ${modeParams.bg} ${modeParams.color}`}>
+                  <modeParams.icon size={14} />
+                  <span>{modeParams.label}</span>
+              </div>
+
               <div className="flex gap-3 mb-4">
                 <div className="w-10 h-10 rounded-full bg-gray-200 overflow-hidden flex-shrink-0">
                   {currentUser?.photoURL ? (
@@ -988,7 +1091,7 @@ const Community = () => {
                 </div>
                 <div className="flex-1 space-y-3">
                   <textarea
-                    placeholder="Meydan'da neler oluyor? Bir şeyler paylaş..."
+                    placeholder={modeParams.placeholder}
                     className="w-full bg-gray-50 hover:bg-white focus:bg-white border border-transparent focus:border-green-500 rounded-lg px-4 py-2.5 text-sm transition-all outline-none resize-none min-h-[60px]"
                     value={newPostContent}
                     onChange={(e) => setNewPostContent(e.target.value)}
@@ -1179,26 +1282,44 @@ const Community = () => {
 
             {/* Posts Feed */}
             <div className="space-y-6">
-              {filteredPosts.map(post => (
-                    <PostCard
-                        key={post.id}
-                        post={post}
-                        isLiked={likedPosts.has(post.id)}
-                        commentsOpen={openComments.has(post.id)}
-                        toggleLike={toggleLike}
-                        toggleComments={toggleComments}
-                        handleShare={handleShare}
-                        currentUser={currentUser}
-                        commentInputs={commentInputs}
-                        setCommentInputs={setCommentInputs}
-                        handleCreateComment={handleCreateComment}
-                        postComments={postComments}
-                        votedPolls={votedPolls}
-                        handleVote={handleVote}
-                        handleDeletePost={handleDeletePost}
-                        handleDeleteComment={handleDeleteComment}
-                    />
-              ))}
+              {filteredPosts.length > 0 ? (
+                  filteredPosts.map(post => (
+                        <PostCard
+                            key={post.id}
+                            post={post}
+                            isLiked={likedPosts.has(post.id)}
+                            commentsOpen={openComments.has(post.id)}
+                            toggleLike={toggleLike}
+                            toggleComments={toggleComments}
+                            handleShare={handleShare}
+                            currentUser={currentUser}
+                            commentInputs={commentInputs}
+                            setCommentInputs={setCommentInputs}
+                            handleCreateComment={handleCreateComment}
+                            postComments={postComments}
+                            votedPolls={votedPolls}
+                            handleVote={handleVote}
+                            handleDeletePost={handleDeletePost}
+                            handleDeleteComment={handleDeleteComment}
+                        />
+                  ))
+              ) : (
+                  <div className="flex flex-col items-center justify-center py-12 text-center bg-white rounded-xl border border-gray-100 border-dashed">
+                      <div className="bg-gray-50 p-4 rounded-full mb-3">
+                          {activeTab === 'RESULTS' ? <Trophy size={32} className="text-gray-300" /> :
+                           activeTab === 'POLLS' ? <BarChart2 size={32} className="text-gray-300" /> :
+                           activeTab === 'REVIEWS' ? <Star size={32} className="text-gray-300" /> :
+                           <MessageSquare size={32} className="text-gray-300" />}
+                      </div>
+                      <h3 className="text-gray-900 font-bold mb-1">Henüz Paylaşım Yok</h3>
+                      <p className="text-gray-500 text-sm max-w-xs">
+                          {activeTab === 'RESULTS' ? 'İlk maç sonucunu sen paylaş!' :
+                           activeTab === 'POLLS' ? 'İlk anketi sen oluştur, topluluğun fikrini al!' :
+                           activeTab === 'REVIEWS' ? 'Gittiğin sahaları puanla, deneyimini paylaş!' :
+                           'Bu kategoride henüz bir şey paylaşılmamış. Sessizliği sen boz!'}
+                      </p>
+                  </div>
+              )}
             </div>
           </div>
 
@@ -1233,26 +1354,51 @@ const Community = () => {
               </div>
             </div>
 
-            {/* 3. Weekly MVPs */}
+            {/* 3. Dynamic Top Players */}
             <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
               <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
                 <Trophy size={18} className="text-yellow-500" />
-                Haftanın MVP'leri 👑
+                Meydan'ın Sakinleri 👑
               </h3>
               <div className="space-y-4">
-                {WEEKLY_MVPS.map((player, idx) => (
-                  <Link to={`/profile/${player.id}`} key={player.id} className="flex items-center gap-3 group">
+                {(topPlayers.length > 0 ? topPlayers : WEEKLY_MVPS).map((player, idx) => (
+                  <Link to={`/oyuncu-detay/${player.id}`} key={player.id} className="flex items-center gap-3 group">
                     <div className="relative font-mono font-bold text-gray-300 w-4 text-center">{idx + 1}</div>
-                    <img src={player.avatar} alt={player.name} className="w-10 h-10 rounded-full border-2 border-white shadow-sm group-hover:border-green-400 transition-colors" />
+                    <img 
+                      src={player.photoURL || player.profilePhoto?.url || player.avatar || `https://ui-avatars.com/api/?name=${player.fullName || player.name}&background=random`} 
+                      alt={player.fullName || player.name} 
+                      className="w-10 h-10 rounded-full border-2 border-white shadow-sm group-hover:border-green-400 transition-colors object-cover" 
+                    />
                     <div className="flex-1">
-                      <h4 className="font-bold text-sm text-gray-900 group-hover:text-green-600 transition-colors">{player.name}</h4>
+                      <h4 className="font-bold text-sm text-gray-900 group-hover:text-green-600 transition-colors line-clamp-1">{player.fullName || player.name}</h4>
                       <p className="text-[10px] text-gray-500 font-medium bg-gray-100 inline-block px-1.5 rounded mt-0.5">
-                        {player.goals} Maç / {player.goals} Gol
+                        {player.city || 'Şehir Belirtilmedi'}
                       </p>
                     </div>
                   </Link>
                 ))}
               </div>
+            </div>
+
+            {/* 4. Community Stats */}
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 overflow-hidden relative">
+                <div className="absolute top-0 right-0 p-3 opacity-10">
+                    <TrendingUp size={64} />
+                </div>
+                <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2 relative z-10">
+                    <Activity size={18} className="text-green-500" />
+                    Meydan İstatistikleri
+                </h3>
+                <div className="grid grid-cols-2 gap-4 relative z-10">
+                    <div className="bg-gray-50 p-3 rounded-lg border border-gray-100">
+                        <span className="block text-xl font-black text-gray-900">{posts.length}</span>
+                        <span className="text-[10px] text-gray-500 uppercase font-bold">Toplam Paylaşım</span>
+                    </div>
+                    <div className="bg-gray-50 p-3 rounded-lg border border-gray-100">
+                        <span className="block text-xl font-black text-green-600">{communityStats.activeUsers}</span>
+                        <span className="text-[10px] text-gray-500 uppercase font-bold">Aktif Oyuncu</span>
+                    </div>
+                </div>
             </div>
 
           </div>

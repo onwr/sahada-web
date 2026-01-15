@@ -371,12 +371,29 @@ const OyuncuOnboard = () => {
     }
 
     setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    
+    if (Object.keys(newErrors).length > 0) {
+      const firstError = Object.values(newErrors)[0];
+      toast.error(firstError);
+      
+      // Hatalı alana kaydır
+      setTimeout(() => {
+        const firstErrorKey = Object.keys(newErrors)[0];
+        const element = document.getElementById(firstErrorKey);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 100);
+      return false;
+    }
+    
+    return true;
   };
 
   const nextStep = () => {
     if (validateStep(currentStep)) {
       setCurrentStep((prev) => Math.min(prev + 1, steps.length));
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
 
@@ -414,6 +431,17 @@ const OyuncuOnboard = () => {
       const errorMsg = 'Lütfen tüm zorunlu sözleşmeleri onaylayın';
       setErrors({ submit: errorMsg });
       toast.error(errorMsg);
+      
+      const agreementIds = ['terms', 'kvkk', 'membershipAgreement'];
+      for (const id of agreementIds) {
+        if (!agreements[id]) {
+          const element = document.getElementById(id);
+          if (element) {
+            element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+          break;
+        }
+      }
       return;
     }
 
@@ -579,6 +607,7 @@ const OyuncuOnboard = () => {
                       size={20}
                     />
                     <input
+                      id="fullName"
                       type='text'
                       value={formData.fullName}
                       onChange={(e) => handleInputChange('fullName', e.target.value)}
@@ -601,7 +630,7 @@ const OyuncuOnboard = () => {
 
                 {/* Doğum Yılı */}
                 <div>
-                  <label className='mb-2 text-sm font-medium text-gray-700 flex justify-between items-center'>
+                  <label id="birthYear" className='mb-2 text-sm font-medium text-gray-700 flex justify-between items-center'>
                     <span>Doğum Yılı *</span>
                     <span className="text-xl font-bold text-green-600 bg-green-50 px-3 py-1 rounded-lg">
                         {formData.birthYear || 'Seçiniz'}
@@ -633,7 +662,7 @@ const OyuncuOnboard = () => {
                 </div>
 
                 {/* Cinsiyet */}
-                <div>
+                <div id="gender">
                   <label className='mb-3 block text-sm font-medium text-gray-700'>Cinsiyet *</label>
                   <div className='grid grid-cols-3 gap-3'>
                     {[
@@ -681,6 +710,7 @@ const OyuncuOnboard = () => {
                           size={20}
                         />
                         <input
+                          id="phone"
                           type='tel'
                           value={formData.phone}
                           onChange={(e) => handlePhoneChange(e, 'phone')}
@@ -725,6 +755,7 @@ const OyuncuOnboard = () => {
                           size={20}
                         />
                         <input
+                          id="whatsapp"
                           type='tel'
                           value={formData.whatsapp}
                           onChange={(e) => handlePhoneChange(e, 'whatsapp')}
@@ -762,7 +793,7 @@ const OyuncuOnboard = () => {
                   <label className='mb-3 block text-sm font-medium text-gray-700'>
                     Favori Sporlarınız *
                   </label>
-                  <div className='grid grid-cols-2 gap-3 sm:grid-cols-3'>
+                  <div id="favoriteSports" className='grid grid-cols-2 gap-3 sm:grid-cols-3'>
                     {sports.map((sport) => (
                       <motion.button
                         key={sport.id}
@@ -811,7 +842,7 @@ const OyuncuOnboard = () => {
 
                       {/* Spor Seviyeniz */}
                       <div>
-                        <label className='mb-3 block text-sm font-medium text-gray-700'>
+                        <label id={`skillLevel_${sportId}`} className='mb-3 block text-sm font-medium text-gray-700'>
                           Spor Seviyeniz *
                         </label>
                         <div className='space-y-2'>
@@ -862,7 +893,7 @@ const OyuncuOnboard = () => {
 
                       {/* Favori Mevki/Pozisyon */}
                       <div>
-                        <label className='mb-2 block text-sm font-medium text-gray-700'>
+                        <label id={`position_${sportId}`} className='mb-2 block text-sm font-medium text-gray-700'>
                           Favori Mevki/Pozisyon *
                         </label>
                         <div className='grid grid-cols-2 gap-2 sm:grid-cols-3'>
@@ -895,7 +926,7 @@ const OyuncuOnboard = () => {
 
                       {/* Oyun Sıklığı */}
                       <div>
-                        <label className='mb-2 block text-sm font-medium text-gray-700'>
+                        <label id={`playFrequency_${sportId}`} className='mb-2 block text-sm font-medium text-gray-700'>
                           Oyun Sıklığı *
                         </label>
                         <div className='space-y-2'>
@@ -1268,6 +1299,7 @@ const OyuncuOnboard = () => {
                   <div className='space-y-3'>
                     <label className='flex items-start gap-3'>
                       <input
+                        id="terms"
                         type='checkbox'
                         checked={agreements.terms}
                         onChange={(e) => handleAgreementChange('terms', e.target.checked)}
@@ -1285,6 +1317,7 @@ const OyuncuOnboard = () => {
 
                     <label className='flex items-start gap-3'>
                       <input
+                        id="kvkk"
                         type='checkbox'
                         checked={agreements.kvkk}
                         onChange={(e) => handleAgreementChange('kvkk', e.target.checked)}
@@ -1312,6 +1345,7 @@ const OyuncuOnboard = () => {
 
                     <label className='flex items-start gap-3'>
                       <input
+                        id="membershipAgreement"
                         type='checkbox'
                         checked={agreements.membershipAgreement}
                         onChange={(e) => handleAgreementChange('membershipAgreement', e.target.checked)}

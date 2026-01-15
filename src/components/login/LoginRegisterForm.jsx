@@ -19,7 +19,7 @@ import {
   loginWithFacebook,
   resetPassword 
 } from '../../services/authService';
-import { getAuthPageContent } from '../../services/firestoreService';
+import { getAuthPageContent, checkUserExists } from '../../services/firestoreService';
 import { useAuth } from '../../contexts/AuthContext';
 
 const LoginRegisterForm = () => {
@@ -141,9 +141,24 @@ const LoginRegisterForm = () => {
     try {
       let result;
       
+
+      
       if (activeTab === 'login') {
         result = await loginUser(formData.email, formData.password);
       } else {
+        // Kayıt öncesi duplicate kontrolü
+        const duplicateCheck = await checkUserExists(formData.email, formData.phone);
+        if (duplicateCheck.success && duplicateCheck.exists) {
+          const newErrors = {};
+          duplicateCheck.errors.forEach(err => {
+             if(err.type === 'email') newErrors.email = err.message;
+             if(err.type === 'phone') newErrors.phone = err.message;
+          });
+          setErrors(newErrors);
+          setIsLoading(false);
+          return;
+        }
+
         result = await registerUser({
           ...formData,
           userType,
@@ -817,7 +832,18 @@ const LoginRegisterForm = () => {
           </div>
 
           {/* Sağ Kolon - Promosyon */}
-          <div className="bg-gradient-to-br from-green-500 to-green-600 p-6 sm:p-8 lg:p-12 flex flex-col justify-center text-white relative overflow-hidden">
+          <div 
+            className={`p-6 sm:p-8 lg:p-12 flex flex-col justify-center text-white relative overflow-hidden ${!pageContent.backgroundImage ? 'bg-gradient-to-br from-green-500 to-green-600' : 'bg-gray-900'}`}
+            style={pageContent.backgroundImage ? { 
+              backgroundImage: `url(${pageContent.backgroundImage})`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center' 
+            } : {}}
+          >
+            {/* Overlay if image exists */}
+            {pageContent.backgroundImage && (
+              <div className="absolute inset-0 bg-black/50 z-0"></div>
+            )}
             {/* Dekoratif Elementler */}
             <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-16 translate-x-16"></div>
             <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/10 rounded-full translate-y-12 -translate-x-12"></div>

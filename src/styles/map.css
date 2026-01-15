@@ -1,0 +1,10 @@
+.custom-popup-clean .leaflet-popup-content-wrapper {
+  padding: 0 !important;
+  overflow: hidden;
+  border-radius: 8px;
+}
+
+.custom-popup-clean .leaflet-popup-content {
+  margin: 0 !important;
+  width: 100% !important;
+}

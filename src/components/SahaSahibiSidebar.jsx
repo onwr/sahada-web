@@ -327,11 +327,11 @@ const SahaSahibiSidebar = () => {
         </nav>
 
         {/* Çıkış Butonu */}
-        <div className="border-t border-gray-200 p-4 bg-gray-50/50">
+        <div className="border-t border-gray-200 p-3 bg-gray-50/50 mt-auto">
           <button
             onClick={handleLogout}
             disabled={isLoggingOut}
-            className="w-full flex items-center justify-center space-x-2 px-4 py-3 rounded-xl text-gray-600 hover:bg-red-50 hover:text-red-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium border border-transparent hover:border-red-100 hover:shadow-sm"
+            className="w-full flex items-center justify-center space-x-2 px-4 py-2 rounded-xl text-gray-600 hover:bg-red-50 hover:text-red-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed text-xs font-medium border border-transparent hover:border-red-100 hover:shadow-sm"
           >
             {isLoggingOut ? (
               <>
@@ -340,8 +340,8 @@ const SahaSahibiSidebar = () => {
               </>
             ) : (
               <>
-                <LogOut className="w-5 h-5" />
-                <span>Çıkış Yap</span>
+                <LogOut className="w-4 h-4" />
+                <span>Çıkış</span>
               </>
             )}
           </button>

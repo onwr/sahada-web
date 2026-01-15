@@ -38,7 +38,13 @@ import {
   Star,
   Award,
   TrendingUp,
-  Info
+  Info,
+  Globe,
+  Users,
+  Target,
+  Dumbbell,
+  Trophy,
+  Medal
 } from 'lucide-react';
 import { exportToCSV, exportToExcel, exportToPDF } from '../../utils/exportUtils';
 import { collection, query, onSnapshot, where } from 'firebase/firestore';
@@ -683,7 +689,13 @@ const Blog = () => {
       Star,
       Award,
       TrendingUp,
-      Info
+      Info,
+      Globe,
+      Users,
+      Target,
+      Dumbbell,
+      Trophy,
+      Medal
     };
     
     const IconComponent = icons[iconName] || BookOpen;
@@ -1548,6 +1560,12 @@ const Blog = () => {
                       <option value="Award">Ödül</option>
                       <option value="TrendingUp">Trend</option>
                       <option value="Info">Bilgi</option>
+                      <option value="Globe">Küresel</option>
+                      <option value="Users">Kullanıcılar</option>
+                      <option value="Target">Hedef</option>
+                      <option value="Dumbbell">Antrenman</option>
+                      <option value="Trophy">Kupa</option>
+                      <option value="Medal">Madalya</option>
                     </select>
                   </div>
                 </div>
@@ -1590,7 +1608,10 @@ const Blog = () => {
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className={`w-8 h-8 rounded-full ${cat.color} flex items-center justify-center text-white`}>
                               {(() => {
-                                const icons = { BookOpen, Activity, Heart, Zap, Star, Award, TrendingUp, Info };
+                                const icons = { 
+                                  BookOpen, Activity, Heart, Zap, Star, Award, TrendingUp, Info,
+                                  Globe, Users, Target, Dumbbell, Trophy, Medal
+                                };
                                 const IconComp = icons[cat.icon] || BookOpen;
                                 return <IconComp className="w-4 h-4" />;
                               })()}

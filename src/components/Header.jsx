@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Menu, X, User, LogOut, Settings, ChevronDown, MapPin,
+
   LayoutDashboard, Building2, Search, BookOpen, Shield, Users
 } from 'lucide-react';
+import * as LucideIcons from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { getPlatformSettings } from '../services/firestoreService';
 
 const Header = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -12,6 +15,29 @@ const Header = () => {
   const { user, userData, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const [logoUrl, setLogoUrl] = useState(null); // Initialize as null to show skeleton
+  const [loadingLogo, setLoadingLogo] = useState(true);
+  const [dynamicMenu, setDynamicMenu] = useState([]);
+
+  useEffect(() => {
+    const fetchSettings = async () => {
+       try {
+         const result = await getPlatformSettings();
+          if (result.success) {
+            if (result.data.logoUrl) setLogoUrl(result.data.logoUrl);
+            if (result.data.menus?.header) setDynamicMenu(result.data.menus.header);
+          } else {
+             setLogoUrl('/images/logo.png'); // Fallback
+          }
+       } catch (error) {
+         console.error('Header logo fetch error:', error);
+         setLogoUrl('/images/logo.png'); // Error fallback
+       } finally {
+         setLoadingLogo(false);
+       }
+    };
+    fetchSettings();
+  }, []);
 
   const handleLogout = async () => {
     try {
@@ -35,21 +61,34 @@ const Header = () => {
 
     if (!user) {
       return [
-        { name: 'Yakındaki Sahalar', href: '/yakin-sahalar', icon: MapPin },
-        { name: 'Oyuncu Bul', href: '/oyuncu-bul', icon: Search },
-        { name: 'Meydan', href: '/community', icon: Users },
-        { name: 'Blog', href: '/blog', icon: BookOpen },
+        { name: 'Yakındaki Sahalar', href: '/yakin-sahalar', icon: 'MapPin' },
+        { name: 'Oyuncu Bul', href: '/oyuncu-bul', icon: 'Search' },
+        { name: 'Meydan', href: '/meydan', icon: 'Users' },
+        { name: 'Blog', href: '/blog', icon: 'BookOpen' },
       ];
     }
 
     // Giriş yapmış kullanıcılar için public sayfalarda gösterilecek linkler
     return [
-      { name: 'Yakındaki Sahalar', href: '/yakin-sahalar', icon: MapPin },
-      { name: 'Oyuncu Bul', href: '/oyuncu-bul', icon: Search },
-      { name: 'Meydan', href: '/community', icon: Users },
-      { name: 'Blog', href: '/blog', icon: BookOpen },
+      { name: 'Yakındaki Sahalar', href: '/yakin-sahalar', icon: 'MapPin' },
+      { name: 'Oyuncu Bul', href: '/oyuncu-bul', icon: 'Search' },
+      { name: 'Meydan', href: '/meydan', icon: 'Users' },
+      { name: 'Blog', href: '/blog', icon: 'BookOpen' },
     ];
   };
+
+  // Helper to get icon component
+  const getIcon = (iconName) => {
+    // If it's already a component (default static list)
+    if (typeof iconName !== 'string') return iconName;
+    
+    // If it's a string, look it up
+    return LucideIcons[iconName] || LucideIcons.Circle;
+  };
+
+  const navigationItems = dynamicMenu.length > 0 
+    ? dynamicMenu.map(item => ({ name: item.label, href: item.href, icon: item.icon }))
+    : getNavigationItems();
 
   const getSettingsUrl = () => {
     if (userData?.userType === 'admin') return '/admin/ayarlar';
@@ -89,32 +128,39 @@ const Header = () => {
             className="flex items-center cursor-pointer"
             onClick={() => navigate('/')}
           >
-            <img 
-              src="/images/logo.png" 
-              className="h-12 sm:h-14 w-auto" 
-              alt="Sahada Logo" 
-            />
+            {loadingLogo ? (
+              <div className="h-12 w-32 bg-gray-200 animate-pulse rounded-md" />
+            ) : (
+              <img 
+                src={logoUrl} 
+                className="h-12 sm:h-14 w-auto object-contain" 
+                alt="Sahada Logo" 
+              />
+            )}
           </div>
 
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center space-x-1">
-            {getNavigationItems().map((item) => (
-              <button
-                key={item.name}
-                onClick={() => {
-                  navigate(item.href);
-                  setIsMobileMenuOpen(false);
-                }}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  isActive(item.href)
-                    ? 'bg-green-50 text-green-600'
-                    : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
-                }`}
-              >
-                <item.icon size={18} />
-                <span>{item.name}</span>
-              </button>
-            ))}
+            {navigationItems.map((item) => {
+              const Icon = getIcon(item.icon);
+              return (
+                <button
+                  key={item.name}
+                  onClick={() => {
+                    navigate(item.href);
+                    setIsMobileMenuOpen(false);
+                  }}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    isActive(item.href)
+                      ? 'bg-green-50 text-green-600'
+                      : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
+                  }`}
+                >
+                  <Icon size={18} />
+                  <span>{item.name}</span>
+                </button>
+              );
+            })}
           </nav>
 
           {/* Right Side - Auth Buttons or User Menu */}
@@ -210,23 +256,26 @@ const Header = () => {
         {isMobileMenuOpen && (
           <div className="md:hidden py-4 border-t border-gray-200">
             <nav className="flex flex-col space-y-1">
-              {getNavigationItems().map((item) => (
-                <button
-                  key={item.name}
-                  onClick={() => {
-                    navigate(item.href);
-                    setIsMobileMenuOpen(false);
-                  }}
-                  className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
-                    isActive(item.href)
-                      ? 'bg-green-50 text-green-600'
-                      : 'text-gray-700 hover:bg-gray-50'
-                  }`}
-                >
-                  <item.icon size={20} />
-                  <span>{item.name}</span>
-                </button>
-              ))}
+              {navigationItems.map((item) => {
+                const Icon = getIcon(item.icon);
+                return (
+                  <button
+                    key={item.name}
+                    onClick={() => {
+                      navigate(item.href);
+                      setIsMobileMenuOpen(false);
+                    }}
+                    className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
+                      isActive(item.href)
+                        ? 'bg-green-50 text-green-600'
+                        : 'text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    <Icon size={20} />
+                    <span>{item.name}</span>
+                  </button>
+                );
+              })}
               
               {!user && (
                 <>

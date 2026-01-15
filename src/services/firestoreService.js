@@ -69,6 +69,49 @@ export const getPlayers = async (filters = {}) => {
   }
 };
 
+// Check if user exists with email or phone
+export const checkUserExists = async (email, phone) => {
+  try {
+    const usersRef = collection(db, 'users');
+    const existingUsers = [];
+
+    if (email) {
+      const emailQuery = query(usersRef, where('email', '==', email));
+      const emailSnap = await getDocs(emailQuery);
+      if (!emailSnap.empty) {
+        existingUsers.push({ type: 'email', message: 'Bu e-posta adresi ile kayıtlı bir kullanıcı zaten var.' });
+      }
+    }
+
+    if (phone) {
+      const phoneQuery = query(usersRef, where('phone', '==', phone));
+      const phoneSnap = await getDocs(phoneQuery);
+      if (!phoneSnap.empty) {
+        existingUsers.push({ type: 'phone', message: 'Bu telefon numarası ile kayıtlı bir kullanıcı zaten var.' });
+      }
+    }
+
+    if (existingUsers.length > 0) {
+      return {
+        success: true,
+        exists: true,
+        errors: existingUsers
+      };
+    }
+
+    return {
+      success: true,
+      exists: false
+    };
+  } catch (error) {
+    console.error('Kullanıcı kontrolü hatası:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+};
+
 // KullanÄ±cÄ± verilerini getir - getUserData export edilmiÅŸtir
 export const getUserData = async (uid) => {
   try {
@@ -1367,6 +1410,159 @@ export const getYakinTesisler = async (lat = null, lng = null, radius = null) =>
 
 // KullanÄ±cÄ±larÄ± ara (sadece player tipindeki kullanÄ±cÄ±lar)
 // KullanÄ±cÄ±larÄ± ara (Optimize edilmiÅŸ)
+// Tesis Değerlendirme Ekle
+export const addReview = async (tesisId, reviewData) => {
+  try {
+    // 1. Değerlendirmeyi 'reviews' koleksiyonuna ekle
+    await addDoc(collection(db, 'reviews'), {
+      tesisId,
+      ...reviewData,
+      createdAt: serverTimestamp()
+    });
+
+    // 2. Tesisin ortalama puanını güncelle
+    const tesisRef = doc(db, 'tesisler', tesisId);
+    
+    // Transaction kullanarak güvenli güncelleme yap
+    await runTransaction(db, async (transaction) => {
+      const tesisDoc = await transaction.get(tesisRef);
+      if (!tesisDoc.exists()) {
+        throw new Error("Tesis bulunamadı!");
+      }
+
+      const currentRating = tesisDoc.data().rating || 0;
+      const currentCount = tesisDoc.data().ratingCount || 0;
+      const newRatingCount = currentCount + 1;
+      
+      // Yeni ortalamayı hesapla: ((eski_ort * eski_sayi) + yeni_puan) / yeni_sayi
+      const newRating = ((currentRating * currentCount) + reviewData.rating) / newRatingCount;
+
+      transaction.update(tesisRef, {
+        rating: Number(newRating.toFixed(1)),
+        ratingCount: newRatingCount
+      });
+    });
+
+    return { success: true };
+  } catch (error) {
+    console.error('Değerlendirme ekleme hatası:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+// Kullanıcının değerlendirme yapıp yapamayacağını kontrol et
+export const checkCanUserReview = async (userId, tesisId) => {
+  try {
+    const q = query(
+      collection(db, 'rezervasyonlar'),
+      where('userId', '==', userId),
+      where('tesisId', '==', tesisId),
+      where('status', 'in', ['confirmed', 'completed'])
+    );
+    
+    const querySnapshot = await getDocs(q);
+    const now = new Date();
+    
+    let hasPlayed = false;
+    querySnapshot.forEach((doc) => {
+      const data = doc.data();
+      // Tarih ve saat bilgisini birleştirerek maçın bitip bitmediğini kontrol et
+      const resDate = data.date?.toDate ? data.date.toDate() : new Date(data.date);
+      
+      // timeSlot formatı genelde "14:00 - 15:00" şeklindedir
+      // Bitiş saatini alalım (eğer varsa)
+      let matchEndTime = new Date(resDate);
+      if (data.timeSlot && data.timeSlot.includes('-')) {
+        const endTimeStr = data.timeSlot.split('-')[1].trim(); // "15:00"
+        const [hours, minutes] = endTimeStr.split(':').map(Number);
+        matchEndTime.setHours(hours, minutes, 0, 0);
+      } else {
+        // Eğer slot yoksa günün sonunu baz alalım veya sadece gün kontrolü yapalım
+        matchEndTime.setHours(23, 59, 59, 999);
+      }
+
+      if (matchEndTime < now) {
+        hasPlayed = true;
+      }
+    });
+    
+    return { success: true, canReview: hasPlayed };
+  } catch (error) {
+    console.error('Rezervasyon kontrol hatası:', error);
+    return { success: false, canReview: false };
+  }
+};
+
+// Tesis Değerlendirmelerini Getir
+export const getTesisReviews = async (tesisId) => {
+  try {
+    // Index hatasını önlemek için orderBy'ı kaldırıp client-side sort yapıyoruz
+    const q = query(
+      collection(db, 'reviews'),
+      where('tesisId', '==', tesisId),
+      limit(50) // Biraz daha fazla çekip en yeni 20'yi manuel seçebiliriz
+    );
+
+    const querySnapshot = await getDocs(q);
+    let reviews = [];
+    
+    querySnapshot.forEach((doc) => {
+      reviews.push({ id: doc.id, ...doc.data() });
+    });
+
+    // Client-side sort: En yeni en üstte
+    reviews.sort((a, b) => {
+      const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt);
+      const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt);
+      return dateB - dateA;
+    });
+
+    return { success: true, data: reviews.slice(0, 20) };
+  } catch (error) {
+    console.error('Yorumları getirme hatası:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+// Tesis Değerlendirmesini Sil
+export const deleteReview = async (reviewId, tesisId, rating) => {
+  try {
+    // 1. Değerlendirmeyi 'reviews' koleksiyonundan sil
+    await deleteDoc(doc(db, 'reviews', reviewId));
+
+    // 2. Tesisin ortalama puanını güncelle
+    const tesisRef = doc(db, 'tesisler', tesisId);
+    
+    await runTransaction(db, async (transaction) => {
+      const tesisDoc = await transaction.get(tesisRef);
+      if (!tesisDoc.exists()) {
+        throw new Error("Tesis bulunamadı!");
+      }
+
+      const currentRating = tesisDoc.data().rating || 0;
+      const currentCount = tesisDoc.data().ratingCount || 0;
+      
+      const newRatingCount = Math.max(0, currentCount - 1);
+      let newRating = 0;
+      
+      if (newRatingCount > 0) {
+        // Yeni ortalamayı hesapla: ((eski_ort * eski_sayi) - silinen_puan) / yeni_sayi
+        newRating = ((currentRating * currentCount) - rating) / newRatingCount;
+      }
+
+      transaction.update(tesisRef, {
+        rating: Number(newRating.toFixed(1)),
+        ratingCount: newRatingCount
+      });
+    });
+
+    return { success: true };
+  } catch (error) {
+    console.error('Değerlendirme silme hatası:', error);
+    return { success: false, error: error.message };
+  }
+};
+
 export const searchUsers = async (queryText) => {
   if (!queryText) return { success: true, data: [] };
   
@@ -4607,6 +4803,7 @@ export const getPlatformStats = async () => {
         },
         activeUsers: {
           total: activeUsers.length,
+          all: users.length,
           players: activePlayers.length,
           owners: activeOwners.length
         },
@@ -9770,4 +9967,25 @@ export const getSavedCustomerSegments = async (ownerId) => {
     } catch (error) {
         return { success: false, error: error.message };
     }
+};
+
+// ==================== TAKIM VE TURNUVA KAYIT SERVİSLERİ ====================
+  
+// Kullanıcının üyesi olduğu takımları getir
+export const getUserTeams = async (userId) => {
+  try {
+    const teamsRef = collection(db, 'teams');
+    const q = query(teamsRef, where('members', 'array-contains', userId));
+    const snapshot = await getDocs(q);
+    
+    const teams = [];
+    snapshot.forEach(doc => {
+      teams.push({ id: doc.id, ...doc.data() });
+    });
+    
+    return { success: true, data: teams };
+  } catch (error) {
+    console.error('Kullanıcı takımları getirme hatası:', error);
+    return { success: false, error: error.message };
+  }
 };
