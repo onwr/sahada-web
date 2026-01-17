@@ -12,7 +12,8 @@ import { db } from '../../config/firebase';
 import OyuncuSidebar from '../../components/OyuncuSidebar';
 import TournamentDetail from '../../components/tournament/TournamentDetail';
 import TournamentPayment from '../../components/tournament/TournamentPayment';
-import { Trophy, Calendar, MapPin, DollarSign, Users, AlertCircle, CheckCircle, X, Eye, UserPlus, Search } from 'lucide-react';
+import DashboardHeader from '../../components/DashboardHeader';
+import { Trophy, Calendar, MapPin, DollarSign, Users, AlertCircle, CheckCircle, X, Eye, UserPlus, Search, Filter } from 'lucide-react';
 import toast from '../../utils/toast';
 import { getTournamentStatusLabel, formatTournamentDate, canRegister } from '../../utils/tournamentUtils';
 
@@ -204,138 +205,151 @@ const Turnuvalar = () => {
     <div className="flex h-screen bg-gray-50">
       <OyuncuSidebar />
 
-      <div className="flex-1 flex flex-col">
-        <header className="bg-white shadow-sm border-b px-6 py-4">
-          <div className="flex items-center justify-between pl-12 lg:pl-0">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">Turnuvalar</h1>
-              <p className="text-gray-600 mt-1">{filteredTournaments.length} turnuva bulundu</p>
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <DashboardHeader title="Turnuvalar">
+          <div className="relative hidden sm:block">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+            <input
+              type="text"
+              placeholder="Turnuva ara..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9 pr-4 py-1.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 w-48 lg:w-64 text-sm outline-none transition-all"
+            />
+          </div>
+        </DashboardHeader>
+
+        <div className="bg-white border-b sticky top-0 z-10">
+          <div className="px-4 sm:px-6 py-3 flex flex-col sm:flex-row gap-4 items-stretch sm:items-center justify-between">
+            {/* Horizontal Scroll Filters */}
+            <div className="flex space-x-2 overflow-x-auto pb-1 sm:pb-0 no-scrollbar items-center">
+              <button
+                onClick={() => setFilter('all')}
+                className={`whitespace-nowrap px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all ${
+                  filter === 'all' ? 'bg-green-600 text-white shadow-lg shadow-green-200' : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                Tümü
+              </button>
+              <button
+                onClick={() => setFilter('open')}
+                className={`whitespace-nowrap px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all ${
+                  filter === 'open' ? 'bg-green-600 text-white shadow-lg shadow-green-200' : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                Kayıtlar Açık
+              </button>
+              <button
+                onClick={() => setFilter('my')}
+                className={`whitespace-nowrap px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all ${
+                  filter === 'my' ? 'bg-green-600 text-white shadow-lg shadow-green-200' : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                Maçlarım
+              </button>
+              <button
+                onClick={() => setFilter('active')}
+                className={`whitespace-nowrap px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all ${
+                  filter === 'active' ? 'bg-green-600 text-white shadow-lg shadow-green-200' : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                Devam Ediyor
+              </button>
+              <button
+                onClick={() => setFilter('completed')}
+                className={`whitespace-nowrap px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all ${
+                  filter === 'completed' ? 'bg-green-600 text-white shadow-lg shadow-green-200' : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                Tamamlanan
+              </button>
             </div>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+
+            {/* Mobile Search - Visible only on mobile */}
+            <div className="relative sm:hidden">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
               <input
                 type="text"
                 placeholder="Turnuva ara..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 w-64"
+                className="w-full pl-9 pr-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-green-500 text-sm outline-none"
               />
             </div>
           </div>
-        </header>
-
-        <div className="bg-white border-b px-6 py-4">
-          <div className="flex space-x-2">
-            <button
-              onClick={() => setFilter('all')}
-              className={`px-4 py-2 rounded-lg text-sm font-medium ${
-                filter === 'all' ? 'bg-green-600 text-white' : 'text-gray-600 hover:bg-gray-50'
-              }`}
-            >
-              Tümü
-            </button>
-            <button
-              onClick={() => setFilter('open')}
-              className={`px-4 py-2 rounded-lg text-sm font-medium ${
-                filter === 'open' ? 'bg-green-600 text-white' : 'text-gray-600 hover:bg-gray-50'
-              }`}
-            >
-              Kayıtlar Açık
-            </button>
-            <button
-              onClick={() => setFilter('my')}
-              className={`px-4 py-2 rounded-lg text-sm font-medium ${
-                filter === 'my' ? 'bg-green-600 text-white' : 'text-gray-600 hover:bg-gray-50'
-              }`}
-            >
-              Benim Turnuvalarım
-            </button>
-            <button
-              onClick={() => setFilter('active')}
-              className={`px-4 py-2 rounded-lg text-sm font-medium ${
-                filter === 'active' ? 'bg-green-600 text-white' : 'text-gray-600 hover:bg-gray-50'
-              }`}
-            >
-              Devam Ediyor
-            </button>
-            <button
-              onClick={() => setFilter('completed')}
-              className={`px-4 py-2 rounded-lg text-sm font-medium ${
-                filter === 'completed' ? 'bg-green-600 text-white' : 'text-gray-600 hover:bg-gray-50'
-              }`}
-            >
-              Tamamlanan
-            </button>
-          </div>
         </div>
 
-        <div className="flex-1 p-6 overflow-y-auto">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="flex-1 p-4 sm:p-6 overflow-y-auto">
+          <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
             {filteredTournaments.length > 0 ? (
               filteredTournaments.map((tournament) => (
-                <div key={tournament.id} className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow">
+                <div key={tournament.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 sm:p-6 hover:shadow-xl hover:shadow-green-900/5 transition-all duration-300 group">
                   <div className="flex items-start justify-between mb-4">
-                    <div className="w-16 h-16 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-xl flex items-center justify-center">
-                      <Trophy className="w-8 h-8 text-white" />
+                    <div className="w-14 h-14 sm:w-16 sm:h-16 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-2xl flex items-center justify-center shadow-lg shadow-orange-200 group-hover:scale-110 transition-transform duration-500">
+                      <Trophy className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
                     </div>
-                    <span className={`px-3 py-1 text-xs font-semibold rounded-full ${
-                      tournament.status === 'registration_open' ? 'bg-blue-100 text-blue-800' :
-                      tournament.status === 'ongoing' ? 'bg-green-100 text-green-800' :
-                      tournament.status === 'completed' ? 'bg-gray-100 text-gray-800' :
-                      'bg-gray-100 text-gray-800'
+                    <span className={`px-3 py-1 text-[10px] sm:text-xs font-bold rounded-full tracking-wider uppercase ${
+                      tournament.status === 'registration_open' ? 'bg-blue-50 text-blue-600 border border-blue-100' :
+                      tournament.status === 'ongoing' ? 'bg-green-50 text-green-600 border border-green-100' :
+                      tournament.status === 'completed' ? 'bg-gray-50 text-gray-600 border border-gray-100' :
+                      'bg-gray-50 text-gray-600 border border-gray-100'
                     }`}>
                       {getTournamentStatusLabel(tournament.status)}
                     </span>
                   </div>
 
-                  <h3 className="text-xl font-bold text-gray-900 mb-2">{tournament.name}</h3>
-                  <p className="text-gray-600 mb-4 text-sm line-clamp-2">{tournament.description}</p>
+                  <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-2 line-clamp-1 group-hover:text-green-600 transition-colors">{tournament.name}</h3>
+                  <p className="text-gray-500 mb-4 text-xs sm:text-sm line-clamp-2 leading-relaxed">{tournament.description}</p>
 
-                  <div className="space-y-2 mb-4">
-                    <div className="flex items-center text-sm text-gray-600">
-                      <Calendar className="w-4 h-4 mr-2" />
-                      {formatTournamentDate(tournament.startDate)} - {formatTournamentDate(tournament.endDate)}
+                  <div className="space-y-2.5 mb-6">
+                    <div className="flex items-center text-xs sm:text-sm text-gray-600 bg-gray-50 rounded-lg p-2">
+                      <Calendar className="w-4 h-4 mr-2 text-orange-500" />
+                      <span className="font-medium">{formatTournamentDate(tournament.startDate)} - {formatTournamentDate(tournament.endDate)}</span>
                     </div>
-                    <div className="flex items-center text-sm text-gray-600">
-                      <Users className="w-4 h-4 mr-2" />
-                      {tournament.type === 'team' 
-                        ? `${tournament.maxTeams || 0} Takım`
-                        : `${tournament.maxParticipants || 0} Katılımcı`}
-                    </div>
-                    {tournament.registrationFee > 0 && (
-                      <div className="flex items-center text-sm text-gray-600">
-                        <DollarSign className="w-4 h-4 mr-2" />
-                        Kayıt: {tournament.registrationFee} ₺
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="flex items-center text-xs sm:text-sm text-gray-600 bg-gray-50 rounded-lg p-2">
+                        <Users className="w-4 h-4 mr-2 text-blue-500" />
+                        <span className="font-medium">
+                          {tournament.type === 'team' 
+                            ? `${tournament.maxTeams || 0} Takım`
+                            : `${tournament.maxParticipants || 0} Kişi`}
+                        </span>
                       </div>
-                    )}
+                      {tournament.registrationFee > 0 && (
+                        <div className="flex items-center text-xs sm:text-sm text-gray-600 bg-gray-50 rounded-lg p-2">
+                          <DollarSign className="w-4 h-4 mr-2 text-green-500" />
+                          <span className="font-bold">{tournament.registrationFee} ₺</span>
+                        </div>
+                      )}
+                    </div>
                     {tournament.prizePool > 0 && (
-                      <div className="flex items-center text-sm text-gray-600">
-                        <Trophy className="w-4 h-4 mr-2" />
-                        Ödül: {tournament.prizePool} ₺
+                      <div className="flex items-center text-xs sm:text-sm text-gray-900 bg-yellow-50 rounded-lg p-2 border border-yellow-100">
+                        <Trophy className="w-4 h-4 mr-2 text-yellow-600" />
+                        <span className="font-bold">Ödül: {tournament.prizePool} ₺</span>
                       </div>
                     )}
                   </div>
 
-                  <div className="flex items-center space-x-2">
+                  <div className="flex items-center gap-2">
                     <button
                       onClick={() => handleViewDetail(tournament)}
-                      className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                      className="flex-1 px-4 py-2.5 bg-gray-100 text-gray-700 text-xs sm:text-sm font-bold rounded-xl hover:bg-gray-200 transition-all active:scale-95"
                     >
                       Detaylar
                     </button>
                     {canRegister(tournament) && !isRegistered(tournament) && (
                       <button
                         onClick={() => handleRegisterClick(tournament)}
-                        className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center justify-center space-x-2"
+                        className="flex-1 px-4 py-2.5 bg-green-600 text-white text-xs sm:text-sm font-bold rounded-xl hover:bg-green-700 shadow-lg shadow-green-100 transition-all active:scale-95 flex items-center justify-center gap-2"
                       >
                         <UserPlus className="w-4 h-4" />
                         <span>Kayıt Ol</span>
                       </button>
                     )}
                     {isRegistered(tournament) && (
-                      <div className="flex-1 flex items-center justify-center space-x-2 text-green-600 px-4 py-2">
+                      <div className="flex-1 flex items-center justify-center gap-2 text-green-600 bg-green-50 px-4 py-2.5 rounded-xl border border-green-100 transition-all">
                         <CheckCircle className="w-4 h-4" />
-                        <span className="font-medium text-sm">Kayıtlı</span>
+                        <span className="font-bold text-xs sm:text-sm">Kayıtlı</span>
                       </div>
                     )}
                   </div>

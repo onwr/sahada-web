@@ -447,7 +447,7 @@ const YakinTesisler = () => {
                                   <div className="text-center text-gray-400 text-xs">Henüz konu yok.</div>
                               )}
                           </div>
-                          <Link to="/community" className="inline-flex items-center gap-2 bg-white text-gray-900 px-6 py-3 rounded-xl font-bold text-sm hover:bg-gray-100 transition-colors">
+                          <Link to="/meydan" className="inline-flex items-center gap-2 bg-white text-gray-900 px-6 py-3 rounded-xl font-bold text-sm hover:bg-gray-100 transition-colors">
                               Tartışmaya Katıl <ArrowRight size={16} />
                           </Link>
                       </div>

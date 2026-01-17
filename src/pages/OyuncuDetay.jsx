@@ -3,12 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
-import { getUserData, getPlayerStats, getPlayerReservations, getPlayerPlayedWith } from '../services/firestoreService';
+import { getUserData, getPlayerStats, getPlayerReservations, getPlayerPlayedWith, sendContactRequest, checkContactRequestStatus } from '../services/firestoreService';
 import { 
-  ArrowLeft, 
-  Star, 
-  MapPin, 
-  Calendar, 
   Trophy,
   Users,
   TrendingUp,
@@ -20,21 +16,30 @@ import {
   Clock,
   Target,
   Zap,
+  ArrowLeft, 
+  Star, 
+  MapPin, 
+  Calendar, 
   Share2,
-  MessageCircle
+  MessageCircle,
+  Eye,
+  EyeOff,
+  Lock as LockIcon
 } from 'lucide-react';
 import toast from '../utils/toast';
 
 const OyuncuDetay = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, userData } = useAuth();
   const [playerData, setPlayerData] = useState(null);
   const [stats, setStats] = useState(null);
   const [recentMatches, setRecentMatches] = useState([]);
   const [playedWith, setPlayedWith] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview'); // 'overview', 'matches', 'tournaments', 'achievements'
+  const [contactRequestStatus, setContactRequestStatus] = useState('none'); // 'none', 'pending', 'accepted'
+  const [requestingContact, setRequestingContact] = useState(false);
 
   const handleMessageClick = () => {
     if (!user) {
@@ -86,8 +91,43 @@ const OyuncuDetay = () => {
   useEffect(() => {
     if (id) {
       loadPlayerData();
+      if (user && user.uid !== id) {
+        checkRequestStatus();
+      }
     }
-  }, [id]);
+  }, [id, user]);
+
+  const checkRequestStatus = async () => {
+    const result = await checkContactRequestStatus(user.uid, id);
+    if (result.success) {
+      setContactRequestStatus(result.status);
+    }
+  };
+
+  const handleRequestContact = async () => {
+    if (!user) {
+      toast.error('İletişim bilgilerini görmek için giriş yapmalısınız');
+      navigate('/login');
+      return;
+    }
+
+    // Üyelik şartı kontrolü (Sadece player'lar için, admin ve owner muaf tutulabilir veya owner da dahil edilebilir)
+    if (userData?.userType === 'player' && userData?.subscriptionStatus !== 'active') {
+       toast.error('İletişim talebi göndermek için Premium üye olmalısınız');
+       navigate('/pricing');
+       return;
+    }
+
+    setRequestingContact(true);
+    const result = await sendContactRequest(user.uid, id, user.displayName || 'Bir oyuncu');
+    if (result.success) {
+      toast.success('İletişim talebi gönderildi');
+      setContactRequestStatus('pending');
+    } else {
+      toast.error(result.error || 'İstek gönderilemedi');
+    }
+    setRequestingContact(false);
+  };
 
   const loadPlayerData = async () => {
     if (!id) return;
@@ -547,30 +587,83 @@ const OyuncuDetay = () => {
           {/* Right Column */}
           <div className="space-y-6">
             {/* Contact Info */}
-            <div className="bg-white rounded-xl shadow-sm p-6">
-              <h2 className="text-xl font-bold text-gray-900 mb-4">İletişim</h2>
-              <div className="space-y-3">
-                {playerData.email && (
-                  <div className="flex items-center gap-3 text-gray-600">
-                    <Mail className="w-5 h-5" />
-                    <span className="text-sm">{playerData.email}</span>
-                  </div>
-                )}
-                {playerData.phone && (
-                  <div className="flex items-center gap-3 text-gray-600">
-                    <Phone className="w-5 h-5" />
-                    <span className="text-sm">{playerData.phone}</span>
-                  </div>
-                )}
-                {playerData.city && (
-                  <div className="flex items-center gap-3 text-gray-600">
-                    <MapPin className="w-5 h-5" />
-                    <span className="text-sm">
-                      {playerData.district ? `${playerData.district}, ` : ''}{playerData.city}
-                    </span>
-                  </div>
+            <div className="bg-white rounded-xl shadow-sm p-6 relative overflow-hidden">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-bold text-gray-900">İletişim</h2>
+                {(user?.uid === id || contactRequestStatus === 'accepted') ? (
+                  <Eye className="w-5 h-5 text-green-500" />
+                ) : (
+                  <EyeOff className="w-5 h-5 text-gray-400" />
                 )}
               </div>
+
+              {(user?.uid === id || contactRequestStatus === 'accepted') ? (
+                <div className="space-y-3">
+                  {playerData.email && (
+                    <div className="flex items-center gap-3 text-gray-600">
+                      <Mail className="w-5 h-5" />
+                      <span className="text-sm">{playerData.email}</span>
+                    </div>
+                  )}
+                  {playerData.phone && (
+                    <div className="flex items-center gap-3 text-gray-600">
+                      <Phone className="w-5 h-5" />
+                      <span className="text-sm">{playerData.phone}</span>
+                    </div>
+                  )}
+                  {playerData.city && (
+                    <div className="flex items-center gap-3 text-gray-600">
+                      <MapPin className="w-5 h-5" />
+                      <span className="text-sm">
+                        {playerData.district ? `${playerData.district}, ` : ''}{playerData.city}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {/* Masked Info UI */}
+                  <div className="space-y-2 opacity-50 blur-[2px] pointer-events-none select-none">
+                    <div className="flex items-center gap-3 text-gray-400">
+                      <Mail className="w-5 h-5" />
+                      <span className="text-sm text-gray-300">••••••••@••••.com</span>
+                    </div>
+                    <div className="flex items-center gap-3 text-gray-400">
+                      <Phone className="w-5 h-5" />
+                      <span className="text-sm text-gray-300">05•• ••• •• ••</span>
+                    </div>
+                  </div>
+
+                  <div className="pt-2">
+                    {contactRequestStatus === 'pending' ? (
+                      <div className="flex flex-col items-center gap-2 p-4 bg-yellow-50 rounded-xl border border-yellow-100">
+                        <Clock className="w-8 h-8 text-yellow-500 animate-pulse" />
+                        <p className="text-xs text-yellow-700 font-medium text-center">
+                          İletişim talebiniz beklemede. Kabul edildiğinde bilgiler açılacaktır.
+                        </p>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={handleRequestContact}
+                        disabled={requestingContact}
+                        className="w-full py-3 bg-gray-900 text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2 hover:bg-black transition-all shadow-lg active:scale-95 disabled:opacity-70"
+                      >
+                        {requestingContact ? (
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        ) : (
+                          <>
+                            <LockIcon size={16} className="text-green-500" />
+                            İletişim Bilgilerini Gör
+                          </>
+                        )}
+                      </button>
+                    )}
+                    <p className="text-[10px] text-gray-400 text-center mt-3">
+                      KVKK gereği iletişim bilgileri gizlenmiştir. Görmek için talep göndermeli ve üyelik şartlarını sağlamalısınız.
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Played With */}

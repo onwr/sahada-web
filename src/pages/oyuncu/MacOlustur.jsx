@@ -272,7 +272,7 @@ const MacOlustur = () => {
     <div className="flex min-h-screen bg-gray-50">
       <OyuncuSidebar />
       
-      <div className="flex-1 p-6 md:p-8">
+      <div className="flex-1 p-6 mt-10 md:mt-0 md:p-8">
         {view === 'list' ? (
           <div className="space-y-6">
              {/* List Header */}

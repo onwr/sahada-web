@@ -43,17 +43,20 @@ const MatchAdCard = ({ match, onJoin }) => {
             {/* Card Content */}
             <div className="p-5 flex-grow flex flex-col">
                 {/* Player Info (İlan Sahibi) */}
-                <div className="flex items-center gap-3 mb-4">
+                <div 
+                    className="flex items-center gap-3 mb-4 cursor-pointer group/organizer"
+                    onClick={() => onJoin && onJoin({ ...match, type: 'profile_click', organizerId: match.organizerId })}
+                >
                     <div className="relative">
                         <img
                             src={organizer.avatar}
                             alt="player"
-                            className="w-11 h-11 rounded-full border-2 border-white shadow-sm object-cover"
+                            className="w-11 h-11 rounded-full border-2 border-white shadow-sm object-cover group-hover/organizer:border-green-400 transition-all"
                         />
                         <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-green-500 rounded-full border-2 border-white"></div>
                     </div>
                     <div>
-                        <div className="font-semibold text-gray-900">{organizer.name}</div>
+                        <div className="font-semibold text-gray-900 group-hover/organizer:text-green-600 transition-colors">{organizer.name}</div>
                         <div className="text-xs text-gray-400">İlan Sahibi</div>
                     </div>
                 </div>

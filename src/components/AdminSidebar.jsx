@@ -24,7 +24,9 @@ import {
   Crown,
   BookOpen,
   Layout,
-  Lock as LockIcon
+  Lock as LockIcon,
+  Home,
+  Globe
 } from 'lucide-react';
 
 const AdminSidebar = () => {
@@ -91,6 +93,18 @@ const AdminSidebar = () => {
       id: 'yonetim',
       name: 'Yönetim',
       items: [
+        {
+          name: 'Anasayfa',
+          href: '/',
+          icon: Home,
+          badge: null
+        },
+        {
+          name: 'Meydan',
+          href: '/meydan',
+          icon: Globe,
+          badge: null
+        },
         {
           name: 'Dashboard',
           href: '/admin/dashboard',

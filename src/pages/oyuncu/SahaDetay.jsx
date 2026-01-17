@@ -5,7 +5,7 @@ import { getTesis, addRezervasyon } from '../../services/firestoreService';
 import { Timestamp, doc, onSnapshot } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import OyuncuSidebar from '../../components/OyuncuSidebar';
-import { MapPin, Star, Users, DollarSign, Clock, AlertCircle, Loader2, Phone, Mail, Globe, CheckCircle, X, Calendar, Plus, MessageSquare } from 'lucide-react';
+import { MapPin, Star, Users, DollarSign, Clock, AlertCircle, Loader2, Phone, Mail, Globe, CheckCircle, X, Calendar, Plus, MessageSquare, ChevronLeft, ChevronRight } from 'lucide-react';
 import toast from '../../utils/toast';
 
 const SahaDetay = () => {
@@ -24,6 +24,8 @@ const SahaDetay = () => {
   });
   const [submitting, setSubmitting] = useState(false);
   const [availableTimeSlots, setAvailableTimeSlots] = useState([]);
+  const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+  const [showImageModal, setShowImageModal] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -98,6 +100,21 @@ const SahaDetay = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleImageClick = (index) => {
+    setSelectedImageIndex(index);
+    setShowImageModal(true);
+  };
+
+  const nextImage = () => {
+    if (!sahaData?.images) return;
+    setSelectedImageIndex((prev) => (prev + 1) % sahaData.images.length);
+  };
+
+  const prevImage = () => {
+    if (!sahaData?.images) return;
+    setSelectedImageIndex((prev) => (prev - 1 + sahaData.images.length) % sahaData.images.length);
   };
 
   const handleReservationSubmit = async (e) => {
@@ -198,20 +215,28 @@ const SahaDetay = () => {
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 mb-6 overflow-hidden">
             {sahaData.images && sahaData.images.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-4 gap-2 h-80">
-                <div className="md:col-span-2 md:row-span-2">
+                <div 
+                  className="md:col-span-2 md:row-span-2 cursor-zoom-in group"
+                  onClick={() => handleImageClick(0)}
+                >
                   <img
                     src={sahaData.images[0].optimized_url || sahaData.images[0].url}
                     alt={sahaData.name}
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-cover group-hover:opacity-90 transition-opacity"
                   />
                 </div>
                 {sahaData.images.slice(1, 5).map((image, index) => (
-                  <img
-                    key={index}
-                    src={image.optimized_url || image.url}
-                    alt={`${sahaData.name} ${index + 2}`}
-                    className="w-full h-full object-cover"
-                  />
+                  <div 
+                    key={index} 
+                    className="cursor-zoom-in group relative"
+                    onClick={() => handleImageClick(index + 1)}
+                  >
+                    <img
+                      src={image.optimized_url || image.url}
+                      alt={`${sahaData.name} ${index + 2}`}
+                      className="w-full h-full object-cover group-hover:opacity-90 transition-opacity"
+                    />
+                  </div>
                 ))}
               </div>
             ) : (
@@ -496,6 +521,62 @@ const SahaDetay = () => {
           </div>
         )}
       </div>
+
+      {/* Image Modal */}
+      {showImageModal && sahaData.images && (
+        <div className="fixed inset-0 bg-black/95 flex items-center justify-center z-[100] p-4 animate-in fade-in duration-300">
+          <div className="relative w-full h-full flex items-center justify-center">
+            {/* Close Button */}
+            <button
+              onClick={() => setShowImageModal(false)}
+              className="absolute top-4 right-4 z-[110] p-3 bg-white/10 hover:bg-white/20 backdrop-blur-md rounded-full text-white transition-all transform hover:scale-110 active:scale-90"
+            >
+              <X className="w-6 h-6" />
+            </button>
+
+            {/* Navigation Buttons */}
+            {sahaData.images.length > 1 && (
+              <>
+                <button
+                  onClick={(e) => { e.stopPropagation(); prevImage(); }}
+                  className="absolute left-4 z-[110] p-4 bg-white/5 hover:bg-white/20 backdrop-blur-sm rounded-full text-white transition-all group"
+                >
+                  <ChevronLeft className="w-8 h-8 group-hover:-translate-x-1 transition-transform" />
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); nextImage(); }}
+                  className="absolute right-4 z-[110] p-4 bg-white/5 hover:bg-white/20 backdrop-blur-sm rounded-full text-white transition-all group"
+                >
+                  <ChevronRight className="w-8 h-8 group-hover:translate-x-1 transition-transform" />
+                </button>
+              </>
+            )}
+
+            {/* Main Image */}
+            <div 
+              className="relative max-w-5xl max-h-[85vh] flex items-center justify-center"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <img
+                src={sahaData.images[selectedImageIndex].optimized_url || sahaData.images[selectedImageIndex].url}
+                alt={`${sahaData.name} ${selectedImageIndex + 1}`}
+                className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
+              />
+              
+              {/* Counter */}
+              <div className="absolute -bottom-10 left-1/2 -translate-x-1/2 text-white/70 text-sm font-medium">
+                {selectedImageIndex + 1} / {sahaData.images.length}
+              </div>
+            </div>
+
+            {/* Click backdrop to close */}
+            <div 
+              className="absolute inset-0 z-0" 
+              onClick={() => setShowImageModal(false)}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 };

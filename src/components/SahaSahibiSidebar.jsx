@@ -21,7 +21,9 @@ import {
   MessageSquare,
   MapPin,
   Menu,
-  X
+  X,
+  Home,
+  Globe
 } from 'lucide-react';
 
 const SahaSahibiSidebar = () => {
@@ -36,6 +38,18 @@ const SahaSahibiSidebar = () => {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
 
   const navigationItems = [
+    {
+      name: 'Anasayfa',
+      href: '/',
+      icon: Home,
+      current: false
+    },
+    {
+      name: 'Meydan',
+      href: '/meydan',
+      icon: Globe,
+      current: location.pathname === '/meydan'
+    },
     {
       name: 'Dashboard',
       href: '/saha-sahibi/dashboard',

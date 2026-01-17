@@ -709,7 +709,7 @@ const Turnuvalar = () => {
                           <div className="grid grid-cols-4 gap-4 mt-3">
                             <div className="flex items-center space-x-2">
                               <Users className="w-4 h-4 text-blue-500" />
-                              <span className="text-sm font-medium">{tournament.registeredTeams || 0}/{tournament.maxTeams} Takım</span>
+                              <span className="text-sm font-medium">{Array.isArray(tournament.registeredTeams) ? tournament.registeredTeams.length : (tournament.registeredTeams || 0)}/{tournament.maxTeams} Takım</span>
                             </div>
                             <div className="flex items-center space-x-2">
                               <Target className="w-4 h-4 text-purple-500" />
@@ -995,41 +995,47 @@ const Turnuvalar = () => {
                   {tournamentForm.type === 'team' ? (
                     <>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Maksimum Takım Sayısı *
+                        <label className="block text-sm font-bold text-gray-900 mb-1">
+                          Toplam Takım Sayısı *
                         </label>
+                        <p className="text-[11px] text-gray-500 mb-2 uppercase font-bold tracking-tight">Turnuvada yarışacak toplam ekip adedi</p>
                         <input
                           type="number"
                           value={tournamentForm.maxTeams}
                           onChange={(e) => setTournamentForm(prev => ({ ...prev, maxTeams: parseInt(e.target.value) }))}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                          className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:bg-white transition-all font-medium"
                           min="2"
-                          max="32"
+                          max="128"
                           required
+                          placeholder="Örn: 16"
                         />
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Minimum Takım Boyutu
+                        <label className="block text-sm font-bold text-gray-900 mb-1">
+                          Min. Kadro Boyutu
                         </label>
+                        <p className="text-[11px] text-gray-500 mb-2 uppercase font-bold tracking-tight">Bir takımdaki minimum oyuncu sayısı</p>
                         <input
                           type="number"
                           value={tournamentForm.minTeamSize}
                           onChange={(e) => setTournamentForm(prev => ({ ...prev, minTeamSize: parseInt(e.target.value) }))}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                          className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:bg-white transition-all font-medium"
                           min="1"
+                          placeholder="Örn: 5"
                         />
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Maksimum Takım Boyutu
+                        <label className="block text-sm font-bold text-gray-900 mb-1">
+                          Maks. Kadro Boyutu
                         </label>
+                        <p className="text-[11px] text-gray-500 mb-2 uppercase font-bold tracking-tight">Bir takımdaki maksimum oyuncu sayısı</p>
                         <input
                           type="number"
                           value={tournamentForm.maxTeamSize}
                           onChange={(e) => setTournamentForm(prev => ({ ...prev, maxTeamSize: parseInt(e.target.value) }))}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                          className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:bg-white transition-all font-medium"
                           min="1"
+                          placeholder="Örn: 11"
                         />
                       </div>
                     </>

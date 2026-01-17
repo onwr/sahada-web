@@ -154,7 +154,11 @@ const OyuncuBul = () => {
     };
 
     const handleMatchClick = (match) => {
-        navigate(`/mac-detay/${match.id}`);
+        if (match.type === 'profile_click') {
+            navigate(`/oyuncu-detay/${match.organizerId}`);
+        } else {
+            navigate(`/mac-detay/${match.id}`);
+        }
     };
     
     const formatDate = (date) => {

@@ -153,6 +153,30 @@ export const updateUserData = async (uid, userData) => {
   }
 };
 
+// 15 GÃ¼nlÃ¼k Demo BaÅŸlat
+export const activateDemoSubscription = async (uid) => {
+  try {
+    const trialStartDate = new Date();
+    const trialEndDate = new Date();
+    trialEndDate.setDate(trialStartDate.getDate() + 15);
+
+    await updateDoc(doc(db, 'users', uid), {
+      subscriptionStatus: 'active', // Direkt active yapÄ±yoruz ki blok kalksÄ±n
+      subscriptionType: 'trial',
+      trialStartDate: Timestamp.fromDate(trialStartDate),
+      trialEndDate: Timestamp.fromDate(trialEndDate),
+      updatedAt: serverTimestamp()
+    });
+    return { success: true };
+  } catch (error) {
+    console.error('Demo baÅŸlatma hatasÄ±:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+};
+
 
 
 // Favori ekle/Ã§Ä±kar
@@ -3714,11 +3738,14 @@ export const getTournamentStats = async (ownerId) => {
 
     // Ä°statistikleri hesapla
     const activeTournaments = tournaments.filter(t => t.status === 'ongoing' || t.status === 'registration_open').length;
-    const totalTeams = tournaments.reduce((sum, t) => sum + (t.registeredTeams || 0), 0);
+    const totalTeams = tournaments.reduce((sum, t) => {
+      const count = Array.isArray(t.registeredTeams) ? t.registeredTeams.length : (Number(t.registeredTeams) || 0);
+      return sum + count;
+    }, 0);
     const totalMatches = tournaments.reduce((sum, t) => sum + (t.totalMatches || 0), 0);
     const totalRevenue = tournaments.reduce((sum, t) => {
       const registrationFee = t.registrationFee || 0;
-      const teamCount = t.registeredTeams || 0;
+      const teamCount = Array.isArray(t.registeredTeams) ? t.registeredTeams.length : (Number(t.registeredTeams) || 0);
       return sum + (registrationFee * teamCount);
     }, 0);
 
@@ -5373,7 +5400,7 @@ export const deleteUserAdmin = async (userId) => {
     reservationsSnapshot.forEach((docSnap) => {
       batch.push(updateDoc(doc(db, 'rezervasyonlar', docSnap.id), {
         userId: null,
-        customerName: 'SilinmiÅŸ KullanÄ±cÄ±',
+        customerName: 'Silinmiş Kullanıcı',
         updatedAt: serverTimestamp()
       }));
     });
@@ -5391,7 +5418,7 @@ export const deleteUserAdmin = async (userId) => {
     tesisSnapshot.forEach((docSnap) => {
       tesisBatch.push(updateDoc(doc(db, 'tesisler', docSnap.id), {
         ownerId: null,
-        ownerName: 'SilinmiÅŸ KullanÄ±cÄ±',
+        ownerName: 'Silinmiş Kullanıcı',
         updatedAt: serverTimestamp()
       }));
     });
@@ -9986,6 +10013,112 @@ export const getUserTeams = async (userId) => {
     return { success: true, data: teams };
   } catch (error) {
     console.error('Kullanıcı takımları getirme hatası:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+// ==================== İLETİŞİM İSTEĞİ SERVİSLERİ ====================
+
+// İletişim isteği gönder
+export const sendContactRequest = async (senderId, recipientId, senderName) => {
+  try {
+    const notificationsRef = collection(db, 'notifications');
+    
+    // Önce mevcut bir istek var mı kontrol et
+    const q = query(
+      notificationsRef,
+      where('type', '==', 'contact_request'),
+      where('senderId', '==', senderId),
+      where('userId', '==', recipientId),
+      where('status', '==', 'pending')
+    );
+    
+    const snapshot = await getDocs(q);
+    if (!snapshot.empty) {
+      return { success: false, error: 'Zaten bekleyen bir isteğiniz bulunuyor.' };
+    }
+
+    await addDoc(notificationsRef, {
+      userId: recipientId, // Alıcı
+      senderId: senderId, // Gönderen
+      senderName: senderName,
+      type: 'contact_request',
+      title: 'İletişim Bilgisi Talebi 📞',
+      message: `${senderName} sizinle iletişime geçmek için telefon ve e-posta bilgilerinizi görmek istiyor.`,
+      status: 'pending',
+      read: false,
+      createdAt: serverTimestamp()
+    });
+
+    return { success: true };
+  } catch (error) {
+    console.error('İletişim isteği gönderme hatası:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+// İletişim isteğini yanıtla (Kabul/Red)
+export const respondToContactRequest = async (notificationId, action) => {
+  try {
+    const notificationRef = doc(db, 'notifications', notificationId);
+    
+    await runTransaction(db, async (transaction) => {
+      const notifDoc = await transaction.get(notificationRef);
+      if (!notifDoc.exists()) throw new Error('İstek bulunamadı');
+      
+      const notifData = notifDoc.data();
+      
+      // Bildirimi güncelle veya sil
+      if (action === 'accept') {
+        transaction.update(notificationRef, {
+          status: 'accepted',
+          read: true
+        });
+        
+        // Gönderene kabul dair bildirim gönder
+        const feedbackRef = doc(collection(db, 'notifications'));
+        transaction.set(feedbackRef, {
+          userId: notifData.senderId,
+          type: 'system',
+          title: 'İletişim İsteği Kabul Edildi! ✅',
+          message: 'Kullanıcı iletişim bilgilerini görmenize izin verdi. Artık profilinden ulaşabilirsiniz.',
+          relatedId: notifData.userId, // Profil ID'si
+          read: false,
+          createdAt: serverTimestamp()
+        });
+      } else {
+        transaction.delete(notificationRef);
+      }
+    });
+
+    return { success: true };
+  } catch (error) {
+    console.error('İletişim isteği yanıt hatası:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+// İletişim isteği durumunu kontrol et
+export const checkContactRequestStatus = async (senderId, recipientId) => {
+  try {
+    const notificationsRef = collection(db, 'notifications');
+    const q = query(
+      notificationsRef,
+      where('type', '==', 'contact_request'),
+      where('senderId', '==', senderId),
+      where('userId', '==', recipientId)
+    );
+    
+    const snapshot = await getDocs(q);
+    if (snapshot.empty) return { success: true, status: 'none' };
+    
+    // Birden fazla olabilir (reddedilip tekrar atılmışsa vb.), en yeniye bak
+    const requests = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+    requests.sort((a, b) => b.createdAt?.toDate() - a.createdAt?.toDate());
+    
+    return { success: true, status: requests[0].status, notificationId: requests[0].id };
+  } catch (error) {
+    console.error('İstek durumu kontrol hatası:', error);
     return { success: false, error: error.message };
   }
 };

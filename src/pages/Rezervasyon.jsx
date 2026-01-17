@@ -9,24 +9,9 @@ import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { Timestamp } from 'firebase/firestore';
 import 'react-datepicker/dist/react-datepicker.css';
-import { 
-  ArrowLeft, 
-  Clock,
-  Users,
-  MapPin,
-  Phone,
-  CreditCard,
-  Check,
-  X,
-  Shield,
-  Download,
-  Plus,
-  Trash2,
-  ChevronLeft,
-  ChevronRight,
-  MessageSquare
-} from 'lucide-react';
+import { ChevronLeft, ChevronRight, MapPin, Clock, Users, ArrowLeft, Plus, Trash2, Check, CreditCard, Download, Shield, MessageSquare, Phone, Globe, Info, X, Wallet, Zap } from 'lucide-react';
 import Header from '../components/Header';
+import AuthModal from '../components/AuthModal';
 
 const Rezervasyon = ({ inPanel = false }) => {
   const { user, userData } = useAuth();
@@ -34,6 +19,7 @@ const Rezervasyon = ({ inPanel = false }) => {
   const navigate = useNavigate();
   const [sahaData, setSahaData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [showAuthModal, setShowAuthModal] = useState(false);
   const [error, setError] = useState(null);
   const [currentStep, setCurrentStep] = useState(1);
   const [showOyuncuModal, setShowOyuncuModal] = useState(false);
@@ -139,6 +125,44 @@ const Rezervasyon = ({ inPanel = false }) => {
     }
   };
   const iframeRef = useRef(null);
+
+  // Animation variants for steps
+  const stepVariants = {
+    initial: (direction) => ({
+      x: direction > 0 ? '20%' : '-20%',
+      opacity: 0,
+      filter: 'blur(10px)'
+    }),
+    animate: {
+      x: 0,
+      opacity: 1,
+      filter: 'blur(0px)',
+      transition: {
+        type: 'spring',
+        stiffness: 300,
+        damping: 30,
+        duration: 0.5
+      }
+    },
+    exit: (direction) => ({
+      x: direction > 0 ? '-20%' : '20%',
+      opacity: 0,
+      filter: 'blur(10px)',
+      transition: {
+        duration: 0.3
+      }
+    })
+  };
+
+  const [direction, setDirection] = useState(1);
+  const [userTeams, setUserTeams] = useState([]);
+  const [loadingTeams, setLoadingTeams] = useState(false);
+
+  const handleStepChange = (newStep) => {
+    setDirection(newStep > currentStep ? 1 : -1);
+    setCurrentStep(newStep);
+  };
+
 
   // Ödeme polling için referanslar
   const paymentTokenRef = useRef(null);
@@ -373,59 +397,70 @@ const Rezervasyon = ({ inPanel = false }) => {
       
       setOyuncular([organizer]);
 
-      // Kullanıcının takımını yükle
-      const fetchUserTeam = async () => {
+      // Kullanıcının takımlarını yükle
+      const fetchUserTeams = async () => {
+        setLoadingTeams(true);
         try {
           const result = await getUserTeams(user.uid);
-          if (result.success && result.data && result.data.length > 0) {
-            const team = result.data[0]; // İlk takımı al
-            if (team && team.members && team.members.length > 0) {
-              const membersPromises = team.members
-                .filter(memberId => memberId !== user.uid) // Organizatörü çıkar
-                .map(async (memberId) => {
-                  try {
-                    const memberData = await getUserData(memberId);
-                    if (memberData.success && memberData.data) {
-                        const m = memberData.data;
-                        const fullName = m.fullName || m.displayName || m.name || m.email?.split('@')[0] || 'Oyuncu';
-                        const avatar = fullName.split(' ').map(n => n[0]).join('').toUpperCase();
-                        return {
-                            id: m.uid || memberId,
-                            name: fullName,
-                            phone: m.phone || m.phoneNumber || '',
-                            status: 'oyuncu',
-                            paymentStatus: 'odenecek',
-                            avatar: m.photoURL || avatar
-                        };
-                    }
-                    return null;
-                  } catch (e) {
-                    console.error('Üye detayları çekilemedi:', memberId, e);
-                    return null;
-                  }
-                });
-
-              const membersDetails = await Promise.all(membersPromises);
-              const validMembers = membersDetails.filter(m => m !== null);
-              
-              if (validMembers.length > 0) {
-                  setOyuncular(prev => {
-                      // Mevcut oyuncuları koru, duplicate ekleme
-                      const currentIds = new Set(prev.map(p => p.id));
-                      const newMembers = validMembers.filter(m => !currentIds.has(m.id));
-                      return [...prev, ...newMembers];
-                  });
-              }
-            }
+          if (result.success && result.data) {
+            setUserTeams(result.data);
           }
         } catch (err) {
-            console.error('Takım yükleme hatası:', err);
+            console.error('Takımlar yükleme hatası:', err);
+        } finally {
+            setLoadingTeams(false);
         }
       };
       
-      fetchUserTeam();
+      fetchUserTeams();
     }
   }, [user, userData]);
+
+  const addTeamMembers = async (team) => {
+    if (!team || !team.members) return;
+    
+    toast.loading(`${team.name} üyeleri ekleniyor...`);
+    try {
+        const membersPromises = team.members
+            .filter(memberId => memberId !== user.uid) // Organizatörü çıkarma (zaten var olabilir, ama setOyuncular içinde kontrol edeceğiz)
+            .map(async (memberId) => {
+                const memberData = await getUserData(memberId);
+                if (memberData.success && memberData.data) {
+                    const m = memberData.data;
+                    const fullName = m.fullName || m.displayName || m.name || m.email?.split('@')[0] || 'Oyuncu';
+                    const avatar = fullName.split(' ').map(n => n[0]).join('').toUpperCase();
+                    return {
+                        id: m.uid || memberId,
+                        name: fullName,
+                        phone: m.phone || m.phoneNumber || '',
+                        status: 'oyuncu',
+                        paymentStatus: 'odenecek',
+                        avatar: m.photoURL || avatar
+                    };
+                }
+                return null;
+            });
+
+        const membersDetails = await Promise.all(membersPromises);
+        const validMembers = membersDetails.filter(m => m !== null);
+        
+        setOyuncular(prev => {
+            const currentIds = new Set(prev.map(p => p.id));
+            const newMembers = validMembers.filter(m => !currentIds.has(m.id));
+            if (newMembers.length === 0) {
+                toast.info('Ekip üyeleri zaten listede.');
+                return prev;
+            }
+            toast.success(`${newMembers.length} üye eklendi.`);
+            return [...prev, ...newMembers];
+        });
+    } catch (err) {
+        console.error('Ekip üyeleri ekleme hatası:', err);
+        toast.error('Grup üyeleri eklenirken hata oluştu.');
+    } finally {
+        toast.dismiss();
+    }
+  };
 
   // Platform ayarlarını yükle
   const loadPlatformSettings = async () => {
@@ -910,8 +945,15 @@ const Rezervasyon = ({ inPanel = false }) => {
   // Manuel oyuncu ekleme
   const handleManualOyuncuEkle = () => {
     if (newOyuncu.name && newOyuncu.phone) {
+      // Duplicate check
+      const isDuplicate = oyuncular.some(o => o.phone === newOyuncu.phone);
+      if (isDuplicate) {
+        toast.error('Bu oyuncu zaten listede.');
+        return;
+      }
+
       const yeniOyuncu = {
-        id: Date.now(),
+        id: `manual_${Date.now()}`,
         name: newOyuncu.name,
         phone: newOyuncu.phone,
         status: 'oyuncu',
@@ -922,25 +964,38 @@ const Rezervasyon = ({ inPanel = false }) => {
       setOyuncular([...oyuncular, yeniOyuncu]);
       setNewOyuncu({ name: '', phone: '', searchTerm: '', selectedUser: null });
       setShowOyuncuModal(false);
+      toast.success('Oyuncu eklendi.');
     }
   };
 
   // Kayıtlı kullanıcıdan oyuncu ekleme
   const handleRegisteredUserAdd = () => {
     if (newOyuncu.selectedUser) {
-      const displayName = newOyuncu.selectedUser.displayName || newOyuncu.selectedUser.name || (newOyuncu.selectedUser.email ? getNameFromEmail(newOyuncu.selectedUser.email) : '');
+      const user = newOyuncu.selectedUser;
+      
+      // Duplicate check
+      const isDuplicate = oyuncular.some(o => o.id === user.id || (o.phone && o.phone === user.phone));
+      if (isDuplicate) {
+        toast.error('Bu oyuncu zaten listede.');
+        return;
+      }
+
+      const displayName = user.displayName || user.name || (user.email ? getNameFromEmail(user.email) : '');
+      const avatar = user.photoURL || displayName.split(' ').map(n => n[0]).join('').toUpperCase();
+      
       const yeniOyuncu = {
-        id: newOyuncu.selectedUser.id,
+        id: user.id || user.uid,
         name: displayName,
-        phone: newOyuncu.selectedUser.phone || '',
+        phone: user.phone || '',
         status: 'oyuncu',
         paymentStatus: 'odenecek',
-        avatar: displayName.split(' ').map(n => n[0]).join('').toUpperCase()
+        avatar: avatar
       };
       
       setOyuncular([...oyuncular, yeniOyuncu]);
       setNewOyuncu({ name: '', phone: '', searchTerm: '', selectedUser: null });
       setShowOyuncuModal(false);
+      toast.success(`${displayName} eklendi.`);
     }
   };
 
@@ -1362,8 +1417,12 @@ const Rezervasyon = ({ inPanel = false }) => {
 
   // Split payment toggle
   const handleSplitPaymentToggle = (enabled) => {
-    setSplitPaymentEnabled(enabled);
-    // Hesaplama useEffect tarafından otomatik yapılacak
+    if (enabled) {
+      setSelectedPaymentMethod('kredi-karti');
+      setSplitPaymentEnabled(true);
+    } else {
+      setSplitPaymentEnabled(false);
+    }
   };
 
 
@@ -1662,7 +1721,7 @@ const Rezervasyon = ({ inPanel = false }) => {
               const isCurrent = currentStep === step.id;
               
               return (
-                <div key={step.id} className="relative z-10 flex flex-col items-center group cursor-pointer" onClick={() => step.id < currentStep && setCurrentStep(step.id)}>
+                <div key={step.id} className="relative z-10 flex flex-col items-center group cursor-pointer" onClick={() => step.id < currentStep && handleStepChange(step.id)}>
                   <div 
                     className={`w-10 h-10 rounded-full flex items-center justify-center border-4 transition-all duration-300 ${
                       isActive 
@@ -1693,10 +1752,11 @@ const Rezervasyon = ({ inPanel = false }) => {
                 <motion.div 
                   key="step1"
                   className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden"
-                  initial={{ x: -20, opacity: 0 }}
-                  animate={{ x: 0, opacity: 1 }}
-                  exit={{ x: 20, opacity: 0 }}
-                  transition={{ duration: 0.3 }}
+                  variants={stepVariants}
+                  custom={direction}
+                  initial="initial"
+                  animate="animate"
+                  exit="exit"
                 >
                 <div className="p-6">
                   <div className="flex flex-col md:flex-row gap-6">
@@ -1766,7 +1826,7 @@ const Rezervasyon = ({ inPanel = false }) => {
                           İptal
                         </button>
                         <button
-                          onClick={() => setCurrentStep(2)}
+                          onClick={() => handleStepChange(2)}
                           className="px-8 py-2.5 rounded-lg bg-green-600 text-white font-bold shadow-lg shadow-green-200 hover:bg-green-700 hover:shadow-green-300 hover:-translate-y-0.5 transition-all flex items-center gap-2"
                         >
                           Rezervasyon Yap <ArrowLeft className="rotate-180" size={18} />
@@ -1784,10 +1844,11 @@ const Rezervasyon = ({ inPanel = false }) => {
                 <motion.div 
                   key="step2"
                   className="space-y-6"
-                  initial={{ x: -50, opacity: 0 }}
-                  animate={{ x: 0, opacity: 1 }}
-                  exit={{ x: 50, opacity: 0 }}
-                  transition={{ duration: 0.3 }}
+                  variants={stepVariants}
+                  custom={direction}
+                  initial="initial"
+                  animate="animate"
+                  exit="exit"
                 >
                 {/* Tarih ve Saat Seçimi */}
                 <div className="bg-white rounded-xl p-6 shadow-sm">
@@ -1887,11 +1948,11 @@ const Rezervasyon = ({ inPanel = false }) => {
                 {/* Devam Et Butonu */}
                 <div className="flex justify-end">
                   <button
-                    onClick={() => setCurrentStep(3)}
+                    onClick={() => handleStepChange(3)}
                     disabled={!selectedTime}
-                    className={`px-6 py-3 rounded-lg font-semibold ${
+                    className={`px-6 py-3 rounded-lg font-semibold transition-all ${
                       selectedTime
-                        ? 'bg-orange-500 text-white hover:bg-orange-600'
+                        ? 'bg-orange-500 text-white hover:bg-orange-600 shadow-lg shadow-orange-100'
                         : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                     }`}
                   >
@@ -1908,73 +1969,118 @@ const Rezervasyon = ({ inPanel = false }) => {
                 <motion.div 
                   key="step3"
                   className="space-y-6"
-                  initial={{ x: -50, opacity: 0 }}
-                  animate={{ x: 0, opacity: 1 }}
-                  exit={{ x: 50, opacity: 0 }}
-                  transition={{ duration: 0.3 }}
+                  variants={stepVariants}
+                  custom={direction}
+                  initial="initial"
+                  animate="animate"
+                  exit="exit"
                 >
+                {/* Ekiplerim */}
+                {userTeams.length > 0 && (
+                  <div className="bg-white rounded-xl p-6 shadow-sm mb-6">
+                    <div className="flex items-center justify-between mb-6">
+                        <h2 className="text-xl font-extrabold text-gray-900 flex items-center gap-2">
+                            <span className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+                                <Users className="text-blue-600" size={18} />
+                            </span>
+                            Ekiplerim
+                        </h2>
+                        <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">{userTeams.length} Ekip</span>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {userTeams.map(team => (
+                            <motion.div 
+                                key={team.id} 
+                                whileHover={{ scale: 1.02, translateY: -2 }}
+                                className="p-4 bg-gray-50 rounded-2xl border border-gray-100 flex items-center justify-between group hover:border-blue-200 hover:bg-white hover:shadow-xl hover:shadow-blue-500/5 transition-all cursor-default"
+                            >
+                                <div className="flex items-center gap-4">
+                                    <div className="w-14 h-14 bg-blue-100 rounded-xl flex items-center justify-center text-blue-600 font-black text-xl shadow-inner">
+                                        {team.photoURL ? <img src={team.photoURL} className="w-full h-full object-cover rounded-xl" alt="" /> : team.name.slice(0, 1).toUpperCase()}
+                                    </div>
+                                    <div>
+                                        <p className="font-black text-gray-900 leading-tight">{team.name}</p>
+                                        <p className="text-xs text-gray-500 mt-1 flex items-center gap-1 font-bold">
+                                            <Users size={12} />
+                                            {team.members?.length || 0} Üye
+                                        </p>
+                                    </div>
+                                </div>
+                                <button 
+                                    onClick={() => addTeamMembers(team)}
+                                    className="px-4 py-2 bg-white text-blue-600 border border-blue-100 hover:bg-blue-600 hover:text-white hover:border-blue-600 rounded-xl transition-all font-black text-xs uppercase tracking-tighter shadow-sm active:scale-95"
+                                >
+                                    Hepsini Ekle
+                                </button>
+                            </motion.div>
+                        ))}
+                    </div>
+                  </div>
+                )}
+
                 {/* Oyuncu Listesi */}
                 <div className="bg-white rounded-xl p-6 shadow-sm">
                   <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-xl font-bold text-gray-900">Oyuncu Listesi</h2>
+                    <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                        <Users className="text-green-500" />
+                        Seçili Kadro
+                    </h2>
                     <div className="flex items-center space-x-3">
-                      <span className="text-sm text-gray-600">{oyuncular.length} kişi</span>
+                      <span className="text-sm font-bold bg-green-50 text-green-700 px-3 py-1 rounded-full">{oyuncular.length} Oyuncu</span>
                       <button
                         onClick={() => setShowOyuncuModal(true)}
-                        className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                        className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all shadow-md hover:shadow-lg active:scale-95"
                       >
                         <Plus className="w-4 h-4" />
-                        <span>Oyuncu Ekle</span>
+                        <span className="font-bold text-sm">Oyuncu Ekle</span>
                       </button>
                     </div>
                   </div>
                   
-                  <div className="space-y-3">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     {oyuncular.length === 0 ? (
-                      <div className="text-center py-8 text-gray-500">
-                        <Users className="w-12 h-12 mx-auto mb-2 text-gray-300" />
-                        <p>Henüz oyuncu eklenmedi</p>
-                        <button
-                          onClick={() => setShowOyuncuModal(true)}
-                          className="mt-4 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
-                        >
-                          İlk Oyuncuyu Ekle
-                        </button>
+                      <div className="col-span-full text-center py-12 text-gray-500 bg-gray-50 rounded-xl border-2 border-dashed border-gray-200">
+                        <Users className="w-16 h-16 mx-auto mb-4 text-gray-300" />
+                        <p className="font-medium">Henüz oyuncu eklenmedi</p>
+                        <p className="text-xs text-gray-400 mt-1">Ekiplerinden seçim yapabilir veya manuel ekleyebilirsin.</p>
                       </div>
                     ) : (
                       oyuncular.map((oyuncu) => (
-                        <div key={oyuncu.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <motion.div 
+                            key={oyuncu.id} 
+                            className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100 group"
+                            layout
+                            initial={{ opacity: 0, scale: 0.9 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                        >
                           <div className="flex items-center space-x-3">
-                            <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
-                              <span className="text-sm font-semibold text-green-800">{oyuncu.avatar}</span>
+                            <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-sm overflow-hidden">
+                                {oyuncu.avatar.length > 2 ? <img src={oyuncu.avatar} className="w-full h-full object-cover" alt="" /> : <span className="text-sm font-bold text-green-600">{oyuncu.avatar}</span>}
                             </div>
                             <div>
-                              <p className="font-medium text-gray-900">
+                              <p className="font-bold text-gray-900 text-sm">
                                 {oyuncu.name}
                                 {oyuncu.status === 'organizator' && (
-                                  <span className="ml-2 text-xs text-green-600">(Sen)</span>
+                                  <span className="ml-2 text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded uppercase font-black">Organizatör</span>
                                 )}
                               </p>
-                              {oyuncu.status === 'organizator' && (
-                                <p className="text-sm text-gray-600">{oyuncu.phone}</p>
+                              {oyuncu.phone && (
+                                <p className="text-[10px] font-medium text-gray-500">{oyuncu.phone}</p>
                               )}
                             </div>
                           </div>
                           <div className="flex items-center space-x-2">
-                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(oyuncu.paymentStatus)}`}>
-                              {getStatusText(oyuncu.paymentStatus)}
-                            </span>
-                            {oyuncu.status !== 'organizator' && (
+                             {oyuncu.status !== 'organizator' && (
                               <button
                                 onClick={() => handleOyuncuSil(oyuncu.id)}
-                                className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
                                 title="Oyuncuyu Kaldır"
                               >
                                 <Trash2 className="w-4 h-4" />
                               </button>
                             )}
                           </div>
-                        </div>
+                        </motion.div>
                       ))
                     )}
                   </div>
@@ -1983,16 +2089,16 @@ const Rezervasyon = ({ inPanel = false }) => {
                 {/* Devam Et Butonu */}
                 <div className="flex justify-between">
                   <button
-                    onClick={() => setCurrentStep(2)}
-                    className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                    onClick={() => handleStepChange(2)}
+                    className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-bold transition-all"
                   >
                     Geri
                   </button>
                   <button
-                    onClick={() => setCurrentStep(4)}
-                    className="px-6 py-3 bg-orange-500 text-white rounded-lg font-semibold hover:bg-orange-600"
+                    onClick={() => handleStepChange(4)}
+                    className="px-10 py-3 bg-orange-500 text-white rounded-lg font-bold hover:bg-orange-600 transition-all shadow-lg shadow-orange-100"
                   >
-                    Devam Et
+                    Ödemeye Geç
                   </button>
                 </div>
                 </motion.div>
@@ -2005,108 +2111,146 @@ const Rezervasyon = ({ inPanel = false }) => {
                 <motion.div 
                   key="step4"
                   className="space-y-6"
-                  initial={{ x: -50, opacity: 0 }}
-                  animate={{ x: 0, opacity: 1 }}
-                  exit={{ x: 50, opacity: 0 }}
-                  transition={{ duration: 0.3 }}
+                  variants={stepVariants}
+                  custom={direction}
+                  initial="initial"
+                  animate="animate"
+                  exit="exit"
                 >
                 {/* Ödeme Yöntemi */}
                 <div className="bg-white rounded-xl p-6 shadow-sm">
-                  <div className="flex justify-between items-center mb-4">
-                    <h2 className="text-xl font-bold text-gray-900">Ödeme Yöntemi</h2>
+                  <div className="flex justify-between items-center mb-6">
+                    <h2 className="text-xl font-black text-gray-900 flex items-center gap-2">
+                        <CreditCard className="text-green-600" />
+                        Ödeme Yöntemi Seçin
+                    </h2>
                   </div>
-                  <div className="flex justify-center">
-                    <div className="p-6 rounded-lg border-2 border-green-500 bg-green-50 w-full max-w-sm">
-                      <CreditCard className="w-8 h-8 mx-auto mb-3 text-green-600" />
-                      <span className="text-lg font-medium text-green-800 text-center block">Kredi Kartı ile Ödeme</span>
-                      <p className="text-sm text-green-600 text-center mt-2">Güvenli ve hızlı ödeme</p>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {/* Tek Çekim */}
+                    <div 
+                        onClick={() => {
+                            setSelectedPaymentMethod('kredi-karti');
+                            setSplitPaymentEnabled(false);
+                        }}
+                        className={`relative p-5 rounded-2xl border-2 transition-all cursor-pointer group ${
+                            selectedPaymentMethod === 'kredi-karti' && !splitPaymentEnabled
+                            ? 'border-green-500 bg-green-50/50 shadow-lg shadow-green-100'
+                            : 'border-gray-100 bg-white hover:border-green-200'
+                        }`}
+                    >
+                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-4 transition-colors ${
+                            selectedPaymentMethod === 'kredi-karti' && !splitPaymentEnabled
+                            ? 'bg-green-500 text-white'
+                            : 'bg-gray-100 text-gray-400 group-hover:bg-green-100 group-hover:text-green-600'
+                        }`}>
+                            <CreditCard size={24} />
+                        </div>
+                        <h3 className="font-bold text-gray-900">Tek Çekim</h3>
+                        <p className="text-xs text-gray-500 mt-1">Tüm tutarı kredi kartınızla hemen ödeyin.</p>
+                        {selectedPaymentMethod === 'kredi-karti' && !splitPaymentEnabled && (
+                            <div className="absolute top-4 right-4">
+                                <div className="w-5 h-5 bg-green-500 rounded-full flex items-center justify-center">
+                                    <Check size={12} className="text-white" strokeWidth={4} />
+                                </div>
+                            </div>
+                        )}
                     </div>
-                  </div>
-                </div>
 
-                {/* Split Payment Seçeneği */}
-                <div className="bg-white rounded-xl p-6 shadow-sm">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Ödeme Seçenekleri</h3>
-                  <div className="space-y-4">
-                    <label className="flex items-center space-x-3">
-                      <input
-                        type="radio"
-                        name="paymentOption"
-                        checked={!splitPaymentEnabled}
-                        onChange={() => handleSplitPaymentToggle(false)}
-                        className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300"
-                      />
-                      <div>
-                        <span className="text-sm font-medium text-gray-700">Tek Ödeme</span>
-                        <p className="text-xs text-gray-500">Tüm tutarı tek seferde ödeyin</p>
-                      </div>
-                    </label>
-                    
-                      <label className={`flex items-center space-x-3 cursor-pointer ${splitPaymentEnabled ? 'ring-2 ring-green-600 rounded-lg p-2 bg-green-50' : 'p-2'}`}>
-                        <input
-                          type="radio"
-                          name="paymentOption"
-                          checked={splitPaymentEnabled}
-                          onChange={() => handleSplitPaymentToggle(true)}
-                          className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300"
-                        />
-                      <div>
-                        <span className="text-sm font-medium text-gray-700">Bölünmüş Ödeme</span>
-                        <p className="text-xs text-gray-500">Organizatör ve oyuncular ayrı ayrı ödeyebilir</p>
-                      </div>
-                    </label>
+                    {/* Bölünmüş Ödeme */}
+                    <div 
+                        onClick={() => {
+                            setSelectedPaymentMethod('kredi-karti');
+                            setSplitPaymentEnabled(true);
+                        }}
+                        className={`relative p-5 rounded-2xl border-2 transition-all cursor-pointer group ${
+                            selectedPaymentMethod === 'kredi-karti' && splitPaymentEnabled
+                            ? 'border-blue-500 bg-blue-50/50 shadow-lg shadow-blue-100'
+                            : 'border-gray-100 bg-white hover:border-blue-200'
+                        }`}
+                    >
+                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-4 transition-colors ${
+                            selectedPaymentMethod === 'kredi-karti' && splitPaymentEnabled
+                            ? 'bg-blue-500 text-white'
+                            : 'bg-gray-100 text-gray-400 group-hover:bg-blue-100 group-hover:text-blue-600'
+                        }`}>
+                            <Users size={24} />
+                        </div>
+                        <h3 className="font-bold text-gray-900">Bölünmüş Ödeme</h3>
+                        <p className="text-xs text-gray-500 mt-1">Sadece kendi payınızı ödeyin, kalanını arkadaşlarınız ödesin.</p>
+                        {selectedPaymentMethod === 'kredi-karti' && splitPaymentEnabled && (
+                            <div className="absolute top-4 right-4">
+                                <div className="w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center">
+                                    <Check size={12} className="text-white" strokeWidth={4} />
+                                </div>
+                            </div>
+                        )}
+                    </div>
 
-
-                    {/* Sahada Ödeme Seçeneği */}
-                    <label className={`flex items-center space-x-3 cursor-pointer ${selectedPaymentMethod === 'sahada-odeme' && !splitPaymentEnabled ? 'ring-2 ring-green-600 rounded-lg p-2 bg-green-50' : 'p-2'}`}>
-                      <input
-                        type="radio"
-                        name="paymentOption" // paymentMethod ile çakışabilir mi? Hayır, bu UI sadece
-                        checked={selectedPaymentMethod === 'sahada-odeme' && !splitPaymentEnabled}
-                        onChange={() => {
+                    {/* Sahada Ödeme */}
+                    <div 
+                        onClick={() => {
                             setSelectedPaymentMethod('sahada-odeme');
                             setSplitPaymentEnabled(false);
                         }}
-                        className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300"
-                      />
-                      <div>
-                        <span className="text-sm font-medium text-gray-700">Sahada Ödeme</span>
-                        <p className="text-xs text-gray-500">Ödemeyi tesiste yapın</p>
-                      </div>
-                    </label>
+                        className={`relative p-5 rounded-2xl border-2 transition-all cursor-pointer group ${
+                            selectedPaymentMethod === 'sahada-odeme'
+                            ? 'border-orange-500 bg-orange-50/50 shadow-lg shadow-orange-100'
+                            : 'border-gray-100 bg-white hover:border-orange-200'
+                        }`}
+                    >
+                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-4 transition-colors ${
+                            selectedPaymentMethod === 'sahada-odeme'
+                            ? 'bg-orange-500 text-white'
+                            : 'bg-gray-100 text-gray-400 group-hover:bg-orange-100 group-hover:text-orange-600'
+                        }`}>
+                            <Wallet size={24} />
+                        </div>
+                        <h3 className="font-bold text-gray-900">Sahada Ödeme</h3>
+                        <p className="text-xs text-gray-500 mt-1">Rezervasyonunuzu oluşturun, ödemeyi sahada yapın.</p>
+                        {selectedPaymentMethod === 'sahada-odeme' && (
+                            <div className="absolute top-4 right-4">
+                                <div className="w-5 h-5 bg-orange-500 rounded-full flex items-center justify-center">
+                                    <Check size={12} className="text-white" strokeWidth={4} />
+                                </div>
+                            </div>
+                        )}
+                    </div>
                   </div>
 
                   {/* Split Payment Detayları */}
-                  {splitPaymentEnabled && (
-                    <motion.div 
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
-                      exit={{ opacity: 0, height: 0 }}
-                      className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200"
-                    >
-                      <h4 className="font-medium text-blue-900 mb-2">Bölünmüş Ödeme Detayları</h4>
-                      <div className="space-y-2 text-sm">
-                        <div className="flex justify-between">
-                          <span className="text-blue-700">Organizatör Payı (1 kişi):</span>
-                          <span className="font-medium text-blue-900">₺{splitPaymentData.organizerAmount}</span>
+                  <AnimatePresence>
+                    {splitPaymentEnabled && (
+                      <motion.div 
+                        initial={{ opacity: 0, y: -10, height: 0 }}
+                        animate={{ opacity: 1, y: 0, height: 'auto' }}
+                        exit={{ opacity: 0, y: -10, height: 0 }}
+                        className="mt-6 p-5 bg-blue-50 rounded-2xl border border-blue-100 overflow-hidden"
+                      >
+                        <div className="flex items-center gap-2 mb-4">
+                            <Zap size={18} className="text-blue-600" />
+                            <h4 className="font-black text-blue-900 uppercase text-xs tracking-widest">Bölünmüş Ödeme Detayları</h4>
                         </div>
-                        <div className="flex justify-between">
-                          <span className="text-blue-700">Oyuncular Toplam ({oyuncular.filter(o => o.status !== 'organizator').length} kişi):</span>
-                          <span className="font-medium text-blue-900">₺{splitPaymentData.playersAmount}</span>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="p-3 bg-white/60 rounded-xl">
+                                <span className="text-xs text-blue-600 font-bold uppercase block mb-1">Sizin Payınız</span>
+                                <span className="text-xl font-black text-blue-900">₺{splitPaymentData.organizerAmount}</span>
+                            </div>
+                            <div className="p-3 bg-white/60 rounded-xl">
+                                <span className="text-xs text-blue-600 font-bold uppercase block mb-1">Arkadaşlarınızın Toplam Payı</span>
+                                <span className="text-xl font-black text-blue-900">₺{splitPaymentData.playersAmount}</span>
+                                <div className="text-[10px] text-blue-500 mt-1 font-bold">
+                                    Kişi başı ₺{splitPaymentData.playerAmount} x {oyuncular.filter(o => o.status !== 'organizator').length} kişi
+                                </div>
+                            </div>
                         </div>
-                        {oyuncular.filter(o => o.status !== 'organizator').length > 0 && (
-                          <div className="flex justify-between text-xs text-blue-600">
-                            <span>Oyuncu başına:</span>
-                            <span>₺{splitPaymentData.playerAmount}</span>
-                          </div>
-                        )}
-                        <div className="flex justify-between border-t border-blue-200 pt-2">
-                          <span className="text-blue-700 font-medium">Toplam ({oyuncular.length} kişi):</span>
-                          <span className="font-bold text-blue-900">₺{selectedPrice > 0 ? selectedPrice : sahaData.price}</span>
+                        <div className="mt-4 flex items-center gap-2 text-[11px] text-blue-600 font-medium">
+                            <Info size={14} />
+                            <span>Kalan oyuncular ödemelerini sisteme giriş yaparak kendi hesaplarından yapabilirler.</span>
                         </div>
-                      </div>
-                    </motion.div>
-                  )}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
 
 
@@ -2127,74 +2271,103 @@ const Rezervasyon = ({ inPanel = false }) => {
 
 
                 {/* Fatura Bilgileri */}
-                <div className="bg-white rounded-xl p-6 shadow-sm">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Fatura Bilgileri</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="bg-white rounded-xl p-8 shadow-sm border border-gray-100">
+                  <div className="flex items-center gap-3 mb-8">
+                    <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center text-green-600">
+                        <MessageSquare size={20} />
+                    </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Ad Soyad / Firma Adı *</label>
+                        <h3 className="text-xl font-black text-gray-900 leading-none">Fatura Bilgileri</h3>
+                        <p className="text-xs text-gray-500 mt-1 uppercase tracking-wider font-bold">Resmi kayıtlar için gereklidir</p>
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-black text-gray-400 uppercase tracking-widest px-1">Ad Soyad / Firma Adı *</label>
                       <input
                         type="text"
                         value={invoiceData.name}
                         onChange={(e) => setInvoiceData({...invoiceData, name: e.target.value})}
-                        placeholder="Mehmet Özkan"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none"
+                        placeholder="Örn: Ahmet Yılmaz"
+                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:bg-white focus:border-transparent outline-none transition-all font-medium text-gray-900"
                         required
                       />
                     </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">TC / Vergi No *</label>
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-black text-gray-400 uppercase tracking-widest px-1">TC / Vergi No *</label>
                       <input
                         type="text"
                         value={invoiceData.taxNumber}
                         onChange={(e) => setInvoiceData({...invoiceData, taxNumber: e.target.value})}
-                        placeholder="00000000000"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none"
+                        placeholder="11 haneli TC veya Vergi No"
+                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:bg-white focus:border-transparent outline-none transition-all font-medium text-gray-900"
                         required
                       />
                     </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Adres *</label>
+                    <div className="md:col-span-2 space-y-1">
+                      <label className="text-[11px] font-black text-gray-400 uppercase tracking-widest px-1">Adres *</label>
                       <input
                         type="text"
                         value={invoiceData.address}
                         onChange={(e) => setInvoiceData({...invoiceData, address: e.target.value})}
-                        placeholder="Mahalle, Sokak, No"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none"
+                        placeholder="Mahalle, Sokak, No, Daire"
+                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:bg-white focus:border-transparent outline-none transition-all font-medium text-gray-900"
                         required
                       />
                     </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">İl *</label>
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-black text-gray-400 uppercase tracking-widest px-1">İl *</label>
                       <input
                         type="text"
                         value={invoiceData.city}
                         onChange={(e) => setInvoiceData({...invoiceData, city: e.target.value})}
-                        placeholder="İstanbul"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none"
+                        placeholder="Örn: İstanbul"
+                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:bg-white focus:border-transparent outline-none transition-all font-medium text-gray-900"
                         required
                       />
                     </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">İlçe *</label>
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-black text-gray-400 uppercase tracking-widest px-1">İlçe *</label>
                       <input
                         type="text"
                         value={invoiceData.district}
                         onChange={(e) => setInvoiceData({...invoiceData, district: e.target.value})}
-                        placeholder="Kadıköy"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none"
+                        placeholder="Örn: Kadıköy"
+                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:bg-white focus:border-transparent outline-none transition-all font-medium text-gray-900"
                         required
                       />
                     </div>
                   </div>
                 </div>
 
-                {/* Geri Butonu */}
-                <div className="flex justify-start">
+                {/* Butonlar */}
+                <div className="flex justify-between gap-4">
                   <button
-                    onClick={() => setCurrentStep(3)}
-                    className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                    onClick={() => handleStepChange(3)}
+                    className="flex-1 md:flex-none px-8 py-3 bg-white border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 font-bold transition-all"
                   >
                     Geri
+                  </button>
+                  <button
+                    onClick={handlePaymentSubmit}
+                    disabled={!acceptTerms || isPaymentProcessing}
+                    className={`flex-1 md:flex-none px-12 py-3 rounded-xl font-bold transition-all shadow-lg active:scale-95 flex items-center justify-center gap-2 ${
+                      acceptTerms && !isPaymentProcessing
+                        ? selectedPaymentMethod === 'sahada-odeme'
+                          ? 'bg-orange-500 text-white hover:bg-orange-600 shadow-orange-100'
+                          : 'bg-blue-600 text-white hover:bg-blue-700 shadow-blue-100'
+                        : 'bg-gray-200 text-gray-400 cursor-not-allowed shadow-none'
+                    }`}
+                  >
+                    {isPaymentProcessing ? (
+                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    ) : (
+                        <>
+                            {selectedPaymentMethod === 'sahada-odeme' ? <Check size={20} /> : <CreditCard size={20} />}
+                            {selectedPaymentMethod === 'sahada-odeme' ? 'Rezervasyonu Tamamla' : 'Ödemeyi Başlat'}
+                        </>
+                    )}
                   </button>
                 </div>
                 </motion.div>
@@ -2207,10 +2380,11 @@ const Rezervasyon = ({ inPanel = false }) => {
                 <motion.div 
                   key="step5"
                   className="space-y-6"
-                  initial={{ x: -50, opacity: 0 }}
-                  animate={{ x: 0, opacity: 1 }}
-                  exit={{ x: 50, opacity: 0 }}
-                  transition={{ duration: 0.3 }}
+                  variants={stepVariants}
+                  custom={direction}
+                  initial="initial"
+                  animate="animate"
+                  exit="exit"
                 >
                 <div className="bg-white rounded-xl p-6 shadow-sm">
                   <h2 className="text-xl font-bold text-gray-900 mb-4">Rezervasyon Onayı</h2>
@@ -2317,7 +2491,7 @@ const Rezervasyon = ({ inPanel = false }) => {
                          className="w-full px-4 py-2 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors font-medium flex items-center justify-center space-x-2"
                          onClick={() => {
                            if (!user) {
-                             alert('Giriş yapmalısınız');
+                             setShowAuthModal(true);
                              return;
                            }
                            navigate(`/oyuncu/mesajlar?userId=${sahaData.ownerId}`);
@@ -2441,18 +2615,23 @@ const Rezervasyon = ({ inPanel = false }) => {
                   {/* Ödeme Butonu */}
                   <button
                     onClick={handlePaymentSubmit}
-                    disabled={
-                      !acceptTerms || 
-                      isPaymentProcessing
-                    }
-                    className={`w-full py-3 rounded-lg font-semibold transition-all ${
-                      acceptTerms && 
-                      !isPaymentProcessing
-                        ? 'bg-blue-500 text-white hover:bg-blue-600'
-                        : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                    disabled={!acceptTerms || isPaymentProcessing}
+                    className={`w-full py-4 rounded-xl font-black transition-all shadow-xl active:scale-95 flex items-center justify-center gap-2 uppercase tracking-tighter text-sm ${
+                      acceptTerms && !isPaymentProcessing
+                        ? selectedPaymentMethod === 'sahada-odeme'
+                          ? 'bg-gradient-to-r from-orange-500 to-orange-600 text-white hover:shadow-orange-200'
+                          : 'bg-gradient-to-r from-blue-600 to-blue-700 text-white hover:shadow-blue-200'
+                        : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                     }`}
                   >
-                    {isPaymentProcessing ? 'İşleniyor...' : (selectedPaymentMethod === 'sahada-odeme' ? 'Rezervasyonu Tamamla' : 'Kredi Kartı ile Ödeme Yap')}
+                    {isPaymentProcessing ? (
+                        <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    ) : (
+                        <>
+                            {selectedPaymentMethod === 'sahada-odeme' ? <Check size={18} /> : <Shield size={18} />}
+                            {selectedPaymentMethod === 'sahada-odeme' ? 'Rezervasyonu Onayla' : 'Güvenli Ödeme Yap'}
+                        </>
+                    )}
                   </button>
 
                   {/* Güvenlik Mesajı */}
@@ -2741,6 +2920,13 @@ const Rezervasyon = ({ inPanel = false }) => {
         )}
       </AnimatePresence>
 
+      <AuthModal 
+        isOpen={showAuthModal} 
+        onClose={() => setShowAuthModal(false)}
+        onSuccess={() => {
+            toast.success('Giriş başarılı! Şimdi mesaj gönderebilirsin.');
+        }}
+      />
     </motion.div>
   );
 

@@ -123,7 +123,7 @@ const PostCard = ({ post, isLiked, commentsOpen, toggleLike, toggleComments, han
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 mb-5 hover:shadow-md transition-shadow relative">
         {/* Author Header */}
         <div className="flex justify-between items-start mb-4">
-          <Link to={`/profile/${post.author.id}`} className="flex gap-3 group">
+          <Link to={`/oyuncu-detay/${post.author.id || post.author.uid}`} className="flex gap-3 group">
             <img src={post.author.avatar} alt={post.author.name} className="w-10 h-10 rounded-full border border-gray-100" />
             <div>
               <div className="flex items-center gap-2">
@@ -241,7 +241,7 @@ const PostCard = ({ post, isLiked, commentsOpen, toggleLike, toggleComments, han
                 </div>
               </div>
 
-              <Link to="/find-player" className="w-full py-2.5 bg-gradient-to-r from-orange-500 to-red-500 text-white font-bold rounded-lg shadow-lg shadow-orange-500/30 hover:shadow-orange-500/50 transition-all flex items-center justify-center gap-2">
+              <Link to="/oyuncu-bul" className="w-full py-2.5 bg-gradient-to-r from-orange-500 to-red-500 text-white font-bold rounded-lg shadow-lg shadow-orange-500/30 hover:shadow-orange-500/50 transition-all flex items-center justify-center gap-2">
                 <Rocket size={18} fill="currentColor" /> Ben Gelirim!
               </Link>
             </div>
@@ -372,9 +372,13 @@ const PostCard = ({ post, isLiked, commentsOpen, toggleLike, toggleComments, han
                   return (
                 <div key={comment.id} className="flex items-start justify-between group/comment text-sm">
                   <div className="flex items-start gap-2">
-                      <img src={comment.authorAvatar || `https://ui-avatars.com/api/?name=${comment.authorName}&background=random`} alt={comment.authorName} className="w-6 h-6 rounded-full object-cover flex-shrink-0" />
+                      <Link to={`/oyuncu-detay/${comment.authorId || comment.authorUid}`} className="flex-shrink-0">
+                        <img src={comment.authorAvatar || `https://ui-avatars.com/api/?name=${comment.authorName}&background=random`} alt={comment.authorName} className="w-6 h-6 rounded-full object-cover" />
+                      </Link>
                       <div>
-                        <span className="font-bold text-gray-900 mr-2">{comment.authorName}</span>
+                        <Link to={`/oyuncu-detay/${comment.authorId || comment.authorUid}`} className="font-bold text-gray-900 mr-2 hover:text-green-600 transition-colors">
+                          {comment.authorName}
+                        </Link>
                         <span className="text-gray-600">{comment.text}</span>
                         <p className="text-xs text-gray-400 mt-0.5">{formatTimestamp(comment.createdAt)}</p>
                       </div>
@@ -391,7 +395,7 @@ const PostCard = ({ post, isLiked, commentsOpen, toggleLike, toggleComments, han
                 </div>
               )})}
               {postComments[post.id]?.length > 10 && (
-                  <Link to={`/post/${post.id}`} className="block text-center text-sm text-green-600 font-bold mt-2 hover:underline">
+                  <Link to={`/meydan?post=${post.id}`} className="block text-center text-sm text-green-600 font-bold mt-2 hover:underline">
                       Tüm {postComments[post.id].length} yorumu gör...
                   </Link>
               )}
@@ -407,6 +411,7 @@ const PostCard = ({ post, isLiked, commentsOpen, toggleLike, toggleComments, han
 
 import Header from '../components/Header';
 import Footer from '../components/Footer';
+import AuthModal from '../components/AuthModal';
 
 // ... (existing imports and mock data)
 
@@ -442,6 +447,7 @@ const Community = () => {
   const [votedPolls, setVotedPolls] = useState({}); // { [postId]: optionIndex }
 
   const [trendingTopics, setTrendingTopics] = useState([]);
+  const [showAuthModal, setShowAuthModal] = useState(false);
   const [topPlayers, setTopPlayers] = useState([]);
   const [communityStats, setCommunityStats] = useState({ totalPosts: 0, activeUsers: 0 });
 
@@ -595,8 +601,7 @@ const Community = () => {
     if (!newPostContent.trim() && !selectedImage && !isPollMode && !isMatchMode && !isReviewMode) return;
 
     if (!currentUser) {
-        toast.error('Paylaşım yapmak için giriş yapmalısınız.');
-        playNotificationSound();
+        setShowAuthModal(true);
         return;
     }
 
@@ -733,8 +738,7 @@ const Community = () => {
 
   const toggleLike = async (postId) => {
     if (!currentUser) {
-        toast.error('Beğenmek için giriş yapmalısınız.');
-        playNotificationSound();
+        setShowAuthModal(true);
         return;
     }
 
@@ -825,8 +829,7 @@ const Community = () => {
 
   const handleVote = async (postId, optionIndex) => {
     if (!currentUser) {
-        toast.error('Oy kullanmak için giriş yapmalısınız.');
-        playNotificationSound();
+        setShowAuthModal(true);
         return;
     }
     if (votedPolls[postId] !== undefined) {
@@ -866,8 +869,7 @@ const Community = () => {
 
   const handleCreateComment = async (postId) => {
     if (!currentUser) {
-        toast.error('Yorum yapmak için giriş yapmalısınız.');
-        playNotificationSound();
+        setShowAuthModal(true);
         return;
     }
     
@@ -1362,7 +1364,7 @@ const Community = () => {
               </h3>
               <div className="space-y-4">
                 {(topPlayers.length > 0 ? topPlayers : WEEKLY_MVPS).map((player, idx) => (
-                  <Link to={`/oyuncu-detay/${player.id}`} key={player.id} className="flex items-center gap-3 group">
+                  <Link to={`/oyuncu-detay/${player.id || player.uid}`} key={player.id || player.uid} className="flex items-center gap-3 group">
                     <div className="relative font-mono font-bold text-gray-300 w-4 text-center">{idx + 1}</div>
                     <img 
                       src={player.photoURL || player.profilePhoto?.url || player.avatar || `https://ui-avatars.com/api/?name=${player.fullName || player.name}&background=random`} 
@@ -1407,9 +1409,17 @@ const Community = () => {
       </div>
 
       <Footer />
+      
+      <AuthModal 
+        isOpen={showAuthModal} 
+        onClose={() => setShowAuthModal(false)}
+        onSuccess={() => {
+            // Success logic if needed, context update will handle the rest
+            toast.success('Giriş başarılı! Şimdi paylaşabilirsin.');
+        }}
+      />
     </div>
   );
 };
 
 export default Community;
-

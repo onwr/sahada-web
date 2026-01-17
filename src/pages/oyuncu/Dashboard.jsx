@@ -28,7 +28,6 @@ import {
   FileText,
   Building2
 } from 'lucide-react';
-import toast from '../../utils/toast';
 
 
 
@@ -480,7 +479,7 @@ const Dashboard = () => {
                       Yaklaşan Maçlar
                     </h2>
                     <button
-                      onClick={() => navigate('/oyuncu/rezervasyonlar')}
+                      onClick={() => navigate('/oyuncu/mac-olustur')}
                       className="text-orange-100 hover:text-white transition-colors text-xs sm:text-sm font-medium flex items-center gap-1 min-h-[44px]"
                     >
                       Tümünü Gör

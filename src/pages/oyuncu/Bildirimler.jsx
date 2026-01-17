@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { getPlayerNotifications, markNotificationAsRead, respondToTeamInvitation, respondToMatchJoinRequest, respondToMessageRequest } from '../../services/firestoreService';
+import { getPlayerNotifications, markNotificationAsRead, respondToTeamInvitation, respondToMatchJoinRequest, respondToMessageRequest, respondToContactRequest } from '../../services/firestoreService';
 import { collection, query, onSnapshot, where, limit, updateDoc, doc, serverTimestamp, deleteDoc, writeBatch } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import OyuncuSidebar from '../../components/OyuncuSidebar';
 import { 
   Bell, Calendar, Trophy, Users, Star, MessageSquare, Crown,
-  Check, Trash2, Settings, Filter, CheckCheck, X, Loader2, AlertCircle, UserPlus, UserX
+  Check, Trash2, Settings, Filter, CheckCheck, X, Loader2, AlertCircle, UserPlus, UserX, Phone
 } from 'lucide-react';
 import toast from '../../utils/toast';
 
@@ -24,6 +24,7 @@ const typeConfig = {
   tournament: { icon: Trophy, bg: 'bg-orange-100', text: 'text-orange-600' },
   system: { icon: Crown, bg: 'bg-gray-100', text: 'text-gray-600' },
   message_request: { icon: MessageSquare, bg: 'bg-blue-100', text: 'text-blue-600' },
+  contact_request: { icon: Phone, bg: 'bg-green-100', text: 'text-green-600' },
   default: { icon: Bell, bg: 'bg-gray-100', text: 'text-gray-600' }
 };
 
@@ -200,6 +201,22 @@ const Bildirimler = () => {
     }
   };
 
+  const handleContactRequest = async (notification, action) => {
+    setInviteLoading(notification.id);
+    try {
+      const result = await respondToContactRequest(notification.id, action);
+      if (result.success) {
+        toast.success(action === 'accept' ? 'İletişim isteği kabul edildi!' : 'İstek reddedildi.');
+      } else {
+        toast.error(result.error || 'İşlem başarısız');
+      }
+    } catch (err) {
+      toast.error('Bir hata oluştu');
+    } finally {
+      setInviteLoading(null);
+    }
+  };
+
   const formatTimestamp = (createdAt) => {
     if (!createdAt) return '';
     const date = createdAt.toDate ? createdAt.toDate() : new Date(createdAt);
@@ -250,6 +267,7 @@ const Bildirimler = () => {
   };
 
   const messageRequests = notifications.filter(n => n.type === 'message_request');
+  const contactRequests = notifications.filter(n => n.type === 'contact_request' && n.status === 'pending');
   const matchJoinRequests = notifications.filter(n => n.type === 'match_join_request');
   const teamInvites = notifications.filter(n => n.type === 'team_invitation' && n.status === 'pending');
   const generalNotifications = notifications.filter(n => filter === 'all' ? true : !n.read);
@@ -361,7 +379,61 @@ const Bildirimler = () => {
             </div>
           )}
 
-          {/* Match Join Requests Section */}
+          {/* Contact Requests Section */}
+          {contactRequests.length > 0 && (
+            <div className="bg-gradient-to-br from-green-500 via-emerald-600 to-teal-500 rounded-3xl p-[1px] shadow-xl mb-6">
+              <div className="bg-white rounded-[23px] p-6">
+                <div className="flex items-center gap-2 mb-6">
+                  <div className="p-2 bg-green-100 rounded-lg">
+                    <Phone size={24} className="text-green-600" />
+                  </div>
+                  <h2 className="text-xl font-bold text-gray-900">İletişim Talepleri</h2>
+                  <span className="bg-green-600 text-white text-xs font-bold px-2 py-1 rounded-lg ml-2">
+                    {contactRequests.length} YENİ
+                  </span>
+                </div>
+                <div className="grid gap-4">
+                  {contactRequests.map((req) => (
+                    <div key={req.id} className="bg-gray-50/50 rounded-2xl p-5 border border-gray-100 hover:border-green-100 transition-all">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
+                        <div className="flex items-center gap-4">
+                          <div 
+                             className="w-14 h-14 bg-white rounded-2xl shadow-sm flex items-center justify-center border border-gray-100 cursor-pointer hover:bg-gray-50"
+                             onClick={() => navigate(`/oyuncu-detay/${req.senderId}`)}
+                          >
+                            <Users size={28} className="text-green-500" />
+                          </div>
+                          <div>
+                            <h3 className="font-bold text-gray-900 text-lg hover:text-green-600 cursor-pointer" onClick={() => navigate(`/oyuncu-detay/${req.senderId}`)}>
+                                {cleanMessage(req.senderName || 'Kullanıcı')}
+                            </h3>
+                            <p className="text-sm text-gray-500">İletişim bilgilerinizi görmek istiyor.</p>
+                          </div>
+                        </div>
+                        <div className="flex gap-3">
+                          <button
+                            onClick={() => handleContactRequest(req, 'reject')}
+                            disabled={inviteLoading === req.id}
+                            className="flex-1 sm:flex-none px-6 py-2.5 border border-gray-200 text-gray-600 rounded-xl text-sm font-bold hover:bg-gray-100 transition-all disabled:opacity-50"
+                          >
+                            Reddet
+                          </button>
+                          <button
+                            onClick={() => handleContactRequest(req, 'accept')}
+                            disabled={inviteLoading === req.id}
+                            className="flex-1 sm:flex-none px-6 py-2.5 bg-green-600 text-white rounded-xl text-sm font-bold hover:bg-green-700 transition-all flex items-center justify-center gap-2 shadow-lg shadow-green-100 disabled:opacity-50"
+                          >
+                             {inviteLoading === req.id ? <Loader2 size={16} className="animate-spin" /> : <Check size={18} />}
+                            Kabul Et
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
           {matchJoinRequests.length > 0 && (
             <div className="bg-gradient-to-br from-green-600 via-teal-600 to-emerald-500 rounded-3xl p-[1px] shadow-xl mb-6">
               <div className="bg-white rounded-[23px] p-6">

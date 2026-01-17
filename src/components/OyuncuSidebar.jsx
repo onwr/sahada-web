@@ -27,7 +27,9 @@ import {
   Shield,
   Target,
   Flame,
-  CheckCircle
+  CheckCircle,
+  Home,
+  Globe
 } from 'lucide-react';
 
 const getAchievements = (userData) => {
@@ -112,6 +114,20 @@ const OyuncuSidebar = () => {
   }, [user, location.pathname]);
 
   const navigationItems = [
+    {
+      name: 'Anasayfa',
+      href: '/',
+      icon: Home,
+      current: location.pathname === '/',
+      badge: null
+    },
+    {
+      name: 'Meydan',
+      href: '/meydan',
+      icon: Globe,
+      current: location.pathname === '/meydan',
+      badge: null
+    },
     {
       name: 'Dashboard',
       href: '/oyuncu/dashboard',

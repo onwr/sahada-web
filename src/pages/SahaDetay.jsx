@@ -18,8 +18,13 @@ import {
   X,
   Heart,
   Share2,
-  Navigation
+  Navigation,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
+import Header from '../components/Header';
+import Footer from '../components/Footer';
+import toast from '../utils/toast';
 
 const SahaDetay = () => {
   const { id } = useParams();
@@ -180,6 +185,16 @@ const SahaDetay = () => {
     setShowImageModal(true);
   };
 
+  const nextImage = () => {
+    if (!sahaData?.images) return;
+    setSelectedImageIndex((prev) => (prev + 1) % sahaData.images.length);
+  };
+
+  const prevImage = () => {
+    if (!sahaData?.images) return;
+    setSelectedImageIndex((prev) => (prev - 1 + sahaData.images.length) % sahaData.images.length);
+  };
+
   const handleRezerveEt = () => {
     // Rezervasyon sayfasına yönlendir
     navigate(`/rezervasyon/${id}`);
@@ -261,9 +276,11 @@ const SahaDetay = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b sticky top-0 z-40">
+    <div className="min-h-screen bg-gray-50 font-sans selection:bg-green-100 selection:text-green-900">
+      <Header />
+      
+      {/* Sub Header / Sticky Back Button & Name Bar */}
+      <header className="bg-white/80 backdrop-blur-md shadow-sm border-b sticky top-[64px] z-40 transition-all">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center space-x-4">
@@ -275,7 +292,9 @@ const SahaDetay = () => {
               </button>
               <div>
                 <h1 className="text-xl font-bold text-gray-900">{sahaData.name}</h1>
-                <p className="text-sm text-gray-600">{sahaData.location || sahaData.address || 'Konum bilgisi yok'}</p>
+                <p className="text-sm text-gray-600">
+                  {sahaData.location || sahaData.address || (sahaData.latitude ? 'Harita üzerinde işaretli' : 'Konum bilgisi yok')}
+                </p>
               </div>
             </div>
             <div className="flex items-center space-x-2">
@@ -311,12 +330,15 @@ const SahaDetay = () => {
           {/* Left Column - Images and Info */}
           <div className="lg:col-span-2 space-y-6">
             {/* Hero Image */}
-            <div className="relative h-64 md:h-80 bg-gray-200 rounded-xl overflow-hidden">
+            <div 
+              onClick={() => handleImageClick(0)}
+              className="relative h-64 md:h-80 bg-gray-200 rounded-xl overflow-hidden cursor-zoom-in"
+            >
               {sahaData.images && sahaData.images.length > 0 ? (
                 <img
                   src={sahaData.images[0].optimized_url || sahaData.images[0].url}
                   alt={sahaData.name}
-                  className="w-full h-full object-cover"
+                  className="w-full h-full object-cover transition-transform hover:scale-105 duration-700"
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center bg-gray-200">
@@ -398,9 +420,11 @@ const SahaDetay = () => {
                       <MapPin className="w-5 h-5 text-red-600" />
                     </div>
                     <div>
-                      <p className="text-sm text-gray-600">Konum</p>
-                      <p className="font-semibold text-gray-900 leading-tight">
-                        {sahaData.location || sahaData.address || 'Konum bilgisi yok'}
+                      <p 
+                        onClick={handleNavigation}
+                        className="font-semibold text-gray-900 leading-tight cursor-pointer hover:text-green-600 transition-colors"
+                      >
+                        {sahaData.location || sahaData.address || (sahaData.latitude ? 'Harita üzerinde işaretli' : 'Konum bilgisi yok')}
                       </p>
                     </div>
                   </div>
@@ -433,9 +457,14 @@ const SahaDetay = () => {
             <div className="bg-white rounded-xl p-6 shadow-sm">
               <h2 className="text-2xl font-bold text-gray-900 mb-4">İletişim Bilgileri</h2>
               <div className="space-y-4">
-                <div className="flex items-start space-x-3">
-                  <MapPin className="w-5 h-5 text-gray-400 mt-1" />
-                  <span className="text-gray-700">{sahaData.address || sahaData.location || 'Konum bilgisi yok'}</span>
+                <div 
+                  onClick={handleNavigation}
+                  className="flex items-start space-x-3 cursor-pointer group"
+                >
+                  <MapPin className="w-5 h-5 text-gray-400 mt-1 group-hover:text-green-600 transition-colors" />
+                  <span className="text-gray-700 group-hover:text-green-600 transition-colors">
+                    {sahaData.address || sahaData.location || (sahaData.latitude ? 'Harita üzerinde işaretli (Yol tarifi için tıklayın)' : 'Konum bilgisi yok')}
+                  </span>
                 </div>
                 {sahaData.phone && (
                   <div className="flex items-center space-x-3">
@@ -649,32 +678,56 @@ const SahaDetay = () => {
 
       {/* Image Modal */}
       {showImageModal && sahaData.images && (
-        <div className="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-50 p-4">
-          <div className="relative max-w-4xl max-h-full">
+        <div className="fixed inset-0 bg-black/95 flex items-center justify-center z-[100] p-4 animate-in fade-in duration-300">
+          <div className="relative w-full h-full flex items-center justify-center">
+            {/* Close Button */}
             <button
               onClick={() => setShowImageModal(false)}
-              className="absolute top-4 right-4 z-10 p-2 bg-white bg-opacity-20 rounded-full text-white hover:bg-opacity-30"
+              className="absolute top-4 right-4 z-[110] p-3 bg-white/10 hover:bg-white/20 backdrop-blur-md rounded-full text-white transition-all transform hover:scale-110 active:scale-90"
             >
               <X className="w-6 h-6" />
             </button>
-            <img
-              src={sahaData.images[selectedImageIndex].optimized_url || sahaData.images[selectedImageIndex].url}
-              alt={`${sahaData.name} ${selectedImageIndex + 1}`}
-              className="max-w-full max-h-full object-contain"
-            />
+
+            {/* Navigation Buttons */}
             {sahaData.images.length > 1 && (
-              <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex space-x-2">
-                {sahaData.images.map((_, index) => (
-                  <button
-                    key={index}
-                    onClick={() => setSelectedImageIndex(index)}
-                    className={`w-3 h-3 rounded-full ${
-                      index === selectedImageIndex ? 'bg-white' : 'bg-white bg-opacity-50'
-                    }`}
-                  />
-                ))}
-              </div>
+              <>
+                <button
+                  onClick={(e) => { e.stopPropagation(); prevImage(); }}
+                  className="absolute left-4 z-[110] p-4 bg-white/5 hover:bg-white/20 backdrop-blur-sm rounded-full text-white transition-all group"
+                >
+                  <ChevronLeft className="w-8 h-8 group-hover:-translate-x-1 transition-transform" />
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); nextImage(); }}
+                  className="absolute right-4 z-[110] p-4 bg-white/5 hover:bg-white/20 backdrop-blur-sm rounded-full text-white transition-all group"
+                >
+                  <ChevronRight className="w-8 h-8 group-hover:translate-x-1 transition-transform" />
+                </button>
+              </>
             )}
+
+            {/* Main Image */}
+            <div 
+              className="relative max-w-5xl max-h-[85vh] flex items-center justify-center"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <img
+                src={sahaData.images[selectedImageIndex].optimized_url || sahaData.images[selectedImageIndex].url}
+                alt={`${sahaData.name} ${selectedImageIndex + 1}`}
+                className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
+              />
+              
+              {/* Counter */}
+              <div className="absolute -bottom-10 left-1/2 -translate-x-1/2 text-white/70 text-sm font-medium">
+                {selectedImageIndex + 1} / {sahaData.images.length}
+              </div>
+            </div>
+
+            {/* Click backdrop to close */}
+            <div 
+              className="absolute inset-0 z-0" 
+              onClick={() => setShowImageModal(false)}
+            />
           </div>
         </div>
       )}
@@ -795,6 +848,8 @@ const SahaDetay = () => {
           </div>
         </div>
       )}
+
+      <Footer />
     </div>
   );
 };

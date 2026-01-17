@@ -579,7 +579,9 @@ const SahaYonetimi = () => {
         isActive: formData.status === 'active',
         rating: editingSaha ? editingSaha.rating || 0 : 0,
         reservations: editingSaha ? editingSaha.reservations || 0 : 0,
-        revenue: editingSaha ? editingSaha.revenue || 0 : 0
+        revenue: editingSaha ? editingSaha.revenue || 0 : 0,
+        location: formData.location || formData.address || '',
+        address: formData.address || formData.location || ''
       };
       
       let result;

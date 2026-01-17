@@ -3,18 +3,14 @@ import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { 
   Bell, 
-  Menu,
-  X,
   ChevronDown,
   LogOut,
-  Settings,
   User,
   Info
 } from 'lucide-react';
 import { collection, query, onSnapshot, where, orderBy, limit, updateDoc, doc, writeBatch } from 'firebase/firestore';
 import { db } from '../config/firebase';
-import { formatDate } from '../utils/dateUtils'; // Assuming you have this or similar
-// moment removed
+import { getPlatformSettings } from '../services/firestoreService';
 
 
 const DashboardHeader = ({ title, showMenuButton, onMenuClick, children, variant = 'default' }) => {
@@ -26,8 +22,27 @@ const DashboardHeader = ({ title, showMenuButton, onMenuClick, children, variant
   const notificationRef = useRef(null);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const userMenuRef = useRef(null);
+  const [logoUrl, setLogoUrl] = useState('/images/logo-svg.png');
+  const [loadingLogo, setLoadingLogo] = useState(true);
 
   const isHero = variant === 'hero';
+
+  // Logo'yu yükle
+  useEffect(() => {
+    const fetchLogo = async () => {
+      try {
+        const result = await getPlatformSettings();
+        if (result.success && result.data?.logoUrl) {
+          setLogoUrl(result.data.logoUrl);
+        }
+      } catch (error) {
+        console.error('Logo yüklenirken hata:', error);
+      } finally {
+        setLoadingLogo(false);
+      }
+    };
+    fetchLogo();
+  }, []);
   
   const headerClasses = isHero 
     ? "bg-transparent absolute top-0 left-0 w-full z-30 px-4 py-3 sm:px-6"
@@ -131,18 +146,27 @@ const DashboardHeader = ({ title, showMenuButton, onMenuClick, children, variant
     <header className={headerClasses}>
       <div className="flex items-center justify-between">
         
-        {/* Left Section: Mobile Menu & Title */}
+        {/* Left Section: Logo & Title */}
         <div className="flex items-center gap-3 pl-12 lg:pl-0">
-            {showMenuButton && (
-                <button 
-                    onClick={onMenuClick}
-                    className={`lg:hidden p-2 -ml-2 rounded-lg ${iconClasses}`}
-                >
-                    <Menu className="w-6 h-6" />
-                </button>
-            )}
+            {/* Logo - Mobilde görünür (Sidebar hamburger butonu için space bırak) */}
+            <div 
+                className="flex items-center cursor-pointer lg:hidden"
+                onClick={() => navigate('/')}
+            >
+                {loadingLogo ? (
+                    <div className={`h-8 w-24 ${isHero ? 'bg-white/20' : 'bg-gray-200'} animate-pulse rounded-md`} />
+                ) : (
+                    <img 
+                        src={logoUrl} 
+                        className="h-8 bg-white/50 rounded-2xl px-2 py-0.5 mt-1 w-auto object-contain"
+                        alt="Sahada Logo" 
+                    />
+                )}
+            </div>
+            
+            {/* Title - Desktop'ta görünür */}
             {title && (
-                <h1 className={`text-lg font-bold truncate hidden sm:block ${titleClasses}`}>
+                <h1 className={`text-lg font-bold truncate hidden lg:block ${titleClasses}`}>
                     {title}
                 </h1>
             )}

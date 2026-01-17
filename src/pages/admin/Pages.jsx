@@ -9,7 +9,8 @@ import { uploadImage } from '../../services/cdnService';
 import AdminSidebar from '../../components/AdminSidebar';
 import {
     FileText, Plus, Edit, Trash2, Save, X, Globe,
-    Search, ExternalLink, EyeOff, Clock, Loader2, CheckCircle, Image, Upload, Link
+    Search, ExternalLink, EyeOff, Clock, Loader2, CheckCircle, Image, Upload, Link,
+    Heading, Type, List, MousePointer2
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -320,6 +321,9 @@ const PageEditor = ({ page, onClose, onSave }) => {
     });
     const [activeTab, setActiveTab] = useState('content');
     const [uploadingImage, setUploadingImage] = useState(false);
+    const [uploadingContentImage, setUploadingContentImage] = useState(false);
+
+    const textAreaRef = React.useRef(null);
 
     const generateSlug = (title) => {
         return title
@@ -357,6 +361,58 @@ const PageEditor = ({ page, onClose, onSave }) => {
             setUploadingImage(false);
         }
     };
+
+    const handleContentImageUpload = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        setUploadingContentImage(true);
+        try {
+            const result = await uploadImage(file, 'pages/content', 'admin');
+            if (result.success) {
+                const url = result.data?.url || result.data;
+                insertSnippet(`<img src="${url}" alt="Görsel" class="w-full h-auto rounded-2xl shadow-lg my-8" />\n`);
+                toast.success("İçerik görseli eklendi");
+            } else {
+                toast.error("Görsel yüklenemedi");
+            }
+        } catch (error) {
+            console.error(error);
+        } finally {
+            setUploadingContentImage(false);
+        }
+    };
+
+    const insertSnippet = (snippet) => {
+        const textarea = textAreaRef.current;
+        if (!textarea) return;
+
+        const start = textarea.selectionStart;
+        const end = textarea.selectionEnd;
+        const text = formData.content;
+        const before = text.substring(0, start);
+        const after = text.substring(end, text.length);
+
+        setFormData({
+            ...formData,
+            content: before + snippet + after
+        });
+
+        // Set focus back and move cursor after a short delay
+        setTimeout(() => {
+            textarea.focus();
+            const newCursorPos = start + snippet.length;
+            textarea.setSelectionRange(newCursorPos, newCursorPos);
+        }, 10);
+    };
+
+    const snippets = [
+        { icon: <Heading size={16} />, label: 'Başlık', code: '<h2 class="text-3xl font-black text-gray-900 mb-6 mt-12">Büyük Başlık</h2>\n' },
+        { icon: <Type size={16} />, label: 'Alt Başlık', code: '<h3 class="text-xl font-bold text-gray-800 mb-4 mt-8">Alt Başlık</h3>\n' },
+        { icon: <Type size={14} />, label: 'Paragraf', code: '<p class="text-gray-600 leading-relaxed mb-6">Buraya detaylı açıklamalarınızı yazabilirsiniz...</p>\n' },
+        { icon: <List size={16} />, label: 'Liste', code: '<ul class="list-disc pl-6 space-y-2 mb-6 text-gray-600">\n  <li>Madde 1</li>\n  <li>Madde 2</li>\n  <li>Madde 3</li>\n</ul>\n' },
+        { icon: <MousePointer2 size={16} />, label: 'Buton', code: '<a href="#" class="inline-flex items-center px-8 py-4 bg-green-600 hover:bg-green-700 text-white font-bold rounded-2xl transition-all no-underline shadow-lg shadow-green-600/20 my-4">Hemen Başlayın</a>\n' },
+    ];
 
     return (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
@@ -472,17 +528,38 @@ const PageEditor = ({ page, onClose, onSave }) => {
                             </div>
 
                             <div>
-                                <label className="text-sm font-bold text-gray-700 block mb-2">İçerik (HTML) <span className="text-red-500">*</span></label>
-                                <div className="border border-gray-200 rounded-xl overflow-hidden bg-white">
-                                    <div className="bg-gray-50 px-4 py-2 border-b border-gray-200 text-xs text-gray-500 flex justify-between">
-                                        <span>HTML Editörü</span>
-                                        <span>Desteklenen taglar: h1, h2, p, ul, img, strong, vb.</span>
+                                <div className="flex justify-between items-end mb-2">
+                                    <label className="text-sm font-bold text-gray-700 block">İçerik (HTML) <span className="text-red-500">*</span></label>
+                                    <div className="flex gap-2">
+                                        {snippets.map((s, idx) => (
+                                            <button
+                                                key={idx}
+                                                type="button"
+                                                onClick={() => insertSnippet(s.code)}
+                                                className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-bold text-gray-600 hover:border-green-500 hover:text-green-600 transition-all shadow-sm"
+                                            >
+                                                {s.icon}
+                                                {s.label}
+                                            </button>
+                                        ))}
+                                        <label className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-bold text-gray-600 hover:border-green-500 hover:text-green-600 transition-all shadow-sm cursor-pointer">
+                                            {uploadingContentImage ? <Loader2 size={14} className="animate-spin" /> : <Image size={14} />}
+                                            İmaj Ekle
+                                            <input type="file" className="hidden" accept="image/*" onChange={handleContentImageUpload} disabled={uploadingContentImage} />
+                                        </label>
+                                    </div>
+                                </div>
+                                <div className="border border-gray-200 rounded-xl overflow-hidden bg-white shadow-sm">
+                                    <div className="bg-gray-50 px-4 py-2 border-b border-gray-200 text-[10px] text-gray-400 flex justify-between uppercase tracking-wider font-bold">
+                                        <span>HTML Modu</span>
+                                        <span>Otomatik Kaydetme Kapalı</span>
                                     </div>
                                     <textarea
+                                        ref={textAreaRef}
                                         value={formData.content}
                                         onChange={(e) => setFormData({ ...formData, content: e.target.value })}
-                                        rows={15}
-                                        className="w-full px-4 py-4 focus:outline-none font-mono text-sm leading-relaxed resize-y"
+                                        rows={18}
+                                        className="w-full px-6 py-6 focus:outline-none font-mono text-sm leading-relaxed resize-y bg-slate-900 text-slate-100 selection:bg-green-500/30"
                                         placeholder="<h2>Başlık</h2><p>İçerik buraya...</p>"
                                     />
                                 </div>
