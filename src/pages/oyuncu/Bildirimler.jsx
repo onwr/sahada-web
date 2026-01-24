@@ -251,7 +251,6 @@ const Bildirimler = () => {
       .replace(/Ã–/g, 'Ö')
       .replace(/Ã‡/g, 'Ç')
       .replace(/Åž/g, 'Ş')
-      .replace(/GK/g, 'Ğ') // Bazı durumlarda farklı gelebilir, not düşüldü
       .replace(/Äž/g, 'Ğ')
       .replace(/Ãœ/g, 'Ü');
 
@@ -587,7 +586,22 @@ const Bildirimler = () => {
                       {/* Content */}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between gap-4">
-                          <div>
+                          <div 
+                            className="cursor-pointer"
+                            onClick={() => {
+                              markAsRead(n.id);
+                              if (n.type === 'system' && n.relatedId) {
+                                navigate(`/mac-detay/${n.relatedId}`);
+                              } else if (n.type === 'contact_request' || n.type === 'system') {
+                                if (n.relatedId) navigate(`/oyuncu-detay/${n.relatedId}`);
+                                else if (n.senderId) navigate(`/oyuncu-detay/${n.senderId}`);
+                              } else if (n.type === 'message') {
+                                navigate(`/oyuncu/mesajlar`);
+                              } else if (n.type === 'reservation') {
+                                navigate(`/oyuncu/rezervasyonlar`);
+                              }
+                            }}
+                          >
                             <h3 className={`font-bold text-lg ${n.read ? 'text-gray-600' : 'text-gray-900'}`}>
                               {cleanMessage(n.title)}
                             </h3>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getPlatformSettings, updatePlatformSettings, logAdminAction, searchUsers } from '../../services/firestoreService';
+import { getPlatformSettings, updatePlatformSettings, logAdminAction, searchUsers, getPages } from '../../services/firestoreService';
 import { useAuth } from '../../contexts/AuthContext';
 import AdminSidebar from '../../components/AdminSidebar';
 import { uploadImage } from '../../services/cdnService';
@@ -70,6 +70,9 @@ const Ayarlar = () => {
     }
   });
 
+  const [ownerData, setOwnerData] = useState(null);
+  const [availablePages, setAvailablePages] = useState([]);
+  const [loadingPages, setLoadingPages] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
 
@@ -87,10 +90,25 @@ const Ayarlar = () => {
   });
 
   useEffect(() => {
-    loadSettings();
+    fetchSettings();
+    fetchAvailablePages();
   }, []);
 
-  const loadSettings = async () => {
+  const fetchAvailablePages = async () => {
+    setLoadingPages(true);
+    try {
+      const result = await getPages();
+      if (result.success) {
+        setAvailablePages(result.data);
+      }
+    } catch (error) {
+      console.error('Error fetching pages:', error);
+    } finally {
+      setLoadingPages(false);
+    }
+  };
+
+  const fetchSettings = async () => {
     setLoading(true);
     try {
       const result = await getPlatformSettings();
@@ -317,6 +335,44 @@ const Ayarlar = () => {
     });
   };
 
+  const loadDefaultHeader = () => {
+    const defaults = [
+      { id: 1, label: 'Yakındaki Sahalar', href: '/yakin-sahalar', icon: 'MapPin' },
+      { id: 2, label: 'Oyuncu Bul', href: '/oyuncu-bul', icon: 'Search' },
+      { id: 3, label: 'Meydan', href: '/meydan', icon: 'Users' },
+      { id: 4, label: 'Blog', href: '/blog', icon: 'BookOpen' },
+    ];
+    setSettings({
+      ...settings,
+      menus: { ...settings.menus, header: defaults }
+    });
+  };
+
+  const loadDefaultFooter = () => {
+    const defaults = {
+      platform: [
+        { id: 1, label: 'Nasıl Çalışır?', href: '/nasil-calisir' },
+        { id: 2, label: 'Tesisler', href: '/yakin-sahalar' },
+        { id: 3, label: 'Oyuncu Bul', href: '/oyuncu-bul' },
+        { id: 4, label: 'Turnuvalar', href: '/turnuvalar' }
+      ],
+      sahaSahipleri: [
+        { id: 1, label: 'Saha Ekle', href: '/saha-sahibi-login' },
+        { id: 2, label: 'Yönetim Paneli', href: '/saha-sahibi/dashboard' },
+        { id: 3, label: 'Destek Merkezi', href: '/destek' }
+      ],
+      kurumsal: [
+        { id: 1, label: 'Hakkımızda', href: '/hakkimizda' },
+        { id: 2, label: 'Blog', href: '/blog' },
+        { id: 3, label: 'İletişim', href: '/iletisim' }
+      ]
+    };
+    setSettings({
+      ...settings,
+      menus: { ...settings.menus, footer: defaults }
+    });
+  };
+
   // Image Upload Logic
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [uploadingFavicon, setUploadingFavicon] = useState(false);
@@ -441,6 +497,47 @@ const Ayarlar = () => {
                     {/* --- GENERAL TAB --- */}
                     {activeTab === 'general' && (
                       <>
+                        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                          <h3 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2">
+                            <Globe size={20} className="text-blue-500" />
+                            Platform Bilgileri
+                          </h3>
+                          <div className="grid grid-cols-1 gap-6">
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">Site Başlığı</label>
+                              <input 
+                                type="text" 
+                                className="w-full border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 p-2.5 border"
+                                placeholder="Örn: Sahada.com"
+                                value={settings.siteTitle}
+                                onChange={(e) => setSettings({...settings, siteTitle: e.target.value})}
+                              />
+                              <p className="text-[11px] text-gray-400 mt-1 uppercase font-bold tracking-wider italic">Bu isim sidebar ve başlıklarda dinamik olarak görünecektir.</p>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Site Açıklaması (Meta Description)</label>
+                                <textarea 
+                                  className="w-full border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 p-2.5 border"
+                                  rows="2"
+                                  placeholder="Site hakkında kısa açıklama..."
+                                  value={settings.siteDescription}
+                                  onChange={(e) => setSettings({...settings, siteDescription: e.target.value})}
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Meta Anahtar Kelimeler</label>
+                                <textarea 
+                                  className="w-full border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 p-2.5 border"
+                                  rows="2"
+                                  placeholder="anahtar, kelime, ayırarak, girin"
+                                  value={settings.metaKeywords}
+                                  onChange={(e) => setSettings({...settings, metaKeywords: e.target.value})}
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        </div>
                         {/* SEO Section Moved to Marketing.jsx */}
         
                         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
@@ -553,12 +650,49 @@ const Ayarlar = () => {
               <div className="space-y-6">
                 {/* Header Menu */}
                 <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-                  <h3 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2">
-                    <Layout size={20} className="text-blue-500" />
-                    Header Menüsü
-                  </h3>
+                  <div className="flex items-center justify-between mb-6">
+                    <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                      <Layout size={20} className="text-blue-500" />
+                      Header Menüsü
+                    </h3>
+                    <button 
+                      onClick={loadDefaultHeader}
+                      className="text-xs font-bold text-blue-600 hover:text-blue-800 bg-blue-50 px-3 py-1.5 rounded-lg border border-blue-100 transition-all hover:bg-blue-100"
+                    >
+                      Varsayılanları Yükle
+                    </button>
+                  </div>
                   
-                  <div className="flex gap-4 mb-6 items-end bg-gray-50 p-4 rounded-lg">
+                  <div className="flex gap-4 mb-4 items-end bg-gray-50 p-4 rounded-lg">
+                    <div className="flex-1">
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Hazır Sayfalar</label>
+                      <select 
+                        className="w-full border border-gray-300 rounded-lg p-2 text-sm"
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (!val) return;
+                          const [label, href] = val.split('|');
+                          setNewHeaderItem({...newHeaderItem, label, href});
+                        }}
+                        defaultValue=""
+                      >
+                        <option value="" disabled>Sistem Sayfası Seç...</option>
+                        <optgroup label="Sistem Sayfaları">
+                          <option value="Yakındaki Sahalar|/yakin-sahalar">Yakındaki Sahalar</option>
+                          <option value="Oyuncu Bul|/oyuncu-bul">Oyuncu Bul</option>
+                          <option value="Meydan|/meydan">Meydan</option>
+                          <option value="Blog|/blog">Blog</option>
+                          <option value="Turnuvalar|/turnuvalar">Turnuvalar</option>
+                        </optgroup>
+                        {availablePages.length > 0 && (
+                          <optgroup label="Özel Sayfalar">
+                            {availablePages.map(p => (
+                              <option key={p.id} value={`${p.title}|/${p.slug}`}>{p.title}</option>
+                            ))}
+                          </optgroup>
+                        )}
+                      </select>
+                    </div>
                     <div className="flex-1">
                       <label className="block text-xs font-medium text-gray-500 mb-1">Etiket</label>
                       <input 
@@ -633,12 +767,20 @@ const Ayarlar = () => {
 
                 {/* Footer Menus */}
                 <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-                  <h3 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2">
-                    <LinkIcon size={20} className="text-purple-500" />
-                    Footer Linkleri
-                  </h3>
+                  <div className="flex items-center justify-between mb-6">
+                    <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                      <LinkIcon size={20} className="text-purple-500" />
+                      Footer Linkleri
+                    </h3>
+                    <button 
+                      onClick={loadDefaultFooter}
+                      className="text-xs font-bold text-purple-600 hover:text-purple-800 bg-purple-50 px-3 py-1.5 rounded-lg border border-purple-100 transition-all hover:bg-purple-100"
+                    >
+                      Varsayılanları Yükle
+                    </button>
+                  </div>
                   
-                  <div className="flex gap-4 mb-6 items-end bg-gray-50 p-4 rounded-lg">
+                  <div className="flex gap-4 mb-4 items-end bg-gray-50 p-4 rounded-lg">
                     <div className="w-1/4">
                        <label className="block text-xs font-medium text-gray-500 mb-1">Kolon</label>
                        <select
@@ -650,6 +792,34 @@ const Ayarlar = () => {
                          <option value="sahaSahipleri">Saha Sahipleri</option>
                          <option value="kurumsal">Kurumsal</option>
                        </select>
+                    </div>
+                    <div className="flex-1">
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Hazır Sayfalar</label>
+                      <select 
+                        className="w-full border border-gray-300 rounded-lg p-2 text-sm"
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (!val) return;
+                          const [label, href] = val.split('|');
+                          setNewFooterItem({...newFooterItem, label, href});
+                        }}
+                        defaultValue=""
+                      >
+                        <option value="" disabled>Sayfa Seç...</option>
+                        <optgroup label="Sistem Sayfaları">
+                           <option value="Nasıl Çalışır?|/nasil-calisir">Nasıl Çalışır?</option>
+                           <option value="Hakkımızda|/hakkimizda">Hakkımızda</option>
+                           <option value="İletişim|/iletisim">İletişim</option>
+                           <option value="Fiyatlandırma|/pricing">Fiyatlandırma</option>
+                        </optgroup>
+                        {availablePages.length > 0 && (
+                          <optgroup label="Özel Sayfalar">
+                            {availablePages.map(p => (
+                              <option key={p.id} value={`${p.title}|/${p.slug}`}>{p.title}</option>
+                            ))}
+                          </optgroup>
+                        )}
+                      </select>
                     </div>
                     <div className="flex-1">
                       <label className="block text-xs font-medium text-gray-500 mb-1">Etiket</label>

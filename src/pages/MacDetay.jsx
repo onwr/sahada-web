@@ -1,23 +1,27 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { getOpenMatch, joinOpenMatch } from '../services/firestoreService';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { getOpenMatch, requestJoinMatch, getTesis, markMatchAsPaid } from '../services/firestoreService';
+import PaymentModal from '../components/PaymentModal';
 import { useAuth } from '../contexts/AuthContext';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import toast from '../utils/toast';
 import { 
     Clock, Calendar, MapPin, Users, DollarSign, Trophy, ArrowLeft, 
-    Share2, AlertCircle, CheckCircle, UserPlus, Shield
+    Share2, AlertCircle, CheckCircle, UserPlus, Shield, Building2
 } from 'lucide-react';
 
 const MacDetay = () => {
     const { id } = useParams();
     const navigate = useNavigate();
+    const location = useLocation();
     const { user } = useAuth();
     const [match, setMatch] = useState(null);
+    const [facility, setFacility] = useState(null);
     const [loading, setLoading] = useState(true);
     const [joining, setJoining] = useState(false);
     const [showShareMenu, setShowShareMenu] = useState(false);
+    const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
 
     useEffect(() => {
         loadMatch();
@@ -28,6 +32,14 @@ const MacDetay = () => {
         const result = await getOpenMatch(id);
         if (result.success) {
             setMatch(result.data);
+            
+            // Eğer bir tesisId varsa tesis detaylarını da çek
+            if (result.data.tesisId) {
+                const tesisResult = await getTesis(result.data.tesisId);
+                if (tesisResult.success) {
+                    setFacility(tesisResult.data);
+                }
+            }
         } else {
             toast.error(result.error);
             navigate('/oyuncu-bul');
@@ -38,7 +50,7 @@ const MacDetay = () => {
     const handleJoinRequest = async () => {
         if (!user) {
             toast.error('Maça katılmak için giriş yapmalısınız');
-            navigate('/login', { state: { from: { pathname: `/mac-detay/${id}` } } });
+            navigate('/login', { state: { from: location } });
             return;
         }
 
@@ -49,15 +61,15 @@ const MacDetay = () => {
 
         setJoining(true);
         try {
-            const result = await joinOpenMatch(match.id, user.uid);
+            const result = await requestJoinMatch(match.id, user.uid, {
+                name: user.displayName,
+                fullName: user.displayName,
+                displayName: user.displayName,
+                uid: user.uid
+            });
             if (result.success) {
-                toast.success('Maça katılım isteğiniz gönderildi!'); // Text changed to reflect "request"
-                // Refresh match data or update local state
-                setMatch(prev => ({
-                    ...prev,
-                    players: [...prev.players, user.uid],
-                    currentPlayers: (prev.currentPlayers || 0) + 1
-                }));
+                toast.success('Maça katılım isteğiniz gönderildi!'); 
+                loadMatch(); // Reload to update UI
             } else {
                 toast.error(result.error || 'Maça katılamadınız');
             }
@@ -66,6 +78,27 @@ const MacDetay = () => {
             toast.error('Bir hata oluştu');
         } finally {
             setJoining(false);
+        }
+    };
+
+    const handlePaymentSuccess = async (paymentId) => {
+        setIsPaymentModalOpen(false);
+        toast.loading('Ödemeniz onaylanıyor...');
+        
+        try {
+            const result = await markMatchAsPaid(match.id, user.uid, paymentId);
+            if (result.success) {
+                toast.dismiss();
+                toast.success('Ödeme başarıyla tamamlandı! Maça katılımınız kesinleşti.');
+                loadMatch(); // Verileri yenile
+            } else {
+                toast.dismiss();
+                toast.error(result.error || 'Ödeme kaydedilemedi.');
+            }
+        } catch (error) {
+            console.error('Payment success handling error:', error);
+            toast.dismiss();
+            toast.error('Bir hata oluştu.');
         }
     };
 
@@ -90,7 +123,12 @@ const MacDetay = () => {
     if (!match) return null;
 
     const missingPlayers = (match.maxPlayers || 0) - (match.currentPlayers || 0);
-    const isJoined = user && match.players && match.players.includes(user.uid);
+    const isPending = user && match.joinRequests && match.joinRequests.includes(user.uid);
+    const isConfirmed = user && match.players && match.players.includes(user.uid);
+    const isPaid = user && match.paidPlayers && match.paidPlayers.includes(user.uid);
+    const needsPayment = match.pricePerPlayer > 0 && isConfirmed && !isPaid;
+    
+    const isJoined = isPending || isConfirmed;
     const organizer = {
         name: match.organizerName || 'İlan Sahibi',
         avatar: match.organizerAvatar || `https://ui-avatars.com/api/?name=${match.organizerName || 'User'}&background=random`
@@ -103,7 +141,7 @@ const MacDetay = () => {
             <main className="flex-grow container mx-auto px-4 py-8">
                 {/* Back Link */}
                 <button 
-                    onClick={() => navigate(-1)} 
+                    onClick={() => navigate('/oyuncu-bul')} 
                     className="flex items-center text-gray-500 hover:text-gray-900 mb-6 transition-colors"
                 >
                     <ArrowLeft size={20} className="mr-2" />
@@ -120,12 +158,17 @@ const MacDetay = () => {
                                 {match.format === 'basketball' && <span className="text-9xl">🏀</span>}
                                 {match.format === 'volleyball' && <span className="text-9xl">🏐</span>}
                                 {match.format === 'tennis' && <span className="text-9xl">🎾</span>}
+                                {match.format === 'swimming' && <span className="text-9xl">🏊‍♂️</span>}
                             </div>
                             
                             <div className="relative z-10">
                                 <div className="flex items-center gap-3 mb-4">
                                     <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-sm font-bold">
-                                        {match.format === 'football' ? 'Halı Saha' : match.format}
+                                        {match.format === 'football' ? 'Halı Saha' : 
+                                         match.format === 'basketball' ? 'Basketbol' :
+                                         match.format === 'tennis' ? 'Tenis' :
+                                         match.format === 'volleyball' ? 'Voleybol' :
+                                         match.format === 'swimming' ? 'Yüzme' : match.format}
                                     </span>
                                     {missingPlayers > 0 ? (
                                         <span className="bg-red-100 text-red-700 px-3 py-1 rounded-full text-sm font-bold flex items-center gap-1">
@@ -141,7 +184,7 @@ const MacDetay = () => {
                                 </div>
 
                                 <h1 className="text-3xl md:text-4xl font-extrabold text-gray-900 mb-4 leading-tight">
-                                    {match.tesisName || match.location || 'Maç Detayı'}
+                                    {facility?.name || match.tesisName || match.location || 'Maç Detayı'}
                                 </h1>
 
                                 <div className="flex flex-wrap gap-4 text-gray-600">
@@ -155,11 +198,48 @@ const MacDetay = () => {
                                     </div>
                                     <div className="flex items-center gap-2 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-100">
                                         <MapPin size={18} className="text-green-600" />
-                                        <span className="font-medium">{match.location || 'Konum'}</span>
+                                        <span className="font-medium truncate max-w-[200px]">
+                                            {facility?.location || match.location || 'Konum'}
+                                        </span>
+                                        {(match.location?.includes('(') || facility?.location) && (
+                                            <a 
+                                                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(facility?.address || match.location)}`}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="text-blue-600 hover:text-blue-800 text-xs font-bold underline ml-1"
+                                            >
+                                                Haritada Aç
+                                            </a>
+                                        )}
                                     </div>
                                 </div>
                             </div>
                         </div>
+
+                        {/* Facility Details Link */}
+                        {facility && (
+                            <div className="bg-gradient-to-r from-green-50 to-emerald-50 p-6 rounded-2xl border border-green-100 flex items-center justify-between">
+                                <div className="flex items-center gap-4">
+                                    {facility.images?.[0] ? (
+                                        <img src={facility.images[0].url} className="w-16 h-16 rounded-xl object-cover shadow-sm" alt={facility.name} />
+                                    ) : (
+                                        <div className="w-16 h-16 bg-white rounded-xl flex items-center justify-center border border-green-100 shadow-sm">
+                                            <Building2 className="text-green-600" />
+                                        </div>
+                                    )}
+                                    <div>
+                                        <h4 className="font-bold text-gray-900">{facility.name}</h4>
+                                        <p className="text-sm text-gray-500 line-clamp-1">{facility.address || facility.location}</p>
+                                    </div>
+                                </div>
+                                <button 
+                                    onClick={() => navigate(`/oyuncu/saha-detay/${facility.id}`)}
+                                    className="bg-white text-green-700 px-5 py-2.5 rounded-xl font-bold border border-green-200 hover:bg-green-600 hover:text-white transition-all shadow-sm"
+                                >
+                                    Sahayı İncele
+                                </button>
+                            </div>
+                        )}
 
                         {/* Details Grid */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -269,10 +349,44 @@ const MacDetay = () => {
                             </div>
 
                             {isJoined ? (
-                                <div className="w-full bg-green-50 border border-green-200 text-green-700 py-4 rounded-xl flex flex-col items-center justify-center gap-2 mb-4">
-                                    <CheckCircle size={32} />
-                                    <span className="font-bold">Katılım Talebi Gönderildi</span>
-                                    <span className="text-xs text-center">Organizatör onayı bekleniyor. <br/> Onaylandığında bildirim alacaksınız.</span>
+                                <div className={`w-full py-4 rounded-xl flex flex-col items-center justify-center gap-2 mb-4 border ${
+                                    isConfirmed 
+                                    ? 'bg-green-50 border-green-200 text-green-700' 
+                                    : 'bg-yellow-50 border-yellow-200 text-yellow-700'
+                                }`}>
+                                    {isConfirmed ? (
+                                        <>
+                                            <CheckCircle size={32} className="text-green-600" />
+                                            <span className="font-bold">Katılımın Onaylandı! 🎉</span>
+                                            
+                                            {needsPayment ? (
+                                                <div className="mt-3 w-full px-2 space-y-3">
+                                                    <div className="bg-orange-100 text-orange-700 p-3 rounded-xl text-xs font-semibold flex items-start gap-2 border border-orange-200">
+                                                        <AlertCircle size={16} className="mt-0.5 flex-shrink-0" />
+                                                        <div>
+                                                            <p className="font-bold mb-1 underline">ÖDEME BEKLENİYOR</p>
+                                                            <p className="font-medium opacity-90">Maça katılımınızın kesinleşmesi için ₺{match.pricePerPlayer} tutarındaki ödemeyi yapmanız gerekmektedir.</p>
+                                                        </div>
+                                                    </div>
+                                                    <button 
+                                                        onClick={() => setIsPaymentModalOpen(true)}
+                                                        className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-100 transition-all flex items-center justify-center gap-2 transform active:scale-95"
+                                                    >
+                                                        <CreditCard size={18} />
+                                                        Güvenli Ödeme Yap
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                <span className="text-xs text-center px-4">Maç kadrosuna dahil edildin. Sahada görüşürüz!</span>
+                                            )}
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Clock size={32} className="text-yellow-600" />
+                                            <span className="font-bold">Katılım Talebi Gönderildi</span>
+                                            <span className="text-xs text-center px-4">Organizatör onayı bekleniyor. <br/> Onaylandığında bildirim alacaksınız.</span>
+                                        </>
+                                    )}
                                 </div>
                             ) : (
                                 <button
@@ -369,6 +483,16 @@ const MacDetay = () => {
             </main>
             
             <Footer />
+
+            <PaymentModal 
+                isOpen={isPaymentModalOpen}
+                onClose={() => setIsPaymentModalOpen(false)}
+                amount={match.pricePerPlayer}
+                user={user}
+                onSuccess={handlePaymentSuccess}
+                title="Maç Katılım Ödemesi"
+                description={`${match.tesisName || 'Maç'} katılım ücreti`}
+            />
         </div>
     );
 };

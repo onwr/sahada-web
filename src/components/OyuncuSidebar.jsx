@@ -104,7 +104,7 @@ const OyuncuSidebar = () => {
         const count = snapshot.size;
         
         if (previousNotifCount !== -1 && count > previousNotifCount && location.pathname !== '/oyuncu/bildirimler') {
-            toast.success('Yeni bildiriminiz var', { icon: 'bell' });
+            toast.success('Yeni bildiriminiz var', { icon: '🔔' });
         }
         
         previousNotifCount = count;
@@ -272,9 +272,9 @@ const OyuncuSidebar = () => {
               <div className="absolute bottom-0 left-0 w-16 h-16 bg-white/10 rounded-full -ml-8 -mb-8 transition-transform group-hover:scale-150 duration-700"></div>
               
               <div className="relative z-10 flex flex-col items-center text-center">
-                 <div className="w-16 h-16 rounded-full border-2 border-white/20 p-1 mb-3 bg-white/10 backdrop-blur-sm shadow-inner group-hover:border-white/40 transition-colors">
-                     {userData?.photoURL ? (
-                         <img src={userData.photoURL} alt={userData.displayName} className="w-full h-full rounded-full object-cover" />
+                 <div className="w-16 h-16 rounded-full border-2 border-white/20 p-1 mb-3 bg-white/10 backdrop-blur-sm shadow-inner group-hover:border-white/40 transition-colors flex items-center justify-center overflow-hidden">
+                     {userData?.photoURL || user?.photoURL || userData?.profilePhoto?.url ? (
+                         <img src={userData.photoURL || user.photoURL || userData?.profilePhoto?.url} alt={userData?.fullName || userData?.displayName || 'Oyuncu'} className="w-full h-full rounded-full object-cover" />
                      ) : (
                          <div className="w-full h-full bg-green-500 rounded-full flex items-center justify-center">
                              <User className="w-8 h-8 text-white" />

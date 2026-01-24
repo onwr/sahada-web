@@ -21,8 +21,10 @@ import {
   Check,
   X,
 } from 'lucide-react';
+import { updateProfile } from 'firebase/auth';
 import { useAuth } from '../../contexts/AuthContext';
 import { updateUserData } from '../../services/authService';
+import { addTesis, slugify } from '../../services/firestoreService';
 import { 
   uploadImage, 
   getImageUrl, 
@@ -107,7 +109,10 @@ const SahaSahibiOnboard = () => {
     businessLocation: { lat: null, lng: null },
 
     // Doğrulama Belgeleri
+    taxPlate: null,
+    activityCertificate: null,
     businessLicense: null,
+    signatureCircular: null,
     facilityPhotos: [],
     taxNumber: '',
     taxOffice: '',
@@ -250,7 +255,10 @@ const SahaSahibiOnboard = () => {
           iban: userData.iban || savedData?.iban || prev.iban || '',
           authorizedPersonId: userData.authorizedPersonId || savedData?.authorizedPersonId || prev.authorizedPersonId || '',
           profilePhoto: userData.profilePhoto || savedData?.profilePhoto || prev.profilePhoto || null,
+          taxPlate: userData.taxPlate || savedData?.taxPlate || prev.taxPlate || null,
+          activityCertificate: userData.activityCertificate || savedData?.activityCertificate || prev.activityCertificate || null,
           businessLicense: userData.businessLicense || savedData?.businessLicense || prev.businessLicense || null,
+          signatureCircular: userData.signatureCircular || savedData?.signatureCircular || prev.signatureCircular || null,
           facilityPhotos: userData.facilityPhotos?.length > 0 ? userData.facilityPhotos : (savedData?.facilityPhotos || prev.facilityPhotos || []),
           sportTypes: userData.sportTypes?.length > 0 ? userData.sportTypes : (savedData?.sportTypes || prev.sportTypes || []),
           facilityCount: userData.facilityCount || savedData?.facilityCount || prev.facilityCount || '',
@@ -295,7 +303,10 @@ const SahaSahibiOnboard = () => {
       const dataToSave = {
         ...formData,
         // File objelerini null yap (localStorage'da saklanamaz)
+        taxPlate: formData.taxPlate instanceof File ? null : formData.taxPlate,
+        activityCertificate: formData.activityCertificate instanceof File ? null : formData.activityCertificate,
         businessLicense: formData.businessLicense instanceof File ? null : formData.businessLicense,
+        signatureCircular: formData.signatureCircular instanceof File ? null : formData.signatureCircular,
         profilePhoto: formData.profilePhoto instanceof File ? null : formData.profilePhoto,
         // facilityPhotos array'ini koru (URL'ler string olarak saklanır)
         facilityPhotos: formData.facilityPhotos.map(photo => 
@@ -454,10 +465,11 @@ const SahaSahibiOnboard = () => {
     if (formData.businessAddress) completion += 4;
 
     // Doğrulama belgeleri (+30 puan)
-    if (formData.businessLicense) completion += 10;
-    if (formData.facilityPhotos.length > 0) completion += 8;
-    if (formData.taxNumber) completion += 5;
-    if (formData.iban) completion += 4;
+    if (formData.taxPlate || formData.businessLicense) completion += 10;
+    if (formData.activityCertificate || formData.signatureCircular) completion += 5;
+    if (formData.facilityPhotos.length > 0) completion += 5;
+    if (formData.taxNumber) completion += 4;
+    if (formData.iban) completion += 3;
     if (formData.authorizedPersonId) completion += 3;
 
     // Tesis detayları (+25 puan)
@@ -509,8 +521,20 @@ const SahaSahibiOnboard = () => {
         newErrors.businessAddress = 'İşletme adresi gereklidir';
       }
     } else if (step === 2) {
-      if (!formData.businessLicense) {
-        newErrors.businessLicense = 'İşletme ruhsatı veya vergi levhası gereklidir';
+      if (formData.companyType === 'individual') {
+        if (!formData.taxPlate) {
+          newErrors.taxPlate = 'Vergi Levhası gereklidir';
+        }
+        if (!formData.activityCertificate) {
+          newErrors.activityCertificate = 'Faaliyet Belgesi gereklidir';
+        }
+      } else {
+        if (!formData.businessLicense) {
+          newErrors.businessLicense = 'İşletme Ruhsatı gereklidir';
+        }
+        if (!formData.signatureCircular) {
+          newErrors.signatureCircular = 'İmza Sirküleri gereklidir';
+        }
       }
 
       if (formData.facilityPhotos.length < 3) {
@@ -721,11 +745,29 @@ const SahaSahibiOnboard = () => {
       // File objelerini URL'lere çevir
       const processedFormData = {
         ...formData,
+        taxPlate: formData.taxPlate ? {
+          url: formData.taxPlate.url || '',
+          fileName: formData.taxPlate.fileName || 'unknown',
+          fileSize: formData.taxPlate.fileSize || 0,
+          uploadedAt: formData.taxPlate.uploadedAt || new Date()
+        } : null,
+        activityCertificate: formData.activityCertificate ? {
+          url: formData.activityCertificate.url || '',
+          fileName: formData.activityCertificate.fileName || 'unknown',
+          fileSize: formData.activityCertificate.fileSize || 0,
+          uploadedAt: formData.activityCertificate.uploadedAt || new Date()
+        } : null,
         businessLicense: formData.businessLicense ? {
           url: formData.businessLicense.url || '',
           fileName: formData.businessLicense.fileName || 'unknown',
           fileSize: formData.businessLicense.fileSize || 0,
           uploadedAt: formData.businessLicense.uploadedAt || new Date()
+        } : null,
+        signatureCircular: formData.signatureCircular ? {
+          url: formData.signatureCircular.url || '',
+          fileName: formData.signatureCircular.fileName || 'unknown',
+          fileSize: formData.signatureCircular.fileSize || 0,
+          uploadedAt: formData.signatureCircular.uploadedAt || new Date()
         } : null,
         facilityPhotos: formData.facilityPhotos ? formData.facilityPhotos.map(photo => ({
           url: photo.url || '',
@@ -738,11 +780,8 @@ const SahaSahibiOnboard = () => {
           fileName: profileImageData.fileName || 'unknown',
           fileSize: profileImageData.fileSize || 0,
           uploadedAt: profileImageData.uploadedAt || new Date()
-        } : null
-      };
-
-      const profileData = {
-        ...processedFormData,
+        } : null,
+        photoURL: profileImageData?.url || formData.profilePhoto?.url || (typeof formData.profilePhoto === 'string' ? formData.profilePhoto : '') || '',
         agreements,
         onboardingCompleted: true, // DB'de tamamlandı işaretle
         profileCompleted: true,
@@ -753,9 +792,75 @@ const SahaSahibiOnboard = () => {
       };
 
       // Debug için console.log
-      console.log('Profile data to save:', profileData);
+      console.log('Profile data to save:', processedFormData);
 
-      await updateUserData(user.uid, profileData);
+      await updateUserData(user.uid, processedFormData);
+
+      // Firebase Auth profilini de güncelle
+      const finalPhotoURL = profileImageData?.url || formData.profilePhoto?.url || formData.profilePhoto;
+      if (finalPhotoURL) {
+        try {
+          await updateProfile(user, {
+            photoURL: String(finalPhotoURL)
+          });
+        } catch (authError) {
+          console.error('Auth profile update error:', authError);
+        }
+      }
+      
+      // Saha (Tesis) belgesi oluştur
+      // Onboarding sırasında girilen bilgileri kullanarak ilk tesisi otomatik oluşturuyoruz
+      try {
+        const tesisName = formData.businessName || `${formData.authorizedPerson} Tesisi`;
+        const slug = `${slugify(tesisName)}-${user.uid.slice(0, 5)}`;
+
+        const tesisData = {
+          name: tesisName,
+          slug,
+          latitude: formData.businessLocation?.lat,
+          longitude: formData.businessLocation?.lng,
+          type: 'Futbol', // Varsayılan tip
+          capacity: parseInt(formData.facilityCount) || 14,
+          price: 0, // Varsayılan fiyat
+          description: formData.description || 'Yeni tesisimiz hizmetinizde.',
+          facilities: [
+            formData.hasShower && 'Duş',
+            formData.hasParking && 'Otopark',
+            formData.hasCafeteria && 'Kafeterya',
+            formData.hasCamera && 'Kamera',
+            formData.hasLockers && 'Soyunma Odası'
+          ].filter(Boolean),
+          workingHours: formData.openingHours || '08:00 - 24:00',
+          phone: formData.businessPhone,
+          status: 'active',
+          isActive: true,
+          images: formData.facilityPhotos ? formData.facilityPhotos.map(photo => ({
+            url: photo.url || '',
+            fileName: photo.fileName || 'unknown',
+            fileSize: photo.fileSize || 0,
+            uploadedAt: photo.uploadedAt || new Date()
+          })) : [],
+          ownerId: user.uid,
+          rating: 0,
+          reservations: 0,
+          revenue: 0,
+          location: formData.city && formData.district ? `${formData.district}, ${formData.city}` : formData.businessAddress,
+          address: formData.businessAddress,
+          city: formData.city,
+          district: formData.district,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        };
+
+        const tesisResult = await addTesis(tesisData);
+        if (!tesisResult.success) {
+          console.error('Saha oluşturma hatası (onboarding):', tesisResult.error);
+          // Ana işlem başarılı olduğu için devam ediyoruz, 
+          // kullanıcı panelden manuel de ekleyebilir
+        }
+      } catch (tesisError) {
+        console.error('Saha oluşturma istisnası (onboarding):', tesisError);
+      }
       
       // Context'i güncelle ama henüz redirect yapma (Son adımda yapılacak)
       setUserData(prev => ({ 
@@ -1357,29 +1462,90 @@ const SahaSahibiOnboard = () => {
                   Doğrulama Belgelerinizi Yükleyin
                 </h3>
 
-                {/* İşletme Ruhsatı */}
-                <div>
-                  <label className='mb-3 block text-sm font-medium text-gray-700'>
-                    {formData.companyType === 'individual' ? 'Vergi Levhası / Faaliyet Belgesi *' : 'İşletme Ruhsatı / İmza Sirküleri *'}
-                  </label>
-                  <ImageUploader
-                    userId={user?.uid}
-                    category="business-license"
-                    initialImages={formData.businessLicense ? (Array.isArray(formData.businessLicense) ? formData.businessLicense : [formData.businessLicense]) : []}
-                    onImagesChange={(images) => handleInputChange('businessLicense', images[0] || null)}
-                    maxFiles={1}
-                    acceptedTypes={['image/jpeg', 'image/png', 'application/pdf', '.pdf']}
-                    placeholder="Belge yükleyin (PDF, JPG, PNG)"
-                  />
-                  {errors.businessLicense && (
-                    <motion.p
-                      initial={{ opacity: 0, y: -10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className='mt-1 text-sm text-red-500'
-                    >
-                      {errors.businessLicense}
-                    </motion.p>
-                  )}
+                {/* Belgeler */}
+                <div className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Vergi Levhası */}
+                    <div>
+                      <label className='mb-3 block text-sm font-medium text-gray-700'>
+                        Vergi Levhası *
+                      </label>
+                      <ImageUploader
+                        userId={user?.uid}
+                        category="tax-plate"
+                        initialImages={formData.taxPlate ? (Array.isArray(formData.taxPlate) ? formData.taxPlate : [formData.taxPlate]) : []}
+                        onImagesChange={(images) => handleInputChange('taxPlate', images[0] || null)}
+                        maxFiles={1}
+                        acceptedTypes={['image/jpeg', 'image/png', 'application/pdf', '.pdf']}
+                        placeholder="Vergi levhası yükleyin"
+                      />
+                      {errors.taxPlate && (
+                        <motion.p initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className='mt-1 text-sm text-red-500'>
+                          {errors.taxPlate}
+                        </motion.p>
+                      )}
+                    </div>
+
+                    {/* Faaliyet Belgesi */}
+                    <div>
+                      <label className='mb-3 block text-sm font-medium text-gray-700'>
+                        Faaliyet Belgesi *
+                      </label>
+                      <ImageUploader
+                        userId={user?.uid}
+                        category="activity-certificate"
+                        initialImages={formData.activityCertificate ? (Array.isArray(formData.activityCertificate) ? formData.activityCertificate : [formData.activityCertificate]) : []}
+                        onImagesChange={(images) => handleInputChange('activityCertificate', images[0] || null)}
+                        maxFiles={1}
+                        acceptedTypes={['image/jpeg', 'image/png', 'application/pdf', '.pdf']}
+                        placeholder="Faaliyet belgesi yükleyin"
+                      />
+                      {errors.activityCertificate && (
+                        <motion.p initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className='mt-1 text-sm text-red-500'>
+                          {errors.activityCertificate}
+                        </motion.p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* İşletme Ruhsatı */}
+                    <div>
+                      <label className='mb-3 block text-sm font-medium text-gray-700'>
+                        İşletme Ruhsatı (Opsiyonel)
+                      </label>
+                      <ImageUploader
+                        userId={user?.uid}
+                        category="business-license"
+                        initialImages={formData.businessLicense ? (Array.isArray(formData.businessLicense) ? formData.businessLicense : [formData.businessLicense]) : []}
+                        onImagesChange={(images) => handleInputChange('businessLicense', images[0] || null)}
+                        maxFiles={1}
+                        acceptedTypes={['image/jpeg', 'image/png', 'application/pdf', '.pdf']}
+                        placeholder="Ruhsat yükleyin"
+                      />
+                    </div>
+
+                    {/* İmza Sirküleri */}
+                    <div>
+                      <label className='mb-3 block text-sm font-medium text-gray-700'>
+                        İmza Sirküleri {formData.companyType === 'corporate' ? '*' : '(Opsiyonel)'}
+                      </label>
+                      <ImageUploader
+                        userId={user?.uid}
+                        category="signature-circular"
+                        initialImages={formData.signatureCircular ? (Array.isArray(formData.signatureCircular) ? formData.signatureCircular : [formData.signatureCircular]) : []}
+                        onImagesChange={(images) => handleInputChange('signatureCircular', images[0] || null)}
+                        maxFiles={1}
+                        acceptedTypes={['image/jpeg', 'image/png', 'application/pdf', '.pdf']}
+                        placeholder="İmza sirküleri yükleyin"
+                      />
+                      {errors.signatureCircular && formData.companyType === 'corporate' && (
+                        <motion.p initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className='mt-1 text-sm text-red-500'>
+                          {errors.signatureCircular}
+                        </motion.p>
+                      )}
+                    </div>
+                  </div>
                 </div>
 
                 {/* Saha Fotoğrafları */}

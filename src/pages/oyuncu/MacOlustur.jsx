@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { createOpenMatch, getAllTesisler, getReservationsByTesisId, getUserOpenMatches } from '../../services/firestoreService';
+import { createOpenMatch, getAllTesisler, getReservationsByTesisId, getUserOpenMatches, updateOpenMatch, deleteOpenMatch } from '../../services/firestoreService';
 import { collection, query, onSnapshot, where } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import OyuncuSidebar from '../../components/OyuncuSidebar';
 import { 
   Calendar, MapPin, DollarSign, Users, Clock, X, Search,
-  Building2, AlertCircle, CheckCircle, Plus, ChevronLeft, ArrowRight
+  Building2, AlertCircle, CheckCircle, Plus, ChevronLeft, ArrowRight,
+  Edit2, Trash2
 } from 'lucide-react';
 import toast from '../../utils/toast';
 
@@ -22,6 +23,7 @@ const MacOlustur = () => {
   // List State
   const [listLoading, setListLoading] = useState(true);
   const [myMatches, setMyMatches] = useState({ upcoming: [], past: [] });
+  const [editingMatchId, setEditingMatchId] = useState(null);
 
   // Create Form State
   const [loading, setLoading] = useState(false);
@@ -145,6 +147,52 @@ const MacOlustur = () => {
     }
   };
 
+  const handleEdit = (match) => {
+    setEditingMatchId(match.id);
+    setSelectedTesis(match.tesisId ? { id: match.tesisId, name: match.tesisName, location: match.location } : null);
+    
+    // Date conversion
+    let matchDate = '';
+    if (match.date) {
+        const d = match.date.toDate ? match.date.toDate() : new Date(match.date);
+        matchDate = d.toISOString().split('T')[0];
+    }
+
+    setFormData({
+      tesisId: match.tesisId || '',
+      tesisName: match.tesisName || '',
+      location: match.location || '',
+      address: match.address || '',
+      date: matchDate,
+      timeSlot: match.timeSlot,
+      title: match.title || '',
+      format: match.format,
+      level: match.level,
+      maxPlayers: match.maxPlayers,
+      pricePerPlayer: match.pricePerPlayer,
+      description: match.description || ''
+    });
+    setTesisSearchQuery(match.tesisName || '');
+    setView('create');
+  };
+
+  const handleDelete = async (matchId) => {
+    if (window.confirm('Bu maçı silmek istediğinizden emin misiniz?')) {
+      try {
+        const result = await deleteOpenMatch(matchId, user.uid);
+        if (result.success) {
+          toast.success('Maç başarıyla silindi');
+          fetchMyMatches();
+        } else {
+          toast.error(result.error || 'Maç silinemedi');
+        }
+      } catch (error) {
+        console.error('Silme hatası:', error);
+        toast.error('Bir hata oluştu');
+      }
+    }
+  };
+
   const filteredTesisler = tesisler.filter(tesis => {
     if (!tesisSearchQuery) return true;
     const query = tesisSearchQuery.toLowerCase();
@@ -212,26 +260,45 @@ const MacOlustur = () => {
     }
     setLoading(true);
     try {
-      const result = await createOpenMatch({
-        organizerId: user.uid,
-        title: formData.title || null,
-        tesisId: formData.tesisId || null,
-        tesisName: formData.tesisName || null,
-        location: formData.location || formData.tesisName || 'Konum belirtilmemiş',
-        address: formData.address || null,
-        date: formData.date,
-        timeSlot: formData.timeSlot,
-        format: formData.format,
-        level: formData.level,
-        maxPlayers: parseInt(formData.maxPlayers),
-        currentPlayers: 1,
-        pricePerPlayer: parseFloat(formData.pricePerPlayer) || 0,
-        description: formData.description || ''
-      });
+      let result;
+      if (editingMatchId) {
+        result = await updateOpenMatch(editingMatchId, {
+          title: formData.title || null,
+          tesisId: formData.tesisId || null,
+          tesisName: formData.tesisName || null,
+          location: formData.location || formData.tesisName || 'Konum belirtilmemiş',
+          address: formData.address || null,
+          date: formData.date,
+          timeSlot: formData.timeSlot,
+          format: formData.format,
+          level: formData.level,
+          maxPlayers: parseInt(formData.maxPlayers),
+          pricePerPlayer: parseFloat(formData.pricePerPlayer) || 0,
+          description: formData.description || ''
+        });
+      } else {
+        result = await createOpenMatch({
+          organizerId: user.uid,
+          title: formData.title || null,
+          tesisId: formData.tesisId || null,
+          tesisName: formData.tesisName || null,
+          location: formData.location || formData.tesisName || 'Konum belirtilmemiş',
+          address: formData.address || null,
+          date: formData.date,
+          timeSlot: formData.timeSlot,
+          format: formData.format,
+          level: formData.level,
+          maxPlayers: parseInt(formData.maxPlayers),
+          currentPlayers: 1,
+          pricePerPlayer: parseFloat(formData.pricePerPlayer) || 0,
+          description: formData.description || ''
+        });
+      }
 
       if (result.success) {
-        toast.success('Maç başarıyla oluşturuldu!');
+        toast.success(editingMatchId ? 'Maç başarıyla güncellendi!' : 'Maç başarıyla oluşturuldu!');
         setView('list'); // Return to list view
+        setEditingMatchId(null);
         fetchMyMatches(); // Refresh list
         // Reset Form
         setFormData({
@@ -282,7 +349,17 @@ const MacOlustur = () => {
                    <p className="text-gray-600 mt-1">Katıldığın ve yönettiğin tüm maçlar</p>
                 </div>
                 <button
-                  onClick={() => setView('create')}
+                  onClick={() => {
+                    setEditingMatchId(null);
+                    setFormData({
+                        tesisId: '', tesisName: '', location: '', address: '', date: '', timeSlot: '',
+                        title: '', format: 'football', level: 'intermediate', maxPlayers: 10,
+                        pricePerPlayer: 0, description: ''
+                    });
+                    setSelectedTesis(null);
+                    setTesisSearchQuery('');
+                    setView('create');
+                  }}
                   className="px-6 py-3 bg-green-600 text-white rounded-xl shadow-lg hover:bg-green-700 transition-all flex items-center gap-2 font-bold"
                 >
                    <Plus size={20} />
@@ -360,13 +437,36 @@ const MacOlustur = () => {
                             </div>
                          </div>
                          
-                         <button
-                           onClick={() => navigate(`/mac-detay/${match.id}`)} 
-                           className="w-full md:w-auto px-6 py-3 border border-blue-200 text-blue-600 bg-blue-50/50 rounded-xl hover:bg-blue-600 hover:text-white transition-all font-bold text-sm flex items-center justify-center gap-2 group-hover:scale-105"
-                         >
-                            Detayları Gör
-                            <ArrowRight size={16} />
-                         </button>
+                          <div className="flex flex-col md:flex-row gap-2 w-full md:w-auto">
+                            <button
+                              onClick={() => navigate(`/mac-detay/${match.id}`)} 
+                              className="w-full md:w-auto px-6 py-3 border border-blue-200 text-blue-600 bg-blue-50/50 rounded-xl hover:bg-blue-600 hover:text-white transition-all font-bold text-sm flex items-center justify-center gap-2"
+                            >
+                                Detay
+                                <ArrowRight size={16} />
+                            </button>
+                            
+                            {match.organizerId === user.uid && activeTab === 'upcoming' && (
+                              <>
+                                <button
+                                  onClick={() => handleEdit(match)}
+                                  className="w-full md:w-auto px-4 py-3 border border-amber-200 text-amber-600 bg-amber-50/50 rounded-xl hover:bg-amber-600 hover:text-white transition-all font-bold text-sm flex items-center justify-center gap-2"
+                                  title="Düzenle"
+                                >
+                                  <Edit2 size={16} />
+                                  Düzenle
+                                </button>
+                                <button
+                                  onClick={() => handleDelete(match.id)}
+                                  className="w-full md:w-auto px-4 py-3 border border-red-200 text-red-600 bg-red-50/50 rounded-xl hover:bg-red-600 hover:text-white transition-all font-bold text-sm flex items-center justify-center gap-2"
+                                  title="Sil"
+                                >
+                                  <Trash2 size={16} />
+                                  Sil
+                                </button>
+                              </>
+                            )}
+                          </div>
                       </div>
                     ))
                   ) : (
@@ -399,10 +499,10 @@ const MacOlustur = () => {
                >
                  <ChevronLeft size={24} className="text-gray-600" />
                </button>
-               <div>
-                  <h2 className="text-2xl font-bold text-gray-900">Yeni Maç Oluştur</h2>
-                  <p className="text-sm text-gray-500">Oyuncu aradığın maçın detaylarını gir</p>
-               </div>
+                <div>
+                   <h2 className="text-2xl font-bold text-gray-900">{editingMatchId ? 'Maçı Düzenle' : 'Yeni Maç Oluştur'}</h2>
+                   <p className="text-sm text-gray-500">{editingMatchId ? 'Maç bilgilerini güncelleyin' : 'Oyuncu aradığın maçın detaylarını gir'}</p>
+                </div>
             </div>
 
             {/* Form */}
@@ -611,6 +711,7 @@ const MacOlustur = () => {
                       <option value="basketball">🏀 Basketbol</option>
                       <option value="tennis">🎾 Tenis</option>
                       <option value="volleyball">🏐 Voleybol</option>
+                      <option value="swimming">🏊‍♂️ Yüzme</option>
                     </select>
                   </div>
 
@@ -708,7 +809,10 @@ const MacOlustur = () => {
                 <div className="flex items-center justify-end gap-4 pt-4 border-t border-gray-200">
                   <button
                     type="button"
-                    onClick={() => setView('list')}
+                    onClick={() => {
+                        setView('list');
+                        setEditingMatchId(null);
+                    }}
                     className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
                   >
                     İptal
@@ -726,7 +830,7 @@ const MacOlustur = () => {
                     ) : (
                       <>
                         <CheckCircle size={20} />
-                        <span>Maç Oluştur</span>
+                        <span>{editingMatchId ? 'Güncelle' : 'Maç Oluştur'}</span>
                       </>
                     )}
                   </button>

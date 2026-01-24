@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
@@ -29,8 +29,9 @@ import {
 import toast from '../utils/toast';
 
 const OyuncuDetay = () => {
-  const { id } = useParams();
+  const { idOrSlug } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, userData } = useAuth();
   const [playerData, setPlayerData] = useState(null);
   const [stats, setStats] = useState(null);
@@ -42,24 +43,32 @@ const OyuncuDetay = () => {
   const [requestingContact, setRequestingContact] = useState(false);
 
   const handleMessageClick = () => {
+    const playerId = playerData?.id || idOrSlug;
+    
     if (!user) {
       toast.error('Mesaj göndermek için giriş yapmalısınız');
-      navigate('/login');
+      // Giriş yaptıktan sonra doğrudan mesajlaşma ekranına dönmesi için targetPath belirleyelim
+      const targetPath = playerId ? `/oyuncu/mesajlar?userId=${playerId}` : '/oyuncu/mesajlar';
+      navigate('/login', { state: { from: targetPath } });
       return;
     }
 
-    // Mesajlaşma sayfasına yönlendir, userId parametresi ile
-    if (id) {
-      navigate(`/oyuncu/mesajlar?userId=${id}`);
+    if (playerId) {
+      // Kullanıcı tipine göre uygun mesajlaşma paneline yönlendir
+      const basePath = userData?.userType === 'owner' ? '/saha-sahibi' : '/oyuncu';
+      navigate(`${basePath}/mesajlar?userId=${playerId}`);
     } else {
-      navigate('/oyuncu/mesajlar');
+      const basePath = userData?.userType === 'owner' ? '/saha-sahibi' : '/oyuncu';
+      navigate(`${basePath}/mesajlar`);
     }
   };
 
   const handleShareClick = async () => {
-    const shareUrl = window.location.href;
-    const shareTitle = `${playerData?.fullName || playerData?.displayName || 'Oyuncu'} Profili`;
-    const shareText = `${playerData?.fullName || playerData?.displayName || 'Oyuncu'} profilini görüntüle`;
+    const name = playerData?.fullName || playerData?.displayName || 'Oyuncu';
+    const slug = playerData?.slug || playerData?.id || idOrSlug;
+    const shareUrl = `${window.location.origin}/oyuncu-detay/${slug}`;
+    const shareTitle = `${name} | Saha Merkezi Oyuncu Profili`;
+    const shareText = `⚽ ${name} profilini incele! Saha Merkezi üzerinden birlikte maç yapabilir veya takıma davet edebilirsin.`;
 
     try {
       if (navigator.share) {
@@ -71,16 +80,14 @@ const OyuncuDetay = () => {
       } else {
         // Fallback: URL'yi kopyala
         await navigator.clipboard.writeText(shareUrl);
-        toast.success('Link panoya kopyalandı!');
+        toast.success('Profil linki kopyalandı!');
       }
     } catch (error) {
-      // Kullanıcı paylaşımı iptal etti veya hata oluştu
       if (error.name !== 'AbortError') {
         console.error('Paylaşım hatası:', error);
-        // Fallback: URL'yi kopyala
         try {
           await navigator.clipboard.writeText(shareUrl);
-          toast.success('Link panoya kopyalandı!');
+          toast.success('Profil linki kopyalandı!');
         } catch (clipboardError) {
           toast.error('Link kopyalanamadı');
         }
@@ -89,16 +96,41 @@ const OyuncuDetay = () => {
   };
 
   useEffect(() => {
-    if (id) {
-      loadPlayerData();
-      if (user && user.uid !== id) {
-        checkRequestStatus();
+    if (playerData) {
+      const name = playerData.fullName || playerData.displayName || 'Oyuncu';
+      const title = `${name} Profili | Saha Merkezi`;
+      document.title = title;
+
+      // Update Meta Tags
+      const updateMeta = (selector, attr, content) => {
+        const el = document.querySelector(selector);
+        if (el) el.setAttribute(attr, content);
+      };
+
+      updateMeta('meta[name="description"]', 'content', `${name} oyuncu profilini ve istatistiklerini görüntüle. Saha Merkezi ile hemen maç bul!`);
+      updateMeta('meta[property="og:title"]', 'content', title);
+      updateMeta('meta[property="og:description"]', 'content', `${name} oyuncu profilini görüntüle.`);
+      if (playerData.photoURL) {
+        updateMeta('meta[property="og:image"]', 'content', playerData.photoURL);
+        updateMeta('meta[property="twitter:image"]', 'content', playerData.photoURL);
       }
     }
-  }, [id, user]);
+  }, [playerData]);
+
+  useEffect(() => {
+    if (idOrSlug) {
+      loadPlayerData();
+    }
+  }, [idOrSlug]);
+
+  useEffect(() => {
+    if (playerData?.id && user && user.uid !== playerData.id) {
+      checkRequestStatus();
+    }
+  }, [playerData?.id, user]);
 
   const checkRequestStatus = async () => {
-    const result = await checkContactRequestStatus(user.uid, id);
+    const result = await checkContactRequestStatus(user.uid, playerData.id);
     if (result.success) {
       setContactRequestStatus(result.status);
     }
@@ -107,19 +139,15 @@ const OyuncuDetay = () => {
   const handleRequestContact = async () => {
     if (!user) {
       toast.error('İletişim bilgilerini görmek için giriş yapmalısınız');
-      navigate('/login');
+      navigate('/login', { state: { from: location.pathname } });
       return;
     }
 
-    // Üyelik şartı kontrolü (Sadece player'lar için, admin ve owner muaf tutulabilir veya owner da dahil edilebilir)
-    if (userData?.userType === 'player' && userData?.subscriptionStatus !== 'active') {
-       toast.error('İletişim talebi göndermek için Premium üye olmalısınız');
-       navigate('/pricing');
-       return;
-    }
+    const playerId = playerData?.id || idOrSlug;
+    if (!playerId) return;
 
     setRequestingContact(true);
-    const result = await sendContactRequest(user.uid, id, user.displayName || 'Bir oyuncu');
+    const result = await sendContactRequest(user.uid, playerId, userData?.fullName || user.displayName || 'Bir oyuncu');
     if (result.success) {
       toast.success('İletişim talebi gönderildi');
       setContactRequestStatus('pending');
@@ -130,34 +158,36 @@ const OyuncuDetay = () => {
   };
 
   const loadPlayerData = async () => {
-    if (!id) return;
+    if (!idOrSlug) return;
     
     setLoading(true);
     try {
       // Kullanıcı verilerini getir
-      const userResult = await getUserData(id);
+      const userResult = await getUserData(idOrSlug);
       if (!userResult.success) {
         toast.error('Oyuncu bulunamadı');
-        navigate('/yakin-sahalar');
+        navigate('/oyuncu-bul');
         return;
       }
 
-      setPlayerData(userResult.data);
+      const player = userResult.data;
+      setPlayerData(player);
+      const playerId = player.id;
 
       // İstatistikleri getir
-      const statsResult = await getPlayerStats(id);
+      const statsResult = await getPlayerStats(playerId);
       if (statsResult.success) {
         setStats(statsResult.data);
       }
 
       // Son maçları getir
-      const matchesResult = await getPlayerReservations(id, 10);
+      const matchesResult = await getPlayerReservations(playerId, 10);
       if (matchesResult.success) {
         setRecentMatches(matchesResult.data);
       }
 
       // Birlikte oynadığı oyuncuları getir
-      const playedWithResult = await getPlayerPlayedWith(id);
+      const playedWithResult = await getPlayerPlayedWith(playerId);
       if (playedWithResult.success) {
         setPlayedWith(playedWithResult.data);
       }
@@ -590,14 +620,14 @@ const OyuncuDetay = () => {
             <div className="bg-white rounded-xl shadow-sm p-6 relative overflow-hidden">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-xl font-bold text-gray-900">İletişim</h2>
-                {(user?.uid === id || contactRequestStatus === 'accepted') ? (
+                {(user?.uid === playerData?.id || contactRequestStatus === 'accepted') ? (
                   <Eye className="w-5 h-5 text-green-500" />
                 ) : (
                   <EyeOff className="w-5 h-5 text-gray-400" />
                 )}
               </div>
 
-              {(user?.uid === id || contactRequestStatus === 'accepted') ? (
+              {(user?.uid === playerData?.id || contactRequestStatus === 'accepted') ? (
                 <div className="space-y-3">
                   {playerData.email && (
                     <div className="flex items-center gap-3 text-gray-600">
@@ -659,7 +689,7 @@ const OyuncuDetay = () => {
                       </button>
                     )}
                     <p className="text-[10px] text-gray-400 text-center mt-3">
-                      KVKK gereği iletişim bilgileri gizlenmiştir. Görmek için talep göndermeli ve üyelik şartlarını sağlamalısınız.
+                      KVKK gereği iletişim bilgileri gizlenmiştir. Görmek için talep göndermelisiniz.
                     </p>
                   </div>
                 </div>

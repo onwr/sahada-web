@@ -1,4 +1,3 @@
-import { auth } from '../config/firebase';
 
 // CDN API konfigürasyonu
 const CDN_CONFIG = {

@@ -12,7 +12,7 @@ import {
     Search, ExternalLink, EyeOff, Clock, Loader2, CheckCircle, Image, Upload, Link,
     Heading, Type, List, MousePointer2
 } from 'lucide-react';
-import toast from 'react-hot-toast';
+import toast from '../../utils/toast';
 
 const Pages = () => {
     const [pages, setPages] = useState([]);
@@ -346,13 +346,13 @@ const PageEditor = ({ page, onClose, onSave }) => {
 
         setUploadingImage(true);
         try {
-            const result = await uploadImage(file, 'pages', 'admin');
+            const result = await uploadImage(file, 'general', 'admin');
              if (result.success) {
                 const url = result.data?.url || result.data;
                 setFormData(prev => ({ ...prev, image: url }));
                 toast.success("Görsel yüklendi");
              } else {
-                 toast.error("Görsel yüklenemedi: " + result.error);
+                 toast.error("Görsel yüklenemedi: " + (result.error || "Bilinmeyen hata"));
              }
         } catch (error) {
             console.error(error);
@@ -368,13 +368,13 @@ const PageEditor = ({ page, onClose, onSave }) => {
 
         setUploadingContentImage(true);
         try {
-            const result = await uploadImage(file, 'pages/content', 'admin');
+            const result = await uploadImage(file, 'general', 'admin');
             if (result.success) {
                 const url = result.data?.url || result.data;
                 insertSnippet(`<img src="${url}" alt="Görsel" class="w-full h-auto rounded-2xl shadow-lg my-8" />\n`);
                 toast.success("İçerik görseli eklendi");
             } else {
-                toast.error("Görsel yüklenemedi");
+                toast.error("Görsel yüklenemedi: " + (result.error || "Bilinmeyen hata"));
             }
         } catch (error) {
             console.error(error);

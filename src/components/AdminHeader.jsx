@@ -2,18 +2,12 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { 
-  Bell, 
-  Search, 
-  ChevronDown,
-  LogOut,
-  Settings,
-  User,
-  AlertCircle,
-  MessageSquare,
-  Building2
+  Bell, Search, ChevronDown, LogOut, Settings, User, 
+  AlertCircle, MessageSquare, Building2, Check, ExternalLink 
 } from 'lucide-react';
-import { collection, query, onSnapshot, where } from 'firebase/firestore';
+import { collection, query, onSnapshot, where, doc, updateDoc, writeBatch } from 'firebase/firestore';
 import { db } from '../config/firebase';
+import toast from '../utils/toast';
 
 const AdminHeader = ({ title, description, children, showSearch, onSearch, searchQuery }) => {
   const { userData, logout } = useAuth();
@@ -61,7 +55,9 @@ const AdminHeader = ({ title, description, children, showSearch, onSearch, searc
             ...complaints.map(c => ({ ...c, type: 'complaint', date: c.createdAt?.toDate?.() || new Date() })),
             ...tickets.map(t => ({ ...t, type: 'ticket', date: t.createdAt?.toDate?.() || new Date() })),
             ...tesis.map(t => ({ ...t, type: 'tesis', date: t.createdAt?.toDate?.() || new Date() }))
-        ].sort((a, b) => b.date - a.date);
+        ]
+        .filter(i => !i.dismissedByAdmin) // Sadece admin tarafından kapatılmamış olanları göster
+        .sort((a, b) => b.date - a.date);
         
         setNotifications(all);
         setUnreadCount(all.length);
@@ -93,6 +89,35 @@ const AdminHeader = ({ title, description, children, showSearch, onSearch, searc
     };
   }, []);
 
+  const markAsRead = async (item) => {
+    try {
+        const collName = item.type === 'complaint' ? 'complaints' : item.type === 'ticket' ? 'tickets' : 'tesisler';
+        const docRef = doc(db, collName, item.id);
+        await updateDoc(docRef, { dismissedByAdmin: true });
+        toast.success('Bildirim okundu olarak işaretlendi');
+    } catch (error) {
+        console.error('Error marking admin notification as read:', error);
+        toast.error('Bildirim güncellenirken hata oluştu');
+    }
+  };
+
+  const markAllAsRead = async () => {
+    if (notifications.length === 0) return;
+    try {
+        const batch = writeBatch(db);
+        notifications.forEach(item => {
+            const collName = item.type === 'complaint' ? 'complaints' : item.type === 'ticket' ? 'tickets' : 'tesisler';
+            batch.update(doc(db, collName, item.id), { dismissedByAdmin: true });
+        });
+        await batch.commit();
+        setIsNotificationsOpen(false);
+        toast.success('Tüm bildirimler okundu olarak işaretlendi');
+    } catch (error) {
+        console.error('Error marking all notifications as read:', error);
+        toast.error('İşlem sırasında hata oluştu');
+    }
+  };
+
   const handleLogout = async () => {
     try {
       await logout();
@@ -121,8 +146,16 @@ const AdminHeader = ({ title, description, children, showSearch, onSearch, searc
   };
 
   const getNotificationText = (item) => {
+      const cleanText = (t) => {
+        if (!t || typeof t !== 'string') return '';
+        return t
+          .replace(/Ã¶/g, 'ö').replace(/Ã§/g, 'ç').replace(/ÅŸ/g, 'ş').replace(/ÄŸ/g, 'ğ')
+          .replace(/Ã¼/g, 'ü').replace(/Ä±/g, 'ı').replace(/Ä°/g, 'İ').replace(/Ã–/g, 'Ö')
+          .replace(/Ã‡/g, 'Ç').replace(/Åž/g, 'Ş').replace(/Äž/g, 'Ğ').replace(/Ãœ/g, 'Ü');
+      };
+
       switch(item.type) {
-          case 'complaint': return `Yeni şikayet: ${item.title || 'Şikayet'}`;
+          case 'complaint': return `Yeni şikayet: ${cleanText(item.title) || 'Şikayet'}`;
           case 'ticket': return `Yeni ticket: ${item.title || 'Ticket'}`;
           case 'tesis': return `Onay bekleyen tesis: ${item.name || 'Tesis'}`;
           default: return 'Yeni bildirim';
@@ -130,7 +163,7 @@ const AdminHeader = ({ title, description, children, showSearch, onSearch, searc
   };
 
   return (
-    <header className="bg-white shadow-sm border-b px-6 py-4">
+    <header className="bg-white shadow-sm border-b px-6 py-4 sticky top-0 z-[1001]">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl md:text-2xl font-bold text-gray-900">{title}</h1>
@@ -173,34 +206,65 @@ const AdminHeader = ({ title, description, children, showSearch, onSearch, searc
                   <h3 className="font-semibold text-gray-900">Bildirimler</h3>
                   {unreadCount > 0 && <span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full font-medium">{unreadCount} Yeni</span>}
                 </div>
-                <div className="max-h-96 overflow-y-auto">
+                <div className="max-h-96 overflow-y-auto custom-scrollbar">
                     {notifications.length > 0 ? (
-                        notifications.map((item, index) => (
-                            <div 
-                                key={item.id + index}
-                                onClick={() => {
-                                    navigate(getNotificationLink(item.type));
-                                    setIsNotificationsOpen(false);
-                                }}
-                                className="px-4 py-3 hover:bg-gray-50 border-b border-gray-100 cursor-pointer transition-colors group"
-                            >
-                                <div className="flex items-start gap-3">
-                                    <div className="mt-1 flex-shrink-0 group-hover:scale-110 transition-transform">
-                                        {getNotificationIcon(item.type)}
-                                    </div>
-                                    <div>
-                                        <p className="text-sm text-gray-800 font-medium line-clamp-2">{getNotificationText(item)}</p>
-                                        <p className="text-xs text-gray-500 mt-1">
-                                            {item.date?.toLocaleString('tr-TR')}
-                                        </p>
+                        <>
+                            {notifications.map((item, index) => (
+                                <div 
+                                    key={item.id + index}
+                                    className="px-4 py-3 hover:bg-gray-50 border-b border-gray-100 transition-colors group relative"
+                                >
+                                    <div className="flex items-start gap-3">
+                                        <div className="mt-1 flex-shrink-0">
+                                            {getNotificationIcon(item.type)}
+                                        </div>
+                                        <div className="flex-1 min-w-0 pr-8">
+                                            <p className="text-sm text-gray-800 font-medium line-clamp-2">{getNotificationText(item)}</p>
+                                            <p className="text-[10px] text-gray-500 mt-1 uppercase tracking-wider font-bold">
+                                                {item.date?.toLocaleString('tr-TR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                                            </p>
+                                            <div className="flex items-center gap-3 mt-2">
+                                                <button 
+                                                    onClick={() => {
+                                                        navigate(getNotificationLink(item.type));
+                                                        setIsNotificationsOpen(false);
+                                                    }}
+                                                    className="text-[11px] font-bold text-green-600 hover:text-green-700 flex items-center gap-1"
+                                                >
+                                                    <ExternalLink size={12} /> Detaya Git
+                                                </button>
+                                            </div>
+                                        </div>
+                                        
+                                        <button 
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                markAsRead(item);
+                                            }}
+                                            className="absolute right-4 top-4 p-1.5 text-gray-300 hover:text-green-600 hover:bg-green-50 rounded-lg transition-all"
+                                            title="Okundu İşaretle"
+                                        >
+                                            <Check size={16} strokeWidth={3} />
+                                        </button>
                                     </div>
                                 </div>
+                            ))}
+                            <div className="p-2 border-t border-gray-100 bg-white sticky bottom-0">
+                                <button 
+                                    onClick={markAllAsRead}
+                                    className="w-full py-2 text-xs font-bold text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-all uppercase tracking-widest"
+                                >
+                                    Tümünü Okundu İşaretle
+                                </button>
                             </div>
-                        ))
+                        </>
                     ) : (
-                        <div className="px-4 py-8 text-center text-gray-500">
-                            <Bell className="w-8 h-8 mx-auto mb-2 text-gray-300" />
-                            <p className="text-sm">Henüz bildirim yok</p>
+                        <div className="px-4 py-8 text-center text-gray-500 flex flex-col items-center">
+                            <div className="w-12 h-12 bg-gray-50 rounded-full flex items-center justify-center mb-3">
+                                <Bell className="w-6 h-6 text-gray-300" />
+                            </div>
+                            <p className="text-sm font-medium">Bütün işler tamam!</p>
+                            <p className="text-xs text-gray-400 mt-1">Bekleyen herhangi bir işlem yok.</p>
                         </div>
                     )}
                 </div>

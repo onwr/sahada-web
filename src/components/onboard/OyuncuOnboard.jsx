@@ -19,6 +19,7 @@ import {
   Loader2,
   MessageCircle,
 } from 'lucide-react';
+import { updateProfile } from 'firebase/auth';
 import { useAuth } from '../../contexts/AuthContext';
 import { updateUserData } from '../../services/authService';
 import { uploadProfileImage, getImageUrl, getOptimizedImageUrl } from '../../services/cdnService';
@@ -453,6 +454,7 @@ const OyuncuOnboard = () => {
       const profileData = {
         ...formData,
         profilePhoto: profileImageData,
+        photoURL: profileImageData?.url || (typeof formData.profilePhoto === 'string' ? formData.profilePhoto : formData.profilePhoto?.url) || '', //photoURL alanını da ekleyelim, sidebar buna bakıyor
         agreements,
         onboardingCompleted: true,
         profileCompleted: true,
@@ -476,6 +478,18 @@ const OyuncuOnboard = () => {
         // Onboarding tamamlandı olarak işaretle (önce bunu yap)
         if (setNeedsOnboarding) {
           setNeedsOnboarding(false);
+        }
+
+        // Firebase Auth profilini de güncelle
+        const finalPhotoURL = profileImageData?.url || formData.profilePhoto;
+        if (finalPhotoURL) {
+          try {
+            await updateProfile(user, {
+              photoURL: finalPhotoURL
+            });
+          } catch (authError) {
+            console.error('Auth profile update error:', authError);
+          }
         }
         
         // Context'i güncelle

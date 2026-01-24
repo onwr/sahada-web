@@ -71,6 +71,7 @@ const sportIcons = {
   'Basketbol': createCustomIcon('#f97316', '🏀'),
   'Tenis': createCustomIcon('#3b82f6', '🎾'),
   'Voleybol': createCustomIcon('#a855f7', '🏐'),
+  'Yüzme': createCustomIcon('#0ea5e9', '🏊‍♂️'),
   'default': createCustomIcon('#6b7280', '📍'),
 };
 
@@ -652,6 +653,7 @@ const OyuncuBul = () => {
       case 'basketball': return '🏀';
       case 'tennis': return '🎾';
       case 'volleyball': return '🏐';
+      case 'swimming': return '🏊‍♂️';
       default: return '⚽';
     }
   };
@@ -662,6 +664,7 @@ const OyuncuBul = () => {
       case 'basketball': return 'Basketbol';
       case 'tennis': return 'Tenis';
       case 'volleyball': return 'Voleybol';
+      case 'swimming': return 'Yüzme';
       default: return format;
     }
   };
@@ -822,6 +825,7 @@ const OyuncuBul = () => {
                       <option value="basketball">🏀 Basketbol</option>
                       <option value="tennis">🎾 Tenis</option>
                       <option value="volleyball">🏐 Voleybol</option>
+                      <option value="swimming">🏊‍♂️ Yüzme</option>
                     </select>
 
                     <select
@@ -1253,8 +1257,10 @@ const OyuncuBul = () => {
 
                       {/* Location */}
                       <div className="flex items-center text-sm text-gray-600 mb-2">
-                        <MapPin className="w-4 h-4 mr-1" />
-                        <span className="truncate">{match.location || match.tesisName || 'Konum belirtilmemiş'}</span>
+                        <MapPin className="w-4 h-4 mr-1 text-green-600" />
+                        <span className="truncate">
+                          {match.tesisName ? match.location || match.tesisName : (match.location?.includes('(') ? 'Seçilen Konum 📍' : match.location || 'Konum belirtilmemiş')}
+                        </span>
                       </div>
 
                       {/* Date & Time */}

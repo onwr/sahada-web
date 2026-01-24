@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   MessageSquare, ThumbsUp, UserPlus, MapPin, Calendar, Activity,
   TrendingUp, Rocket, Trophy, Share2, ImageIcon, BarChart2, Star,
-  Send, MoreHorizontal, Heart
+  Send, MoreHorizontal, Heart, Search, Edit, Loader2, ChevronDown
 } from 'lucide-react';
 import { X, Plus, Trash2 } from 'lucide-react';
 import { uploadImage } from '../services/cdnService';
@@ -40,10 +40,11 @@ const playNotificationSound = () => {
     }
 }; 
 
-import { getPlayers } from '../services/firestoreService';
+import { getPlayers, getAllTesisler, getCommunityLiveStats } from '../services/firestoreService';
 import { 
   getPosts, 
   createPost, 
+  updatePost,
   toggleLikePost, 
   checkUserLike, 
   addComment, 
@@ -58,8 +59,12 @@ import {
 const formatTimestamp = (date) => {
   if (!date) return '';
   const now = new Date();
-  const postDate = new Date(date);
-  const diff = now.getTime() - postDate.getTime(); // Use getTime() for milliseconds
+  // Firestore Timestamp handling
+  const postDate = date?.toDate ? date.toDate() : new Date(date);
+  
+  if (!(postDate instanceof Date) || isNaN(postDate.getTime())) return 'Az önce';
+  
+  const diff = now.getTime() - postDate.getTime();
   const minutes = Math.floor(diff / 60000);
   const hours = Math.floor(minutes / 60);
   const days = Math.floor(hours / 24);
@@ -114,9 +119,7 @@ const WEEKLY_MVPS = [
   { id: 3, name: 'Alex de Souza', team: 'Efsaneler', goals: 15, matches: 6, avatar: 'https://ui-avatars.com/api/?name=Alex+D&background=FCB900&color=fff' },
 ];
 
-// --- COMPONENT: POST CARD ---
-// --- COMPONENT: POST CARD ---
-const PostCard = ({ post, isLiked, commentsOpen, toggleLike, toggleComments, handleShare, currentUser, commentInputs, setCommentInputs, handleCreateComment, postComments, votedPolls, handleVote, handleDeletePost, handleDeleteComment }) => {
+  const PostCard = ({ post, isLiked, commentsOpen, toggleLike, toggleComments, handleShare, currentUser, commentInputs, setCommentInputs, handleCreateComment, postComments, votedPolls, handleVote, handleDeletePost, handleDeleteComment, handleEditClick }) => {
     const isAuthor = currentUser?.uid === post.author.id;
 
     return (
@@ -144,16 +147,27 @@ const PostCard = ({ post, isLiked, commentsOpen, toggleLike, toggleComments, han
             {post.type === PostType.PLAYER_SEARCH && <span className="text-xs font-bold text-red-600 bg-red-50 px-2 py-1 rounded">OYUNCU ARANIYOR</span>}
             {post.type === PostType.REVIEW && <span className="text-xs font-bold text-yellow-600 bg-yellow-50 px-2 py-1 rounded">İNCELEME</span>}
             {post.type === PostType.SCOREBOARD && <span className="text-xs font-bold text-green-600 bg-green-50 px-2 py-1 rounded">MAÇ SONUCU</span>}
+            {post.type === PostType.TOURNAMENT && <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded">TURNUVA</span>}
+            {post.type === PostType.NEWS && <span className="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded">HABER</span>}
             {post.type === PostType.GENERAL && <span className="text-xs font-bold text-gray-600 bg-gray-50 px-2 py-1 rounded">PAYLAŞIM</span>}
             
             {isAuthor && (
-                <button 
-                    onClick={() => handleDeletePost(post.id)} 
-                    className="text-gray-400 hover:text-red-500 transition-colors p-1"
-                    title="Paylaşımı Sil"
-                >
-                    <Trash2 size={18} />
-                </button>
+                <div className="flex gap-1">
+                    <button 
+                        onClick={() => handleEditClick(post)} 
+                        className="text-gray-400 hover:text-blue-500 transition-colors p-1"
+                        title="Düzelt"
+                    >
+                        <Edit size={18} />
+                    </button>
+                    <button 
+                        onClick={() => handleDeletePost(post.id)} 
+                        className="text-gray-400 hover:text-red-500 transition-colors p-1"
+                        title="Paylaşımı Sil"
+                    >
+                        <Trash2 size={18} />
+                    </button>
+                </div>
             )}
             {!isAuthor && (
                  <button className="text-gray-400 hover:text-gray-600"><MoreHorizontal size={20} /></button>
@@ -313,6 +327,68 @@ const PostCard = ({ post, isLiked, commentsOpen, toggleLike, toggleComments, han
                  </div>
              </div>
           )}
+
+          {/* TOURNAMENT RENDER */}
+          {post.type === PostType.TOURNAMENT && (
+            <div className="bg-gradient-to-br from-indigo-50 to-blue-50 border border-indigo-100 rounded-xl p-5 mt-3 shadow-sm">
+              <div className="flex justify-between items-start mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 bg-indigo-600 text-white rounded-xl flex items-center justify-center shadow-lg shadow-indigo-200">
+                    <Trophy size={24} />
+                  </div>
+                  <div>
+                    <h4 className="font-black text-indigo-900 leading-tight">{post.tournamentName || post.title}</h4>
+                    <p className="text-xs text-indigo-600 font-bold uppercase tracking-wider">{post.tournamentType || 'Genel Turnuva'}</p>
+                  </div>
+                </div>
+                {post.prizePool && (
+                  <div className="text-right">
+                    <span className="block text-[10px] text-indigo-400 font-bold uppercase">Ödül Havuzu</span>
+                    <span className="text-lg font-black text-green-600">{post.prizePool}</span>
+                  </div>
+                )}
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4 mb-4">
+                <div className="flex items-center gap-2 text-sm text-slate-600">
+                  <Calendar size={16} className="text-indigo-500" />
+                  <span className="font-semibold">{post.matchDate || post.tournamentDate || 'Tarih Belirtilmedi'}</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm text-slate-600">
+                  <MapPin size={16} className="text-indigo-500" />
+                  <span className="font-semibold">{post.location || post.facilityName || 'Konum Belirtilmedi'}</span>
+                </div>
+              </div>
+              
+              <button className="w-full py-3 bg-indigo-600 text-white font-black rounded-xl shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition-all flex items-center justify-center gap-2 group">
+                Kayıt Ol <Rocket size={18} className="group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
+              </button>
+            </div>
+          )}
+
+          {/* NEWS RENDER */}
+          {post.type === PostType.NEWS && (
+            <div className="mt-3">
+               <div className="relative rounded-xl overflow-hidden border border-gray-100 shadow-sm group bg-white">
+                 {post.image && (
+                   <div className="h-48 overflow-hidden">
+                     <img src={post.image} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" alt="News" />
+                   </div>
+                 )}
+                 <div className="p-4">
+                   <div className="flex items-center gap-2 mb-2">
+                      <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-[10px] font-bold rounded uppercase">Haber / Gündem</span>
+                      <span className="text-[10px] text-gray-400 font-medium">{formatTimestamp(post.createdAt)}</span>
+                   </div>
+                   <h4 className="font-bold text-gray-900 mb-2">{post.title}</h4>
+                   <p className="text-gray-600 text-sm leading-relaxed line-clamp-3 mb-3">{post.content}</p>
+                   <button className="text-blue-600 text-sm font-bold flex items-center gap-1 hover:gap-2 transition-all">
+                     Haberin Devamı <TrendingUp size={16} />
+                   </button>
+                 </div>
+               </div>
+            </div>
+          )}
         </div>
 
         {/* Action Footer */}
@@ -439,6 +515,9 @@ const Community = () => {
   const [isReviewMode, setIsReviewMode] = useState(false);
   const [reviewDetails, setReviewDetails] = useState({ facilityName: '', rating: 0 });
 
+  const [isTournamentMode, setIsTournamentMode] = useState(false);
+  const [isNewsMode, setIsNewsMode] = useState(false);
+
   // Interaction State
   const [likedPosts, setLikedPosts] = useState(new Set());
   const [openComments, setOpenComments] = useState(new Set());
@@ -449,13 +528,38 @@ const Community = () => {
   const [trendingTopics, setTrendingTopics] = useState([]);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [topPlayers, setTopPlayers] = useState([]);
-  const [communityStats, setCommunityStats] = useState({ totalPosts: 0, activeUsers: 0 });
+  const [communityStats, setCommunityStats] = useState({ 
+    totalPosts: 0, 
+    activeUsers: 850,
+    newMatches: 142,
+    liveMatches: 28 
+  });
+  const [allTesisler, setAllTesisler] = useState([]);
+  const [loadingTesisler, setLoadingTesisler] = useState(false);
+  const [tesisSearchQuery, setTesisSearchQuery] = useState('');
+  const [showTesisDropdown, setShowTesisDropdown] = useState(false);
+  const [editingPostId, setEditingPostId] = useState(null);
 
   // Load Posts and Dynamic Data
   useEffect(() => {
     fetchPosts();
     fetchDynamicData();
+    fetchAllTesisler();
   }, [currentUser]); 
+
+  const fetchAllTesisler = async () => {
+    setLoadingTesisler(true);
+    try {
+      const result = await getAllTesisler();
+      if (result.success) {
+        setAllTesisler(result.data);
+      }
+    } catch (error) {
+      console.error('Error fetching tesisler:', error);
+    } finally {
+      setLoadingTesisler(false);
+    }
+  };
 
   const fetchDynamicData = async () => {
     // Top Players
@@ -466,11 +570,18 @@ const Community = () => {
     }
     
     // Stats
-    // For now we use actual post count and a mock active users
-    setCommunityStats({
-      totalPosts: posts.length || 0,
-      activeUsers: Math.floor(Math.random() * 50) + 10 // Mock dynamic feeling
-    });
+    try {
+        const statsResult = await getCommunityLiveStats();
+        
+        setCommunityStats({
+          totalPosts: posts.length || 0,
+          activeUsers: statsResult.data?.onlineUsers || 850,
+          newMatches: statsResult.data?.newMatches || 142,
+          liveMatches: statsResult.data?.liveMatches || 28
+        });
+    } catch (err) {
+        console.error('Error fetching live stats:', err);
+    }
   };
 
   // Sync Creation Mode with Active Tab
@@ -487,6 +598,10 @@ const Community = () => {
         setIsPollMode(true);
     } else if (activeTab === 'REVIEWS') {
         setIsReviewMode(true);
+    } else if (activeTab === 'TOURNAMENTS') {
+        setIsTournamentMode(true);
+    } else if (activeTab === 'NEWS') {
+        setIsNewsMode(true);
     }
   }, [activeTab]);
 
@@ -494,7 +609,11 @@ const Community = () => {
     setLoading(true);
     const result = await getPosts(50); // Fetch last 50 posts
     if (result.success) {
-      const sortedPosts = result.data.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      const sortedPosts = result.data.sort((a, b) => {
+        const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt);
+        const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt);
+        return dateB - dateA;
+      });
       setPosts(sortedPosts);
       
       // Calculate Trends
@@ -540,6 +659,8 @@ const Community = () => {
     if (activeTab === 'RESULTS') return posts.filter(p => p.type === PostType.SCOREBOARD);
     if (activeTab === 'POLLS') return posts.filter(p => p.type === PostType.POLL);
     if (activeTab === 'REVIEWS') return posts.filter(p => p.type === PostType.REVIEW);
+    if (activeTab === 'TOURNAMENTS') return posts.filter(p => p.type === PostType.TOURNAMENT);
+    if (activeTab === 'NEWS') return posts.filter(p => p.type === PostType.NEWS);
     return posts;
   }, [posts, activeTab]);
 
@@ -548,6 +669,8 @@ const Community = () => {
       if (isPollMode) return { label: 'Anket Oluşturuluyor', placeholder: 'Anket sorusu nedir?', color: 'text-purple-600', bg: 'bg-purple-50', icon: BarChart2 };
       if (isMatchMode) return { label: 'Maç Sonucu Paylaşılıyor', placeholder: 'Maç hakkında bir şeyler yaz...', color: 'text-green-600', bg: 'bg-green-50', icon: Trophy };
       if (isReviewMode) return { label: 'Saha İncelemesi Yapılıyor', placeholder: 'Deneyimlerin nasıldı?', color: 'text-yellow-600', bg: 'bg-yellow-50', icon: Star };
+      if (isTournamentMode) return { label: 'Turnuva Tanıtımı', placeholder: 'Turnuva detaylarını anlat...', color: 'text-indigo-600', bg: 'bg-indigo-50', icon: Trophy };
+      if (isNewsMode) return { label: 'Haber Paylaşımı', placeholder: 'Spor dünyasından son gelişmeler...', color: 'text-blue-600', bg: 'bg-blue-50', icon: TrendingUp };
       return { label: 'Genel Paylaşım', placeholder: 'Meydan\'da neler oluyor? Bir şeyler paylaş...', color: 'text-gray-500', bg: 'bg-gray-50', icon: MessageSquare };
   };
 
@@ -570,9 +693,25 @@ const Community = () => {
       setIsMatchMode(!isMatchMode);
       if(!isMatchMode) { setIsPollMode(false); setIsReviewMode(false); setShowLocationInput(false); }
   };
-  const toggleReviewMode = () => {
-      setIsReviewMode(!isReviewMode);
-      if(!isReviewMode) { setIsPollMode(false); setIsMatchMode(false); setShowLocationInput(false); }
+   const toggleReviewMode = () => {
+       setIsReviewMode(!isReviewMode);
+       if(!isReviewMode) { 
+           setIsPollMode(false); 
+           setIsMatchMode(false); 
+           setIsTournamentMode(false); 
+           setIsNewsMode(false); 
+           setShowLocationInput(false); 
+           setTesisSearchQuery('');
+           setShowTesisDropdown(false);
+       }
+   };
+  const toggleTournamentMode = () => {
+      setIsTournamentMode(!isTournamentMode);
+      if(!isTournamentMode) { setIsPollMode(false); setIsMatchMode(false); setIsReviewMode(false); setIsNewsMode(false); setShowLocationInput(false); }
+  };
+  const toggleNewsMode = () => {
+      setIsNewsMode(!isNewsMode);
+      if(!isNewsMode) { setIsPollMode(false); setIsMatchMode(false); setIsReviewMode(false); setIsTournamentMode(false); setShowLocationInput(false); }
   };
   const toggleLocationInput = () => {
       setShowLocationInput(!showLocationInput);
@@ -597,8 +736,70 @@ const Community = () => {
       }
   };
 
+  const handleEditClick = (post) => {
+    setEditingPostId(post.id);
+    setNewPostContent(post.content || '');
+    
+    // Reset modes
+    setIsPollMode(false);
+    setIsMatchMode(false);
+    setIsReviewMode(false);
+    
+    if (post.type === PostType.POLL) {
+        setIsPollMode(true);
+        setPollOptions(post.pollOptions.map(opt => ({ text: opt.label })));
+    } else if (post.type === PostType.SCOREBOARD) {
+        setIsMatchMode(true);
+        const [hScore, aScore] = (post.score || '0 - 0').split(' - ');
+        setMatchDetails({
+            homeTeam: post.homeTeam,
+            awayTeam: post.awayTeam,
+            homeScore: hScore,
+            awayScore: aScore,
+            mvp: post.mvp
+        });
+    } else if (post.type === PostType.REVIEW) {
+        setIsReviewMode(true);
+        setReviewDetails({
+            facilityName: post.facilityName,
+            facilityId: post.facilityId,
+            rating: post.rating
+        });
+    } else if (post.type === PostType.TOURNAMENT) {
+        setIsTournamentMode(true);
+    } else if (post.type === PostType.NEWS) {
+        setIsNewsMode(true);
+    }
+    
+    if (post.location) {
+        setShowLocationInput(true);
+        setLocationText(post.location);
+    }
+    
+    // Scroll to Top
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleCancelEdit = () => {
+    setEditingPostId(null);
+    setNewPostContent('');
+    setSelectedImage(null);
+    setIsPollMode(false);
+    setIsMatchMode(false);
+    setIsReviewMode(false);
+    setIsTournamentMode(false);
+    setIsNewsMode(false);
+    setPollOptions([{ text: '' }, { text: '' }]);
+    setMatchDetails({ homeTeam: '', awayTeam: '', homeScore: '', awayScore: '', mvp: '' });
+    setReviewDetails({ facilityName: '', rating: 0 });
+    setTesisSearchQuery('');
+    setShowTesisDropdown(false);
+    setShowLocationInput(false);
+    setLocationText('');
+  };
+
   const handlePostSubmit = async () => {
-    if (!newPostContent.trim() && !selectedImage && !isPollMode && !isMatchMode && !isReviewMode) return;
+    if (!newPostContent.trim() && !selectedImage && !isPollMode && !isMatchMode && !isReviewMode && !isTournamentMode && !isNewsMode) return;
 
     if (!currentUser) {
         setShowAuthModal(true);
@@ -658,26 +859,43 @@ const Community = () => {
         };
     } else if (isReviewMode) {
         if (!reviewDetails.facilityName || reviewDetails.rating === 0) {
-             toast.error('Lütfen saha ismi ve puanlama giriniz.');
-             playNotificationSound();
-             setIsPosting(false);
-             return;
+            toast.error('Lütfen bir saha seçin ve puan verin.');
+            playNotificationSound();
+            setIsPosting(false);
+            return;
         }
         finalPostType = PostType.REVIEW;
         extraData = {
             facilityName: reviewDetails.facilityName,
+            facilityId: reviewDetails.facilityId || null,
             rating: reviewDetails.rating,
-            reviewText: newPostContent 
+            reviewText: newPostContent
         };
+    } else if (isTournamentMode) {
+        finalPostType = PostType.TOURNAMENT;
+        extraData = {
+            tournamentName: newPostContent.split('\n')[0] || 'Yeni Turnuva',
+            tournamentType: 'Topluluk Turnuvası',
+            prizePool: 'Ödüllü',
+            matchDate: locationText ? 'Yakında' : new Date().toLocaleDateString('tr-TR'),
+        };
+    } else if (isNewsMode) {
+        finalPostType = PostType.NEWS;
     }
 
-    // 3. Construct Post Object
-    const defaultTitle = isPollMode ? 'Anket: ' + newPostContent : 
-                         isMatchMode ? 'Maç Sonucu: ' + matchDetails.homeTeam + ' vs ' + matchDetails.awayTeam :
-                         isReviewMode ? 'Saha İncelemesi: ' + reviewDetails.facilityName :
-                         (newPostContent.length > 20 ? newPostContent.substring(0, 20) + '...' : 'Yeni Paylaşım');
+    const defaultTitle = isPollMode 
+        ? 'Anket: ' + (newPostContent.trim() || (finalPollOptions && finalPollOptions.length > 0 ? finalPollOptions[0].label : 'Yeni Anket')) 
+        : isMatchMode 
+            ? `Maç Sonucu: ${matchDetails.homeTeam} ${matchDetails.homeScore} - ${matchDetails.awayScore} ${matchDetails.awayTeam}`
+            : isReviewMode 
+                ? 'Saha İncelemesi: ' + (newPostContent.trim() || reviewDetails.facilityName) 
+                : isTournamentMode
+                    ? 'Turnuva Duyurusu: ' + (newPostContent.split('\n')[0] || 'Katılmak İsteyenler?')
+                    : isNewsMode
+                        ? 'Günün Haberi: ' + (newPostContent.split('\n')[0] || 'Son Dakika')
+                        : (newPostContent.length > 20 ? newPostContent.substring(0, 20) + '...' : 'Yeni Paylaşım');
 
-    const newPostData = {
+    const postData = {
         type: finalPostType,
         author: {
             id: currentUser.uid,
@@ -687,33 +905,29 @@ const Community = () => {
         },
         title: defaultTitle,
         content: newPostContent,
-        image: imageUrl,
+        image: imageUrl || (editingPostId ? posts.find(p => p.id === editingPostId)?.image : null),
         pollOptions: finalPollOptions,
         location: showLocationInput ? locationText : null,
         ...extraData
     };
 
-    const result = await createPost(newPostData);
+    let result;
+    if (editingPostId) {
+        // If it's a poll and options changed, we might want to keep or reset votes. 
+        // For simplicity, we just update all.
+        result = await updatePost(editingPostId, postData);
+    } else {
+        result = await createPost(postData);
+    }
 
     if (result.success) {
-        setNewPostContent('');
-        setSelectedImage(null);
-        setIsPollMode(false);
-        setIsMatchMode(false);
-        setIsReviewMode(false);
-        setPollOptions([{ text: '' }, { text: '' }]);
-        setMatchDetails({ homeTeam: '', awayTeam: '', homeScore: '', awayScore: '', mvp: '' });
-        setReviewDetails({ facilityName: '', rating: 0 });
-        setShowLocationInput(false);
-        setLocationText('');
-        
-        // Refresh posts or prepend locally
+        handleCancelEdit();
         fetchPosts(); 
-        setActiveTab('ALL');
-        toast.success('Paylaşım gönderildi! 🚀');
+        if (!editingPostId) setActiveTab('ALL');
+        toast.success(editingPostId ? 'Paylaşım güncellendi! ✨' : 'Paylaşım gönderildi! 🚀');
         playNotificationSound();
     } else {
-        toast.error('Paylaşım yapılamadı: ' + result.error);
+        toast.error('İşlem başarısız: ' + result.error);
         playNotificationSound();
     }
     setIsPosting(false);
@@ -958,50 +1172,48 @@ const Community = () => {
       <Header />
       
       {/* EXCLUSIVE COMMUNITY HERO HEADER */}
-      <div className="bg-[#0f172a] text-white relative overflow-hidden">
-         {/* Dynamic Background Elements */}
-        <div className="absolute top-0 right-0 w-1/2 h-full bg-gradient-to-l from-green-900/40 to-transparent pointer-events-none"></div>
-        <div className="absolute -bottom-24 -left-24 w-96 h-96 bg-blue-600/20 rounded-full blur-[100px] pointer-events-none"></div>
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10 pointer-events-none"></div>
-        
-        <div className="container mx-auto px-4 py-12 relative z-10">
-          <div className="flex flex-col md:flex-row justify-between items-end gap-8">
-            <div className="max-w-2xl">
-              <div className="inline-flex items-center gap-2 mb-4 bg-green-500/10 border border-green-500/20 px-3 py-1 rounded-full text-green-400 text-xs font-bold uppercase tracking-wider backdrop-blur-md">
-                <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-                Sporun Kalbi Burada Atıyor
-              </div>
-              <h1 className="text-4xl md:text-5xl font-black tracking-tight mb-4 leading-tight">
-                {getGreeting()}, <span className="text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-emerald-600">{currentUser?.displayName?.split(' ')[0] || 'Sporcu'}</span> 👋
-              </h1>
-              <p className="text-slate-400 text-lg leading-relaxed">
-                Meydan'da maç sonuçlarını paylaş, anketlere katıl, kendine rakip veya takım arkadaşı bul. Spor dünyasının nabzını tutan 
-                <span className="text-white font-bold mx-1">15.000+</span> 
-                sporcu ile etkileşime geç.
-              </p>
-            </div>
-
-            {/* Live Stats Cards within Header */}
-            <div className="flex gap-4">
-               <div className="bg-white/5 backdrop-blur-lg border border-white/10 p-4 rounded-2xl flex flex-col items-center justify-center min-w-[120px] hover:bg-white/10 transition-colors cursor-default">
-                  <span className="text-3xl font-black text-white mb-1">142</span>
-                  <span className="text-xs text-slate-400 font-bold uppercase tracking-wide">Yeni İlan</span>
-               </div>
-               <div className="bg-white/5 backdrop-blur-lg border border-white/10 p-4 rounded-2xl flex flex-col items-center justify-center min-w-[120px] hover:bg-white/10 transition-colors cursor-default">
-                  <span className="text-3xl font-black text-green-400 mb-1">28</span>
-                  <span className="text-xs text-green-400/80 font-bold uppercase tracking-wide">Canlı Maç</span>
-               </div>
-               <div className="bg-white/5 backdrop-blur-lg border border-white/10 p-4 rounded-2xl flex flex-col items-center justify-center min-w-[120px] hover:bg-white/10 transition-colors cursor-default">
-                   <div className="flex -space-x-2 mb-2">
-                      <div className="w-6 h-6 rounded-full bg-red-500 border-2 border-[#0f172a]"></div>
-                      <div className="w-6 h-6 rounded-full bg-blue-500 border-2 border-[#0f172a]"></div>
-                      <div className="w-6 h-6 rounded-full bg-green-500 border-2 border-[#0f172a]"></div>
-                   </div>
-                  <span className="text-xs text-slate-400 font-bold uppercase tracking-wide">850 Online</span>
-               </div>
-            </div>
-          </div>
+      <div className="bg-gradient-to-r from-green-600 to-green-700 text-white py-12 relative overflow-hidden">
+        <div className="container mx-auto px-4 relative z-10">
+          <h1 className="text-3xl font-black mb-2">Meydan</h1>
+          <p className="text-green-100">
+            {getGreeting()}, <span className="font-bold">{currentUser?.displayName?.split(' ')[0] || 'Sporcu'}</span> 👋 
+            Sporun kalbi burada atıyor! Maç sonuçlarını paylaş, anketlere katıl, toplulukla etkileşime geç.
+          </p>
         </div>
+      </div>
+
+      <div className="container mx-auto px-4 -mt-8 relative z-20">
+          <div className="bg-white rounded-2xl shadow-lg p-6 mb-8 flex flex-col md:flex-row justify-between items-center gap-6">
+              <div className="flex-1">
+                  <div className="inline-flex items-center gap-2 bg-green-50 text-green-600 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider mb-2">
+                    <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                    Sporun Kalbi Burada Atıyor
+                  </div>
+                  <p className="text-gray-500 text-sm">
+                    Meydan'da <span className="text-green-600 font-bold">15.000+</span> sporcu ile etkileşime geç.
+                  </p>
+              </div>
+
+              {/* Live Stats Cards in Hero overlap */}
+              <div className="flex gap-3 sm:gap-4 overflow-x-auto pb-1 no-scrollbar sm:pb-0">
+                  <div className="bg-gray-50 border border-gray-100 p-3 sm:p-4 rounded-xl flex flex-col items-center justify-center min-w-[90px] sm:min-w-[100px] transition-colors cursor-default">
+                      <span className="text-xl sm:text-2xl font-black text-gray-900 mb-1">{communityStats.newMatches}</span>
+                      <span className="text-[9px] sm:text-[10px] text-gray-500 font-bold uppercase tracking-wide text-center">Yeni İlan</span>
+                  </div>
+                  <div className="bg-green-50 border border-green-100 p-3 sm:p-4 rounded-xl flex flex-col items-center justify-center min-w-[90px] sm:min-w-[100px] transition-colors cursor-default">
+                      <span className="text-xl sm:text-2xl font-black text-green-600 mb-1">{communityStats.liveMatches}</span>
+                      <span className="text-[9px] sm:text-[10px] text-green-600/80 font-bold uppercase tracking-wide text-center">Canlı Maç</span>
+                  </div>
+                  <div className="bg-gray-50 border border-gray-100 p-3 sm:p-4 rounded-xl flex flex-col items-center justify-center min-w-[90px] sm:min-w-[100px] transition-colors cursor-default">
+                      <div className="flex -space-x-1.5 mb-1.5">
+                          <div className="w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-red-400 border-2 border-white animate-pulse"></div>
+                          <div className="w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-blue-400 border-2 border-white animate-pulse" style={{ animationDelay: '0.2s' }}></div>
+                          <div className="w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-green-400 border-2 border-white animate-pulse" style={{ animationDelay: '0.4s' }}></div>
+                      </div>
+                      <span className="text-[9px] sm:text-[10px] text-gray-500 font-bold uppercase tracking-wide">{communityStats.activeUsers} Online</span>
+                  </div>
+              </div>
+          </div>
       </div>
 
       <div className="container mx-auto px-4 py-8 flex-grow">
@@ -1048,17 +1260,17 @@ const Community = () => {
                 </button>
                 <div className="my-2 border-t border-gray-100"></div>
                 <button
-                  onClick={() => toast('Yakında!', { icon: '⏳' })}
-                  className="w-full flex items-center gap-3 px-4 py-3 rounded-lg font-bold text-sm text-gray-400 hover:bg-gray-50 transition-all"
+                  onClick={() => setActiveTab('TOURNAMENTS')}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg font-bold text-sm transition-all ${activeTab === 'TOURNAMENTS' ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-50'}`}
                 >
-                  <Rocket size={18} />
+                  <Trophy size={18} className={activeTab === 'TOURNAMENTS' ? 'text-indigo-600' : 'text-gray-400'} />
                   Turnuvalar
                 </button>
                 <button
-                  onClick={() => toast('Yakında!', { icon: '⏳' })}
-                  className="w-full flex items-center gap-3 px-4 py-3 rounded-lg font-bold text-sm text-gray-400 hover:bg-gray-50 transition-all"
+                  onClick={() => setActiveTab('NEWS')}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg font-bold text-sm transition-all ${activeTab === 'NEWS' ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50'}`}
                 >
-                  <TrendingUp size={18} />
+                  <TrendingUp size={18} className={activeTab === 'NEWS' ? 'text-blue-600' : 'text-gray-400'} />
                   Haberler
                 </button>
               </nav>
@@ -1074,6 +1286,31 @@ const Community = () => {
 
           {/* --- CENTER FEED --- */}
           <div className="col-span-1 lg:col-span-6">
+            
+            {/* Mobile Category Tabs */}
+            <div className="flex lg:hidden overflow-x-auto pb-4 mb-2 gap-2 no-scrollbar">
+                {[
+                    { id: 'ALL', label: 'Hepsi', icon: Globe },
+                    { id: 'RESULTS', label: 'Sonuçlar', icon: Trophy },
+                    { id: 'POLLS', label: 'Anketler', icon: BarChart2 },
+                    { id: 'REVIEWS', label: 'Sahalar', icon: Star },
+                    { id: 'NEWS', label: 'Haberler', icon: TrendingUp }
+                ].map(tab => (
+                    <button
+                        key={tab.id}
+                        onClick={() => setActiveTab(tab.id)}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-full whitespace-nowrap text-xs font-bold transition-all border ${
+                            activeTab === tab.id 
+                            ? 'bg-green-600 text-white border-green-600 shadow-md shadow-green-600/20' 
+                            : 'bg-white text-gray-600 border-gray-100'
+                        }`}
+                    >
+                        <tab.icon size={14} />
+                        {tab.label}
+                    </button>
+                ))}
+            </div>
+
             {/* Create Post Box */}
             <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 mb-6">
               
@@ -1152,28 +1389,34 @@ const Community = () => {
                             <span className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1"><Trophy size={14}/> Maç Skoru</span>
                             <button onClick={toggleMatchMode} className="text-gray-400 hover:text-red-500"><X size={16}/></button>
                           </div>
-                          <div className="flex items-center gap-3">
-                              <input 
-                                type="text" placeholder="Ev Sahibi" 
-                                className="flex-1 text-center bg-white border border-gray-200 rounded px-2 py-2 text-sm font-bold placeholder:font-normal"
-                                value={matchDetails.homeTeam} onChange={e => setMatchDetails({...matchDetails, homeTeam: e.target.value})}
-                              />
-                              <input 
-                                type="number" placeholder="0" 
-                                className="w-12 text-center bg-white border border-gray-200 rounded px-1 py-2 font-black text-lg"
-                                value={matchDetails.homeScore} onChange={e => setMatchDetails({...matchDetails, homeScore: e.target.value})}
-                              />
-                              <span className="text-gray-400 font-bold">-</span>
-                              <input 
-                                type="number" placeholder="0" 
-                                className="w-12 text-center bg-white border border-gray-200 rounded px-1 py-2 font-black text-lg"
-                                value={matchDetails.awayScore} onChange={e => setMatchDetails({...matchDetails, awayScore: e.target.value})}
-                              />
-                              <input 
-                                type="text" placeholder="Deplasman" 
-                                className="flex-1 text-center bg-white border border-gray-200 rounded px-2 py-2 text-sm font-bold placeholder:font-normal"
-                                value={matchDetails.awayTeam} onChange={e => setMatchDetails({...matchDetails, awayTeam: e.target.value})}
-                              />
+                          <div className="flex flex-col sm:flex-row items-center gap-3">
+                              <div className="flex items-center gap-2 w-full sm:flex-1">
+                                <input 
+                                  type="text" placeholder="Ev Sahibi" 
+                                  className="flex-1 text-center bg-white border border-gray-200 rounded px-2 py-2 text-sm font-bold placeholder:font-normal outline-none focus:border-green-500"
+                                  value={matchDetails.homeTeam} onChange={e => setMatchDetails({...matchDetails, homeTeam: e.target.value})}
+                                />
+                                <input 
+                                  type="number" placeholder="0" 
+                                  className="w-12 text-center bg-white border border-gray-200 rounded px-1 py-2 font-black text-lg outline-none focus:border-green-500"
+                                  value={matchDetails.homeScore} onChange={e => setMatchDetails({...matchDetails, homeScore: e.target.value})}
+                                />
+                              </div>
+                              
+                              <span className="hidden sm:block text-gray-400 font-bold">-</span>
+                              
+                              <div className="flex items-center gap-2 w-full sm:flex-1">
+                                <input 
+                                  type="number" placeholder="0" 
+                                  className="w-12 text-center bg-white border border-gray-200 rounded px-1 py-2 font-black text-lg outline-none focus:border-green-500"
+                                  value={matchDetails.awayScore} onChange={e => setMatchDetails({...matchDetails, awayScore: e.target.value})}
+                                />
+                                <input 
+                                  type="text" placeholder="Deplasman" 
+                                  className="flex-1 text-center bg-white border border-gray-200 rounded px-2 py-2 text-sm font-bold placeholder:font-normal outline-none focus:border-green-500"
+                                  value={matchDetails.awayTeam} onChange={e => setMatchDetails({...matchDetails, awayTeam: e.target.value})}
+                                />
+                              </div>
                           </div>
                           <input 
                             type="text" placeholder="MVP (Maçın Adamı)" 
@@ -1190,11 +1433,60 @@ const Community = () => {
                             <span className="text-xs font-bold text-yellow-600 uppercase flex items-center gap-1"><Star size={14}/> Saha İncelemesi</span>
                             <button onClick={toggleReviewMode} className="text-gray-400 hover:text-red-500"><X size={16}/></button>
                           </div>
-                          <input 
-                             type="text" placeholder="Saha / Tesis Adı"
-                             className="w-full bg-white border border-yellow-200 rounded px-3 py-2 text-sm focus:border-yellow-500 outline-none"
-                             value={reviewDetails.facilityName} onChange={e => setReviewDetails({...reviewDetails, facilityName: e.target.value})}
-                          />
+                          <div className="relative">
+                            <div className="relative">
+                              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-yellow-600" size={16} />
+                              <input 
+                                type="text"
+                                placeholder="Saha ara... (En az 3 karakter)"
+                                className="w-full bg-white border border-yellow-200 rounded-lg pl-10 pr-4 py-2.5 text-sm focus:border-yellow-500 outline-none"
+                                value={reviewDetails.facilityName || tesisSearchQuery}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setTesisSearchQuery(val);
+                                  setShowTesisDropdown(val.length >= 3);
+                                  if (reviewDetails.facilityName) {
+                                    setReviewDetails({ ...reviewDetails, facilityName: '', facilityId: '' });
+                                  }
+                                }}
+                                onFocus={() => tesisSearchQuery.length >= 3 && setShowTesisDropdown(true)}
+                              />
+                            </div>
+
+                            {showTesisDropdown && tesisSearchQuery.length >= 3 && (
+                              <div className="absolute z-50 w-full mt-1 bg-white border border-yellow-200 rounded-xl shadow-xl max-h-60 overflow-y-auto">
+                                {allTesisler
+                                  .filter(t => t.name?.toLowerCase().includes(tesisSearchQuery.toLowerCase()))
+                                  .map(tesis => (
+                                    <button
+                                      key={tesis.id}
+                                      type="button"
+                                      className="w-full text-left px-4 py-3 hover:bg-yellow-50 flex items-center justify-between border-b border-gray-50 last:border-0"
+                                      onClick={() => {
+                                        setReviewDetails({
+                                          ...reviewDetails,
+                                          facilityId: tesis.id,
+                                          facilityName: tesis.name
+                                        });
+                                        setTesisSearchQuery(tesis.name);
+                                        setShowTesisDropdown(false);
+                                      }}
+                                    >
+                                      <div>
+                                        <p className="font-bold text-gray-900 text-sm">{tesis.name}</p>
+                                        <p className="text-xs text-gray-500">{tesis.location || tesis.address}</p>
+                                      </div>
+                                      <span className="text-[10px] font-bold bg-yellow-100 text-yellow-700 px-2 py-1 rounded uppercase">
+                                        {tesis.type || 'Saha'}
+                                      </span>
+                                    </button>
+                                  ))}
+                                {allTesisler.filter(t => t.name?.toLowerCase().includes(tesisSearchQuery.toLowerCase())).length === 0 && (
+                                  <div className="p-4 text-center text-gray-500 text-sm">Saha bulunamadı.</div>
+                                )}
+                              </div>
+                            )}
+                          </div>
                           <div className="flex items-center gap-2">
                               <span className="text-sm text-yellow-800 font-medium">Puanın:</span>
                               <div className="flex gap-1">
@@ -1214,26 +1506,45 @@ const Community = () => {
 
                   {/* 5. Location Input */}
                   {showLocationInput && (
-                      <div className="flex gap-2 items-center bg-blue-50 p-2 rounded-lg border border-blue-100 mt-2">
-                          <MapPin size={16} className="text-blue-500" />
-                          <input 
-                            type="text" 
-                            placeholder="Konum ekle..."
-                            className="bg-transparent text-sm w-full outline-none text-blue-900 placeholder:text-blue-300"
-                            value={locationText}
-                            onChange={(e) => setLocationText(e.target.value)}
-                          />
-                          <button onClick={toggleLocationInput} className="text-blue-400 hover:text-blue-700">
-                              <X size={14} />
-                          </button>
+                      <div className="space-y-2 mt-2">
+                          <div className="flex gap-2 items-center bg-blue-50 p-2 rounded-lg border border-blue-100">
+                              <MapPin size={16} className="text-blue-500" />
+                              <div className="flex-1 relative">
+                                  <select 
+                                    className="bg-transparent text-sm w-full outline-none text-blue-900 appearance-none cursor-pointer"
+                                    value={allTesisler.find(t => t.name === locationText)?.id || ''}
+                                    onChange={(e) => {
+                                        const selectedTesis = allTesisler.find(t => t.id === e.target.value);
+                                        if (selectedTesis) setLocationText(selectedTesis.name);
+                                    }}
+                                  >
+                                      <option value="">--- Konum / Saha Seçin ---</option>
+                                      {allTesisler.map(tesis => (
+                                          <option key={tesis.id} value={tesis.id}>{tesis.name} ({tesis.type})</option>
+                                      ))}
+                                  </select>
+                              </div>
+                              <button onClick={toggleLocationInput} className="text-blue-400 hover:text-blue-700">
+                                  <X size={14} />
+                              </button>
+                          </div>
+                          <div className="px-1">
+                              <input 
+                                type="text" 
+                                placeholder="Veya manuel bir konum yazın..."
+                                className="w-full bg-white border border-gray-100 rounded-lg px-3 py-1.5 text-xs text-gray-600 outline-none focus:border-blue-200"
+                                value={locationText}
+                                onChange={(e) => setLocationText(e.target.value)}
+                              />
+                          </div>
                       </div>
                   )}
 
                 </div>
               </div>
               
-              <div className="flex justify-between items-center pt-3 border-t border-gray-100">
-                <div className="flex gap-2">
+              <div className="flex flex-wrap justify-between items-center pt-3 border-t border-gray-100 gap-y-4">
+                <div className="flex flex-wrap gap-1 sm:gap-2">
                   <label className={`p-2 rounded-lg transition-colors cursor-pointer group relative ${selectedImage ? 'text-green-600 bg-green-50' : 'text-gray-500 hover:text-green-600 hover:bg-green-50'}`}>
                     <input type="file" accept="image/*" className="hidden" onChange={handleImageSelect} />
                     <ImageIcon size={20} />
@@ -1265,6 +1576,22 @@ const Community = () => {
                   </button>
 
                   <button 
+                    onClick={toggleTournamentMode}
+                    className={`p-2 rounded-lg transition-colors group relative ${isTournamentMode ? 'text-indigo-600 bg-indigo-50' : 'text-gray-500 hover:text-indigo-600 hover:bg-indigo-50'}`}
+                  >
+                    <Trophy size={20} className={isTournamentMode ? 'text-indigo-600' : ''} />
+                    <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-gray-800 text-white text-[10px] py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">Turnuva Duyurusu</span>
+                  </button>
+
+                  <button 
+                    onClick={toggleNewsMode}
+                    className={`p-2 rounded-lg transition-colors group relative ${isNewsMode ? 'text-blue-600 bg-blue-50' : 'text-gray-500 hover:text-blue-600 hover:bg-blue-50'}`}
+                  >
+                    <TrendingUp size={20} />
+                    <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-gray-800 text-white text-[10px] py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">Haber Paylaş</span>
+                  </button>
+
+                  <button 
                     onClick={toggleLocationInput}
                     className={`p-2 rounded-lg transition-colors group relative ${showLocationInput ? 'text-green-600 bg-green-50' : 'text-gray-500 hover:text-green-600 hover:bg-green-50'}`}
                   >
@@ -1272,13 +1599,24 @@ const Community = () => {
                     <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-gray-800 text-white text-[10px] py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">Konum</span>
                   </button>
                 </div>
-                <button
-                  onClick={handlePostSubmit}
-                  disabled={(!newPostContent.trim() && !selectedImage && !isPollMode && !isMatchMode && !isReviewMode) || isPosting}
-                  className={`bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg font-bold text-sm transition-all shadow-lg shadow-green-600/20 flex items-center gap-2 ${((!newPostContent.trim() && !selectedImage && !isPollMode && !isMatchMode && !isReviewMode) || isPosting) ? 'opacity-50 cursor-not-allowed' : ''}`}
-                >
-                  {isPosting ? 'Paylaşılıyor...' : 'Paylaş'} <Send size={14} />
-                </button>
+                <div className="flex flex-row gap-3 items-center ml-auto sm:ml-0">
+                  {editingPostId && (
+                    <button
+                      onClick={handleCancelEdit}
+                      className="px-3 py-2 text-gray-500 hover:text-gray-700 font-bold text-sm transition-colors"
+                    >
+                      Vazgeç
+                    </button>
+                  )}
+                  <button
+                    disabled={(!newPostContent.trim() && !selectedImage && !isPollMode && !isMatchMode && !isReviewMode) || isPosting}
+                    onClick={handlePostSubmit}
+                    className="px-5 sm:px-6 py-2 sm:py-2.5 bg-green-600 text-white font-bold rounded-xl shadow-lg shadow-green-600/20 hover:shadow-green-600/40 hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2 disabled:opacity-50 text-sm sm:text-base whitespace-nowrap"
+                  >
+                    {isPosting ? <Loader2 className="animate-spin" size={18} /> : <Send size={18} />}
+                    {editingPostId ? 'Güncelle' : 'Paylaş'}
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -1303,6 +1641,7 @@ const Community = () => {
                             handleVote={handleVote}
                             handleDeletePost={handleDeletePost}
                             handleDeleteComment={handleDeleteComment}
+                            handleEditClick={handleEditClick}
                         />
                   ))
               ) : (

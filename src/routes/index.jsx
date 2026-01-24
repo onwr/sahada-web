@@ -33,13 +33,14 @@ const AppRoutes = () => {
       <Route path="/" element={<Home />} />
       <Route path="/gizlilik-sozlesmesi" element={<GizlilikSozlesmesi />} />
       <Route path="/pricing" element={<Pricing />} />
-      <Route path="/saha-detay/:id" element={<SahaDetay />} />
+      <Route path="/saha/:idOrSlug" element={<SahaDetay />} />
+      <Route path="/saha-detay/:idOrSlug" element={<SahaDetay />} />
       <Route path="/rezervasyon/:id" element={<Rezervasyon />} />
       <Route path="/payment-callback" element={<PaymentCallback />} />
       <Route path="/oyuncu-bul" element={<OyuncuBul />} />
       <Route path="/mac-detay/:id" element={<MacDetay />} />
       <Route path="/yakin-sahalar" element={<YakinSahalar />} />
-      <Route path="/oyuncu-detay/:id" element={<OyuncuDetay />} />
+      <Route path="/oyuncu-detay/:idOrSlug" element={<OyuncuDetay />} />
       <Route path="/blog" element={<Blog />} />
       <Route path="/blog/:slug" element={<BlogDetail />} />
       <Route path="/turnuvalar" element={<Turnuvalar />} />

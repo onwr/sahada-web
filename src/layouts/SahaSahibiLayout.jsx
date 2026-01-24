@@ -16,6 +16,7 @@ import Premium from '../pages/saha-sahibi/Premium';
 import CRM from '../pages/saha-sahibi/CRM';
 import Destek from '../pages/saha-sahibi/Destek';
 import Mesajlar from '../pages/saha-sahibi/Mesajlar';
+import Bildirimler from '../pages/saha-sahibi/Bildirimler';
 import { Lock, AlertTriangle, ChevronRight, CreditCard, Zap, Gem, Rocket, Check, Gift } from 'lucide-react';
 import { activateDemoSubscription } from '../services/firestoreService';
 import toast from '../utils/toast';
@@ -52,7 +53,7 @@ const SahaSahibiLayout = () => {
   const isUserActive = userData?.subscriptionStatus === 'active'; 
 
   // Allow crucial pages even if blocked
-  const allowedPaths = ['/saha-sahibi/ayarlar', '/saha-sahibi/destek', '/saha-sahibi/onboarding'];
+  const allowedPaths = ['/saha-sahibi/ayarlar', '/saha-sahibi/destek', '/saha-sahibi/onboarding', '/saha-sahibi/bildirimler'];
   const isAllowedPath = allowedPaths.some(path => location.pathname.startsWith(path));
 
   const shouldBlock = !loading && isPaymentRequired && !isUserActive && !isAllowedPath;
@@ -76,6 +77,7 @@ const SahaSahibiLayout = () => {
         <Route path="/crm" element={<CRM />} />
         <Route path="/mesajlar" element={<Mesajlar />} />
         <Route path="/destek" element={<Destek />} />
+        <Route path="/bildirimler" element={<Bildirimler />} />
       </Routes>
 
       {/* Profile Completion Overlay (Higher Priority) */}

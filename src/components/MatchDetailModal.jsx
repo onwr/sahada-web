@@ -125,10 +125,16 @@ const MatchDetailModal = ({ isOpen, onClose, match, currentUser }) => {
         {/* Header */}
         <div className="p-4 border-b flex justify-between items-center bg-gray-50">
           <div>
-            <h3 className="text-xl font-bold text-gray-900">{match.tesisName || match.location}</h3>
+            <h3 className="text-xl font-bold text-gray-900">{match.tesisName || (match.location?.includes('(') ? 'Seçilen Konum 📍' : match.location || 'Bilinmeyen Maç')}</h3>
             <div className="flex items-center gap-4 text-sm text-gray-600 mt-1">
-              <span className="flex items-center gap-1"><Calendar size={14}/> {match.date instanceof Object ? new Date(match.date.seconds * 1000).toLocaleDateString('tr-TR') : match.date}</span>
-              <span className="flex items-center gap-1"><Clock size={14}/> {match.timeSlot}</span>
+              <span className="flex items-center gap-1 font-medium"><Calendar size={14} className="text-green-600" /> {match.date instanceof Object ? new Date(match.date.seconds * 1000).toLocaleDateString('tr-TR') : match.date}</span>
+              <span className="flex items-center gap-1 font-medium"><Clock size={14} className="text-green-600" /> {match.timeSlot}</span>
+              {match.location && (
+                <span className="flex items-center gap-1 font-medium truncate max-w-[150px]">
+                  <MapPin size={14} className="text-green-600" /> 
+                  {match.location}
+                </span>
+              )}
             </div>
           </div>
           <button onClick={onClose} className="p-2 hover:bg-gray-200 rounded-full">

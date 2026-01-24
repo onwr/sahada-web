@@ -6,11 +6,12 @@ import {
   ChevronDown,
   LogOut,
   User,
-  Info
+  Info,
+  Check
 } from 'lucide-react';
-import { collection, query, onSnapshot, where, orderBy, limit, updateDoc, doc, writeBatch } from 'firebase/firestore';
+import { collection, query, onSnapshot, where, orderBy, limit, updateDoc, doc, writeBatch, getDocs, serverTimestamp } from 'firebase/firestore';
 import { db } from '../config/firebase';
-import { getPlatformSettings } from '../services/firestoreService';
+import { getPlatformSettings, markNotificationAsRead, markAllNotificationsAsRead } from '../services/firestoreService';
 
 
 const DashboardHeader = ({ title, showMenuButton, onMenuClick, children, variant = 'default' }) => {
@@ -46,7 +47,7 @@ const DashboardHeader = ({ title, showMenuButton, onMenuClick, children, variant
   
   const headerClasses = isHero 
     ? "bg-transparent absolute top-0 left-0 w-full z-30 px-4 py-3 sm:px-6"
-    : "bg-white/80 backdrop-blur-md sticky top-0 z-30 border-b border-gray-100 px-4 py-3 sm:px-6";
+    : "bg-white/80 backdrop-blur-md sticky top-0 z-[1001] border-b border-gray-100 px-4 py-3 sm:px-6";
 
   const iconClasses = isHero
     ? "text-white hover:bg-white/10"
@@ -100,29 +101,12 @@ const DashboardHeader = ({ title, showMenuButton, onMenuClick, children, variant
   }, [user]);
 
   const markAsRead = async (notificationId) => {
-    try {
-        const notifRef = doc(db, 'notifications', notificationId);
-        await updateDoc(notifRef, { read: true });
-    } catch (error) {
-        console.error("Bildirim okundu işaretlenemedi:", error);
-    }
+    await markNotificationAsRead(notificationId);
   };
 
   const markAllAsRead = async () => {
-      const unreadNotifications = notifications.filter(n => !n.read);
-      if (unreadNotifications.length === 0) return;
-
-      const batch = writeBatch(db);
-      unreadNotifications.forEach(n => {
-          const ref = doc(db, 'notifications', n.id);
-          batch.update(ref, { read: true });
-      });
-
-      try {
-          await batch.commit();
-      } catch (error) {
-          console.error("Toplu okundu işaretleme hatası:", error);
-      }
+    if (!user) return;
+    await markAllNotificationsAsRead(user.uid);
   };
 
   const handleNotificationClick = async (notification) => {
@@ -140,6 +124,25 @@ const DashboardHeader = ({ title, showMenuButton, onMenuClick, children, variant
       // Firestore timestamp to Date
       const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
       return date.toLocaleDateString('tr-TR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  };
+
+  const cleanMessage = (msg) => {
+    if (!msg || typeof msg !== 'string') return '';
+    
+    // Fix UTF-8 encoding issues (Mojibake)
+    return msg
+      .replace(/Ã¶/g, 'ö')
+      .replace(/Ã§/g, 'ç')
+      .replace(/ÅŸ/g, 'ş')
+      .replace(/ÄŸ/g, 'ğ')
+      .replace(/Ã¼/g, 'ü')
+      .replace(/Ä±/g, 'ı')
+      .replace(/Ä°/g, 'İ')
+      .replace(/Ã–/g, 'Ö')
+      .replace(/Ã‡/g, 'Ç')
+      .replace(/Åž/g, 'Ş')
+      .replace(/Äž/g, 'Ğ')
+      .replace(/Ãœ/g, 'Ü');
   };
 
   return (
@@ -227,17 +230,29 @@ const DashboardHeader = ({ title, showMenuButton, onMenuClick, children, variant
                           </div>
                           <div className="flex-1 min-w-0">
                             <p className={`text-sm ${!notification.read ? 'font-semibold text-gray-900' : 'text-gray-700'}`}>
-                                {notification.title}
+                                {cleanMessage(notification.title)}
                             </p>
                             <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">
-                                {notification.message}
+                                {cleanMessage(notification.message)}
                             </p>
                             <p className="text-[10px] text-gray-400 mt-1.5">
                                 {formatNotificationDate(notification.createdAt)}
                             </p>
                           </div>
                           {!notification.read && (
-                              <div className="w-2 h-2 bg-green-500 rounded-full mt-2 flex-shrink-0"></div>
+                              <div className="flex flex-col items-center gap-2 self-center">
+                                  <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        markAsRead(notification.id);
+                                    }}
+                                    className="p-1.5 hover:bg-green-100 text-green-600 rounded-full transition-colors tooltip"
+                                    title="Okundu olarak işaretle"
+                                  >
+                                      <Check size={14} strokeWidth={3} />
+                                  </button>
+                                  <div className="w-2 h-2 bg-green-500 rounded-full flex-shrink-0 animate-pulse"></div>
+                              </div>
                           )}
                         </div>
                       </div>
@@ -262,8 +277,8 @@ const DashboardHeader = ({ title, showMenuButton, onMenuClick, children, variant
               className={`flex items-center gap-2 lg:gap-3 pl-2 sm:pl-4 transition-colors focus:outline-none ${isHero ? 'text-white' : 'text-gray-700'}`}
             >
               <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full border-2 flex items-center justify-center overflow-hidden ${isHero ? 'border-white/30' : 'border-green-100'}`}>
-                {userData?.photoURL ? (
-                  <img src={userData.photoURL} alt={userData.displayName} className="w-full h-full object-cover" />
+                {userData?.photoURL || user?.photoURL ? (
+                  <img src={userData.photoURL || user.photoURL} alt={userData?.fullName || userData?.displayName || 'Oyuncu'} className="w-full h-full object-cover" />
                 ) : (
                    <User className={`w-5 h-5 ${isHero ? 'text-white' : 'text-gray-400'}`} />
                 )}

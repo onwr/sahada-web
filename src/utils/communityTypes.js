@@ -5,6 +5,8 @@ export const PostType = {
   POLL: 'POLL',
   PLAYER_SEARCH: 'PLAYER_SEARCH',
   REVIEW: 'REVIEW',
+  TOURNAMENT: 'TOURNAMENT',
+  NEWS: 'NEWS',
 };
 
 // Types can be defined as JSDoc or just implied in JS, 

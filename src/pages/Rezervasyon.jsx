@@ -547,11 +547,6 @@ const Rezervasyon = ({ inPanel = false }) => {
 
   // Oyuncu sayısı, saha fiyatı veya bölünmüş ödeme durumu değiştiğinde otomatik hesaplama
   useEffect(() => {
-    // Tek kişi varsa bölünmüş ödeme kapat (Organizatör tek başına ise)
-    if (oyuncular.length <= 1 && splitPaymentEnabled) {
-       setSplitPaymentEnabled(false);
-    }
-
     if (splitPaymentEnabled && sahaData && oyuncular.length > 0) {
       calculateSplitPayment();
     }
@@ -2160,6 +2155,10 @@ const Rezervasyon = ({ inPanel = false }) => {
                     {/* Bölünmüş Ödeme */}
                     <div 
                         onClick={() => {
+                            if (oyuncular.length <= 1) {
+                                toast.error('Bölünmüş ödeme için kadroda en az 2 oyuncu olmalıdır. Lütfen kadro adımına geri dönüp oyuncu ekleyin.');
+                                return;
+                            }
                             setSelectedPaymentMethod('kredi-karti');
                             setSplitPaymentEnabled(true);
                         }}
@@ -2167,7 +2166,7 @@ const Rezervasyon = ({ inPanel = false }) => {
                             selectedPaymentMethod === 'kredi-karti' && splitPaymentEnabled
                             ? 'border-blue-500 bg-blue-50/50 shadow-lg shadow-blue-100'
                             : 'border-gray-100 bg-white hover:border-blue-200'
-                        }`}
+                        } ${oyuncular.length <= 1 ? 'opacity-50 grayscale cursor-not-allowed' : ''}`}
                     >
                         <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-4 transition-colors ${
                             selectedPaymentMethod === 'kredi-karti' && splitPaymentEnabled

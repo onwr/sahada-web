@@ -1,17 +1,7 @@
-import { 
-  createUserWithEmailAndPassword, 
-  signInWithEmailAndPassword, 
-  signOut, 
-  updateProfile,
-  sendEmailVerification,
-  sendPasswordResetEmail,
-  GoogleAuthProvider,
-  FacebookAuthProvider,
-  signInWithPopup,
-  onAuthStateChanged
-} from 'firebase/auth';
-import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, updateProfile, sendEmailVerification, sendPasswordResetEmail, GoogleAuthProvider, FacebookAuthProvider, signInWithPopup, onAuthStateChanged } from 'firebase/auth';
+import { doc, setDoc, getDoc, updateDoc } from 'firebase/firestore';
 import { auth, db } from '../config/firebase';
+import { slugify } from './firestoreService';
 
 // Kullanıcı kayıt işlemi
 export const registerUser = async (userData) => {
@@ -30,12 +20,16 @@ export const registerUser = async (userData) => {
     // Email doğrulama gönder
     await sendEmailVerification(user);
     
+    // Slug oluştur
+    const slug = `${slugify(fullName)}-${user.uid.slice(0, 5)}`;
+    
     // Firestore'da kullanıcı verilerini kaydet
     const userDoc = {
       uid: user.uid,
       email: user.email,
       fullName,
       phone,
+      slug,
       userType, // 'player' veya 'owner'
       createdAt: new Date(),
       emailVerified: false,
@@ -107,13 +101,14 @@ export const loginWithGoogle = async (userType = 'player') => {
         uid: user.uid,
         email: user.email,
         fullName: user.displayName,
+        photoURL: user.photoURL || '',
         phone: user.phoneNumber || '',
+        slug: `${slugify(user.displayName)}-${user.uid.slice(0, 5)}`,
         userType: userType, // Seçilen kullanıcı tipi
         createdAt: new Date(),
         emailVerified: user.emailVerified,
         onboardingCompleted: false,
-        profileCompleted: false,
-        onboardingCompleted: false
+        profileCompleted: false
       };
       
       await setDoc(doc(db, 'users', user.uid), userData);
@@ -153,13 +148,14 @@ export const loginWithFacebook = async (userType = 'player') => {
         uid: user.uid,
         email: user.email,
         fullName: user.displayName,
+        photoURL: user.photoURL || '',
         phone: user.phoneNumber || '',
+        slug: `${slugify(user.displayName)}-${user.uid.slice(0, 5)}`,
         userType: userType, // Seçilen kullanıcı tipi
         createdAt: new Date(),
         emailVerified: user.emailVerified,
         onboardingCompleted: false,
-        profileCompleted: false,
-        onboardingCompleted: false
+        profileCompleted: false
       };
       
       await setDoc(doc(db, 'users', user.uid), userData);

@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { collection, query, onSnapshot, where } from 'firebase/firestore';
+import { collection, query, onSnapshot, where, doc, updateDoc, writeBatch } from 'firebase/firestore';
 import { db } from '../config/firebase';
+import toast from '../utils/toast';
 import { 
   BarChart3,
   Building2,
@@ -26,7 +27,9 @@ import {
   Layout,
   Lock as LockIcon,
   Home,
-  Globe
+  Globe,
+  Bell,
+  Check
 } from 'lucide-react';
 
 const AdminSidebar = () => {
@@ -42,6 +45,12 @@ const AdminSidebar = () => {
     sistem: true
   });
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const [platformSettings, setPlatformSettings] = useState({
+    logoUrl: '/images/logo.png',
+    siteTitle: 'Sahada'
+  });
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [notifications, setNotifications] = useState([]);
 
   useEffect(() => {
     const complaintsQuery = query(
@@ -58,33 +67,63 @@ const AdminSidebar = () => {
     );
 
     // Her sorgu için ayrı listener - nested sorgular kaldırıldı
-    let complaintsCount = 0;
-    let ticketsCount = 0;
-    let tesisCount = 0;
+    let complaintsItems = [];
+    let ticketsItems = [];
+    let tesisItems = [];
 
-    const updateNotificationCount = () => {
-      setNotificationCount(complaintsCount + ticketsCount + tesisCount);
+    const updateAllData = () => {
+      const all = [
+        ...complaintsItems.map(i => ({ ...i, type: 'sikayet', title: `Şikayet: ${i.reason || i.title || 'Detay yok'}`, icon: AlertCircle, color: 'text-orange-600', bg: 'bg-orange-50', link: '/admin/sikayetler' })),
+        ...ticketsItems.map(i => ({ ...i, type: 'destek', title: `Destek: ${i.subject || i.title || 'Yardım talebi'}`, icon: MessageSquare, color: 'text-blue-600', bg: 'bg-blue-50', link: '/admin/destek' })),
+        ...tesisItems.map(i => ({ ...i, type: 'tesis', title: `Tesis Onayı: ${i.name || 'İsimsiz Tesis'}`, icon: Building2, color: 'text-green-600', bg: 'bg-green-50', link: '/admin/tesisler' }))
+      ];
+      // Sort by date if available
+      all.sort((a, b) => {
+        const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt || 0);
+        const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt || 0);
+        return dateB - dateA;
+      });
+      setNotifications(all);
+      setNotificationCount(all.length);
     };
 
     const unsubscribeComplaints = onSnapshot(complaintsQuery, (snapshot) => {
-      complaintsCount = snapshot.size;
-      updateNotificationCount();
+      complaintsItems = snapshot.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .filter(i => !i.dismissedByAdmin);
+      updateAllData();
     });
 
     const unsubscribeTickets = onSnapshot(ticketsQuery, (snapshot) => {
-      ticketsCount = snapshot.size;
-      updateNotificationCount();
+      ticketsItems = snapshot.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .filter(i => !i.dismissedByAdmin);
+      updateAllData();
     });
 
     const unsubscribeTesis = onSnapshot(tesisQuery, (snapshot) => {
-      tesisCount = snapshot.size;
-      updateNotificationCount();
+      tesisItems = snapshot.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .filter(i => !i.dismissedByAdmin);
+      updateAllData();
+    });
+
+    const settingsRef = doc(db, 'platformSettings', 'main');
+    const unsubscribeSettings = onSnapshot(settingsRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.data();
+        setPlatformSettings({
+          logoUrl: data.logoUrl || '/images/logo.png',
+          siteTitle: data.siteTitle || 'Sahada'
+        });
+      }
     });
 
     return () => {
       unsubscribeComplaints();
       unsubscribeTickets();
       unsubscribeTesis();
+      unsubscribeSettings();
     };
   }, []);
 
@@ -282,17 +321,20 @@ const AdminSidebar = () => {
         {/* Logo Section */}
         <div className="bg-gradient-to-br from-green-600 via-green-600 to-green-700 p-6 shadow-lg">
           <div className="flex items-center space-x-3 mb-4">
-            <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center shadow-lg border border-white/30">
-              <img src="/images/logo.png" alt="Sahada Logo" className="w-10 h-10 object-contain" />
+            <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center shadow-lg border border-white/30 p-1">
+              <img src={platformSettings.logoUrl} alt={platformSettings.siteTitle} className="w-full h-full object-contain" />
             </div>
             <div>
-              <h2 className="text-white font-bold text-lg">Sahada</h2>
+              <h2 className="text-white font-bold text-lg leading-tight">{platformSettings.siteTitle}</h2>
               <p className="text-green-100 text-xs font-medium">Admin Panel</p>
             </div>
           </div>
-          <div className="flex items-center justify-between bg-white/10 backdrop-blur-sm rounded-xl px-3 py-2.5 border border-white/20">
+          <div 
+            onClick={() => setIsModalOpen(true)}
+            className="flex items-center justify-between bg-white/10 backdrop-blur-sm rounded-xl px-3 py-2.5 border border-white/20 cursor-pointer hover:bg-white/20 transition-all group"
+          >
             <div className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center">
+              <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
                 <Shield className="w-4 h-4 text-white" />
               </div>
               <div className="flex flex-col">
@@ -374,9 +416,9 @@ const AdminSidebar = () => {
                             }`}
                           >
                             <Icon className={`w-5 h-5 ${isActive ? 'text-green-600' : 'text-gray-400 group-hover:text-gray-600'}`} />
-                            <span className="flex-1 text-sm">{item.name}</span>
+                            <span className={`flex-1 text-[14px] ${isActive ? 'font-bold' : 'font-semibold'}`}>{item.name}</span>
                             {item.badge && (
-                              <span className="bg-red-500 text-white text-xs font-bold rounded-full min-w-[18px] h-4 px-1 flex items-center justify-center">
+                              <span className="bg-red-500 text-white text-[10px] font-black rounded-full min-w-[18px] h-[18px] px-1 flex items-center justify-center shadow-sm">
                                 {item.badge}
                               </span>
                             )}
@@ -412,6 +454,113 @@ const AdminSidebar = () => {
           </button>
         </div>
       </div>
+
+      {/* Admin Notification Modal */}
+      {isModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity" onClick={() => setIsModalOpen(false)} />
+          
+          <div className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[80vh] animate-in zoom-in-95 duration-200">
+            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-white sticky top-0 z-10">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center text-green-600">
+                  <Bell size={20} />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900">Bekleyen İşlemler</h3>
+                  <p className="text-xs text-gray-500">{notificationCount} adet aksiyon gerekli</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setIsModalOpen(false)}
+                className="p-2 hover:bg-gray-100 rounded-full text-gray-400 hover:text-gray-600 transition-colors"
+                aria-label="Kapat"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50/50">
+              {notifications.length > 0 ? (
+                notifications.map((n) => (
+                  <div 
+                    key={`${n.type}-${n.id}`}
+                    className="bg-white border border-gray-100 p-4 rounded-2xl shadow-sm hover:shadow-md transition-all flex items-start gap-4 relative group/item"
+                  >
+                    <div className={`p-2.5 rounded-xl ${n.bg} ${n.color} flex-shrink-0`}>
+                      <n.icon size={20} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex justify-between items-start">
+                        <p className="text-sm font-bold text-gray-900 leading-tight mb-1 truncate pr-6">
+                          {n.title}
+                        </p>
+                        <button
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            try {
+                              const collName = n.type === 'sikayet' || n.type === 'complaint' ? 'complaints' : n.type === 'destek' || n.type === 'ticket' ? 'tickets' : 'tesisler';
+                              const docRef = doc(db, collName, n.id);
+                              await updateDoc(docRef, { dismissedByAdmin: true });
+                              toast.success('Bildirim okundu olarak işaretlendi');
+                            } catch (error) {
+                              console.error('Error dismissing admin notification:', error);
+                              toast.error('Hata oluştu');
+                            }
+                          }}
+                          className="absolute right-4 top-4 p-1.5 text-gray-300 hover:text-green-600 hover:bg-green-50 rounded-lg transition-all"
+                          title="Okundu İşaretle"
+                        >
+                          <Check size={16} strokeWidth={3} />
+                        </button>
+                      </div>
+                      <p className="text-[11px] text-gray-500 font-medium">
+                        {n.createdAt?.toDate ? n.createdAt.toDate().toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' }) : 'Az önce'}
+                      </p>
+                      <button 
+                        onClick={() => {
+                          setIsModalOpen(false);
+                          navigate(n.link);
+                        }}
+                        className="mt-3 text-xs font-bold text-green-600 hover:text-green-700 flex items-center gap-1 group"
+                      >
+                        İşleme Git <ChevronRight size={14} className="group-hover:translate-x-1 transition-transform" />
+                      </button>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="py-12 flex flex-col items-center justify-center text-center px-6">
+                  <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center text-gray-400 mb-4">
+                    <Shield size={32} />
+                  </div>
+                  <h4 className="text-base font-bold text-gray-900">Harika!</h4>
+                  <p className="text-sm text-gray-500 mt-1">Şu an için bekleyen herhangi bir işlem bulunmuyor.</p>
+                </div>
+              )}
+            </div>
+
+            <div className="px-6 py-4 bg-white border-t border-gray-100 sticky bottom-0">
+                <button 
+                  onClick={async () => {
+                     // Bulk dismiss all current items
+                     const batch = writeBatch(db);
+                     notifications.forEach(n => {
+                         const collName = n.type === 'sikayet' || n.type === 'complaint' ? 'complaints' : n.type === 'destek' || n.type === 'ticket' ? 'tickets' : 'tesisler';
+                         batch.update(doc(db, collName, n.id), { dismissedByAdmin: true });
+                     });
+                     await batch.commit();
+                     setIsModalOpen(false);
+                     toast.success('Tüm bildirimler okundu olarak işaretlendi');
+                  }}
+                  className="w-full py-2.5 bg-gray-900 text-white rounded-xl font-bold text-sm hover:bg-black transition-colors"
+                >
+                  Tümünü Okundu İşaretle
+                </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 };

@@ -10,7 +10,8 @@ import {
   List,
   Loader2,
   BookOpen,
-  Filter
+  Filter,
+  ChevronDown
 } from 'lucide-react';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
@@ -179,93 +180,72 @@ const Blog = () => {
       <Header />
       
       {/* Hero Section */}
-      <div className="bg-gradient-to-br from-green-600 via-green-700 to-green-800 text-white py-16">
+      <div className="bg-gradient-to-r from-green-600 to-green-700 text-white py-12">
         <div className="container mx-auto max-w-screen-xl px-4">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="text-center"
-          >
-            <div className="flex items-center justify-center gap-3 mb-4">
-              <div className="w-16 h-16 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center">
-                <BookOpen className="w-8 h-8" />
-              </div>
-              <h1 className="text-4xl lg:text-5xl font-bold">Blog</h1>
-            </div>
-            <p className="text-xl text-white/90 max-w-2xl mx-auto">
-              Spor dünyasından en güncel haberler, ipuçları ve rehberler
-            </p>
-          </motion.div>
+          <h1 className="text-3xl font-black mb-2">Blog</h1>
+          <p className="text-green-100">Spor dünyasından en güncel haberler, ipuçları ve rehberler</p>
         </div>
       </div>
 
-      {/* Filters and Search */}
-      <div className="bg-white border-b border-gray-200 sticky top-0 z-10 shadow-sm">
-        <div className="container mx-auto max-w-screen-xl px-4 py-6">
-          {/* Search Bar */}
-          <div className="mb-6">
-            <div className="relative max-w-2xl mx-auto">
-              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={handleSearch}
-                placeholder="Blog yazılarında ara..."
-                className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent"
-              />
-            </div>
-          </div>
+      {/* Filters and Search Bar overlapping the hero */}
+      <div className="container mx-auto max-w-screen-xl px-4 -mt-8 relative z-20">
+          <div className="bg-white rounded-2xl shadow-lg p-4 mb-8">
+              <div className="flex flex-col lg:flex-row gap-4">
+                  {/* Search Bar */}
+                  <div className="flex-1 relative flex items-center bg-white border border-gray-200 rounded-xl focus-within:ring-2 focus-within:ring-green-500/20 overflow-hidden">
+                      <div className="flex-1 relative">
+                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+                          <input
+                              type="text"
+                              value={searchQuery}
+                              onChange={handleSearch}
+                              placeholder="Blog yazılarında ara..."
+                              className="w-full pl-10 pr-4 py-3 focus:outline-none text-gray-900"
+                          />
+                      </div>
+                  </div>
 
-          {/* Category Filter and View Mode */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            {/* Categories */}
-            <div className="flex flex-wrap gap-3">
-              <button
-                onClick={() => handleCategoryChange('all')}
-                className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
-                  selectedCategory === 'all'
-                    ? 'bg-gradient-to-r from-green-600 to-green-700 text-white shadow-lg'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                Tümü
-              </button>
-              {categories.map((category) => (
-                <button
-                  key={category.id || category.slug}
-                  onClick={() => handleCategoryChange(category.slug)}
-                  className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
-                    selectedCategory === category.slug
-                      ? 'bg-gradient-to-r from-green-600 to-green-700 text-white shadow-lg'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
-                >
-                  {category.name}
-                </button>
-              ))}
-            </div>
+                  {/* Category Filter and View Toggle */}
+                  <div className="flex gap-3 flex-wrap lg:flex-nowrap items-center">
+                      {/* Categories Dropdown */}
+                      <div className="relative">
+                          <select
+                              value={selectedCategory}
+                              onChange={(e) => handleCategoryChange(e.target.value)}
+                              className="appearance-none bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 pr-10 text-sm font-medium text-gray-700 focus:outline-none cursor-pointer"
+                          >
+                              <option value="all">Tüm Kategoriler</option>
+                              {categories.map((category) => (
+                                  <option key={category.id || category.slug} value={category.slug}>
+                                      {category.name}
+                                  </option>
+                              ))}
+                          </select>
+                          <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={16} />
+                      </div>
 
-            {/* View Mode Toggle */}
-            <div className="flex items-center gap-2 bg-gray-100 rounded-lg p-1">
-              <button
-                onClick={() => setViewMode('grid')}
-                className={`p-2 rounded transition-colors ${
-                  viewMode === 'grid' ? 'bg-white text-green-600 shadow-sm' : 'text-gray-600'
-                }`}
-              >
-                <Grid3x3 size={20} />
-              </button>
-              <button
-                onClick={() => setViewMode('list')}
-                className={`p-2 rounded transition-colors ${
-                  viewMode === 'list' ? 'bg-white text-green-600 shadow-sm' : 'text-gray-600'
-                }`}
-              >
-                <List size={20} />
-              </button>
-            </div>
+                      {/* View Mode Toggle */}
+                      <div className="flex items-center gap-2 bg-gray-100 rounded-lg p-1">
+                          <button
+                              onClick={() => setViewMode('grid')}
+                              className={`p-1.5 rounded-md transition-all ${
+                                  viewMode === 'grid' ? 'bg-white shadow text-green-600' : 'text-gray-400 hover:text-gray-600'
+                              }`}
+                          >
+                              <Grid3x3 size={18} />
+                          </button>
+                          <button
+                              onClick={() => setViewMode('list')}
+                              className={`p-1.5 rounded-md transition-all ${
+                                  viewMode === 'list' ? 'bg-white shadow text-green-600' : 'text-gray-400 hover:text-gray-600'
+                              }`}
+                          >
+                              <List size={18} />
+                          </button>
+                      </div>
+                  </div>
+              </div>
           </div>
-        </div>
       </div>
 
       {/* Content */}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { getTesis, toggleFavoriteTesis, addReview, getTesisReviews, deleteReview, checkCanUserReview } from '../services/firestoreService';
 import { useAuth } from '../contexts/AuthContext';
 import { 
@@ -20,15 +20,24 @@ import {
   Share2,
   Navigation,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Wifi,
+  Car,
+  Coffee,
+  Bath,
+  Tv,
+  Utensils,
+  Shirt,
+  Wind
 } from 'lucide-react';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import toast from '../utils/toast';
 
 const SahaDetay = () => {
-  const { id } = useParams();
+  const { idOrSlug } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, userData } = useAuth();
   const [sahaData, setSahaData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -51,16 +60,73 @@ const SahaDetay = () => {
   const [canReview, setCanReview] = useState(false);
   const [checkingPermission, setCheckingPermission] = useState(true);
 
+  const handleShareClick = async () => {
+    const name = sahaData?.name || 'Spor Tesisi';
+    const slug = sahaData?.slug || sahaData?.id || idOrSlug;
+    const shareUrl = `${window.location.origin}/saha/${slug}`;
+    const shareTitle = `${name} | Saha Merkezi`;
+    const shareText = `🏟️ ${name} halı sahasını incele! Saha Merkezi üzerinden hemen rezervasyon yapabilir veya tesis bilgilerine ulaşabilirsin.`;
+
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: shareTitle,
+          text: shareText,
+          url: shareUrl,
+        });
+      } else {
+        await navigator.clipboard.writeText(shareUrl);
+        toast.success('Paylaşım linki kopyalandı!');
+      }
+    } catch (error) {
+      if (error.name !== 'AbortError') {
+        try {
+          await navigator.clipboard.writeText(shareUrl);
+          toast.success('Paylaşım linki kopyalandı!');
+        } catch (e) {
+          toast.error('Link kopyalanamadı');
+        }
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (sahaData) {
+      const name = sahaData.name || 'Spor Tesisi';
+      const title = `${name} | Saha Merkezi`;
+      document.title = title;
+
+      const updateMeta = (selector, attr, content) => {
+        const el = document.querySelector(selector);
+        if (el) el.setAttribute(attr, content);
+      };
+
+      updateMeta('meta[name="description"]', 'content', `${name} halı saha detayları, rezervasyon imkanları ve kullanıcı yorumları. Saha Merkezi ile hemen maçını planla!`);
+      updateMeta('meta[property="og:title"]', 'content', title);
+      updateMeta('meta[property="og:description"]', 'content', `${name} tesis detaylarını görüntüle.`);
+      if (sahaData.images?.[0]) {
+        updateMeta('meta[property="og:image"]', 'content', sahaData.images[0]);
+        updateMeta('meta[property="twitter:image"]', 'content', sahaData.images[0]);
+      }
+    }
+  }, [sahaData]);
+
   // Saha verilerini yükle
   useEffect(() => {
     loadSahaData();
-    loadReviews();
-  }, [id]);
+  }, [idOrSlug]);
+
+  useEffect(() => {
+     if (sahaData?.id) {
+        loadReviews();
+     }
+  }, [sahaData?.id]);
 
   const loadReviews = async () => {
-    if (!id) return;
+    const tesisId = sahaData?.id || idOrSlug;
+    if (!tesisId) return;
     setReviewsLoading(true);
-    const result = await getTesisReviews(id);
+    const result = await getTesisReviews(tesisId);
     if (result.success) {
       setReviews(result.data);
     }
@@ -70,6 +136,9 @@ const SahaDetay = () => {
   const handleReviewSubmit = async (e) => {
     e.preventDefault();
     if (!user) return;
+
+    const tesisId = sahaData?.id || idOrSlug;
+    if (!tesisId) return;
 
     setSubmittingReview(true);
     try {
@@ -86,7 +155,7 @@ const SahaDetay = () => {
         }
       };
 
-      const result = await addReview(id, reviewData);
+      const result = await addReview(tesisId, reviewData);
       
       if (result.success) {
         setShowReviewModal(false);
@@ -111,8 +180,9 @@ const SahaDetay = () => {
   const handleDeleteReview = async (reviewId, rating) => {
     if (!window.confirm('Bu değerlendirmeyi silmek istediğinizden emin misiniz?')) return;
 
+    const tesisId = sahaData?.id || idOrSlug;
     try {
-      const result = await deleteReview(reviewId, id, rating);
+      const result = await deleteReview(reviewId, tesisId, rating);
       if (result.success) {
         loadReviews();
         loadSahaData();
@@ -126,30 +196,29 @@ const SahaDetay = () => {
 
   // Favori durumunu kontrol et
   useEffect(() => {
-    if (userData && userData.favorites && id) {
-      setIsFavorite(userData.favorites.includes(id));
+    const tesisId = sahaData?.id || idOrSlug;
+    if (userData && userData.favorites && tesisId) {
+      setIsFavorite(userData.favorites.includes(tesisId));
     }
-  }, [userData, id]);
+  }, [userData, sahaData?.id, idOrSlug]);
 
   const loadSahaData = async () => {
-    if (!id) return;
+    if (!idOrSlug) return;
     
     setLoading(true);
     setError(null);
     
     try {
-      const result = await getTesis(id);
+      const result = await getTesis(idOrSlug);
       if (result.success) {
         setSahaData(result.data);
       } else {
         setError(result.error);
       }
 
-      // Değerlendirme izni kontrolü
+      // Değerlendirme izni - Herkese açık hale getirildi
       if (user) {
-        setCheckingPermission(true);
-        const permResult = await checkCanUserReview(user.uid, id);
-        setCanReview(permResult.canReview);
+        setCanReview(true);
         setCheckingPermission(false);
       }
     } catch (err) {
@@ -163,13 +232,14 @@ const SahaDetay = () => {
   const handleToggleFavorite = async () => {
     if (!user) {
       // Giriş yapmamış kullanıcıyı yönlendir veya uyar
-      navigate('/login');
+      navigate('/login', { state: { from: location.pathname } });
       return;
     }
     
+    const tesisId = sahaData?.id || idOrSlug;
     setFavLoading(true);
     try {
-      const result = await toggleFavoriteTesis(user.uid, id);
+      const result = await toggleFavoriteTesis(user.uid, tesisId);
       if (result.success) {
         setIsFavorite(result.isFavorite);
       }
@@ -197,7 +267,8 @@ const SahaDetay = () => {
 
   const handleRezerveEt = () => {
     // Rezervasyon sayfasına yönlendir
-    navigate(`/rezervasyon/${id}`);
+    const tesisId = sahaData?.id || idOrSlug;
+    navigate(`/rezervasyon/${tesisId}`);
   };
 
   const handleShare = () => {
@@ -299,7 +370,7 @@ const SahaDetay = () => {
             </div>
             <div className="flex items-center space-x-2">
               <button
-                onClick={handleShare}
+                onClick={handleShareClick}
                 className="p-2 text-gray-600 hover:bg-gray-50 rounded-lg"
               >
                 <Share2 className="w-5 h-5" />
@@ -442,13 +513,28 @@ const SahaDetay = () => {
             {sahaData.facilities && sahaData.facilities.length > 0 && (
               <div className="bg-white rounded-xl p-6 shadow-sm">
                 <h2 className="text-2xl font-bold text-gray-900 mb-4">Olanaklar</h2>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                  {sahaData.facilities.map((facility, index) => (
-                    <div key={index} className="flex items-center space-x-2 p-3 bg-gray-50 rounded-lg">
-                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                      <span className="text-sm text-gray-700">{facility}</span>
-                    </div>
-                  ))}
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  {sahaData.facilities.map((facility, index) => {
+                    const getIcon = (name) => {
+                      const n = name.toLowerCase();
+                      if (n.includes('wifi') || n.includes('internet')) return <Wifi size={18} className="text-blue-500" />;
+                      if (n.includes('park')) return <Car size={18} className="text-gray-600" />;
+                      if (n.includes('kafe') || n.includes('kantin')) return <Coffee size={18} className="text-orange-500" />;
+                      if (n.includes('duş') || n.includes('soyuna')) return <Bath size={18} className="text-blue-400" />;
+                      if (n.includes('tv') || n.includes('televizyon')) return <Tv size={18} className="text-red-500" />;
+                      if (n.includes('yemek') || n.includes('restoran')) return <Utensils size={18} className="text-orange-600" />;
+                      if (n.includes('kiralık') || n.includes('ekipman')) return <Shirt size={18} className="text-green-500" />;
+                      if (n.includes('klima') || n.includes('havalandırma')) return <Wind size={18} className="text-indigo-400" />;
+                      return <div className="w-2 h-2 bg-green-500 rounded-full"></div>;
+                    };
+
+                    return (
+                      <div key={index} className="flex items-center space-x-3 p-3.5 bg-gray-50 rounded-2xl border border-gray-100/50 hover:bg-white hover:shadow-md hover:border-green-100 transition-all duration-300">
+                        {getIcon(facility)}
+                        <span className="text-sm font-semibold text-gray-700">{facility}</span>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -516,20 +602,10 @@ const SahaDetay = () => {
                   <div className="flex flex-col items-end gap-1">
                     <button 
                       onClick={() => setShowReviewModal(true)}
-                      disabled={!canReview || checkingPermission}
-                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                        canReview 
-                          ? 'bg-green-600 text-white hover:bg-green-700' 
-                          : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                      }`}
+                      className="px-4 py-2 bg-green-600 text-white hover:bg-green-700 rounded-lg text-sm font-medium transition-colors"
                     >
-                      {checkingPermission ? 'Kontrol ediliyor...' : 'Değerlendir'}
+                      Değerlendir
                     </button>
-                    {!canReview && !checkingPermission && (
-                      <span className="text-[10px] text-gray-500 max-w-[150px] text-right">
-                        Sadece bu sahada maç yapmış oyuncular yorum yapabilir. Maç saatiniz geçince değerlendirme yapabilirsiniz.
-                      </span>
-                    )}
                   </div>
                 )}
               </div>

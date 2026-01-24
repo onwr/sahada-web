@@ -1,37 +1,37 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Check, ArrowRight } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { getSiteSettings } from '../services/firestoreService';
 
 const Rakamlar = () => {
-  const features = [
-    'İlk 6 ay %0 komisyon',
-    'Anında ödeme garantisi',
-    'Ücretsiz dijital pazarlama',
-    '7/24 destek'
-  ];
+  const navigate = useNavigate();
+  const [content, setContent] = useState({
+    title: 'Spor Tesisinizi Binlerce Sporcuyla Buluşturun',
+    subtitle: 'Doluluk oranınızı %40 artırın, ödemelerinizi kolaylaştırın',
+    features: [
+        'İlk 6 ay %0 komisyon',
+        'Anında ödeme garantisi',
+        'Ücretsiz dijital pazarlama',
+        '7/24 destek'
+    ],
+    stats: [
+        { number: '%40', label: 'Doluluk Artışı', color: 'bg-green-500' },
+        { number: '₺50K+', label: 'Aylık Ek Gelir', color: 'bg-green-600' },
+        { number: '15K+', label: 'Aktif Tesis', color: 'bg-green-700' },
+        { number: '%95', label: 'Memnuniyet', color: 'bg-green-800' }
+    ]
+  });
 
-  const stats = [
-    {
-      number: '%40',
-      label: 'Doluluk Artışı',
-      color: 'bg-green-500'
-    },
-    {
-      number: '₺50K+',
-      label: 'Aylık Ek Gelir',
-      color: 'bg-green-600'
-    },
-    {
-      number: '15K+',
-      label: 'Aktif Tesis',
-      color: 'bg-green-700'
-    },
-    {
-      number: '%95',
-      label: 'Memnuniyet',
-      color: 'bg-green-800'
-    }
-  ];
+  useEffect(() => {
+    const fetchContent = async () => {
+      const result = await getSiteSettings('rakamlar');
+      if (result.success) {
+        setContent(result.data);
+      }
+    };
+    fetchContent();
+  }, []);
 
   return (
     <div className='bg-green-600 py-12 lg:py-20'>
@@ -40,18 +40,16 @@ const Rakamlar = () => {
           {/* Left Content */}
           <div className='text-white'>
             <h2 className='text-3xl sm:text-4xl lg:text-5xl font-bold mb-6 leading-tight'>
-              Spor Tesisinizi Binlerce{' '}
-              <br className='hidden lg:block' />
-              Sporcuyla Buluşturun
+              {content.title}
             </h2>
 
             <p className='text-lg lg:text-xl text-white/90 mb-8'>
-              Doluluk oranınızı %40 artırın, ödemelerinizi kolaylaştırın
+              {content.subtitle}
             </p>
 
             {/* Features */}
             <div className='grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8'>
-              {features.map((feature, index) => (
+              {content.features.map((feature, index) => (
                 <div
                   key={index}
                   className='flex items-center gap-3'
@@ -66,6 +64,7 @@ const Rakamlar = () => {
 
             {/* CTA Button */}
             <button
+              onClick={() => navigate('/saha-sahibi-login')} // Yönlendirme eklendi
               className='bg-gradient-to-r from-orange-500 to-orange-600 text-white px-8 py-4 rounded-full font-bold text-lg hover:from-orange-600 hover:to-orange-700 transition-all duration-200 shadow-lg hover:shadow-xl hover:scale-105 active:scale-95 flex items-center gap-3'
             >
               Hemen Başla
@@ -75,7 +74,7 @@ const Rakamlar = () => {
 
           {/* Right Stats Grid */}
           <div className='grid grid-cols-2 gap-4'>
-            {stats.map((stat, index) => (
+            {content.stats.map((stat, index) => (
               <div
                 key={index}
                 className={`${stat.color} rounded-2xl p-6 text-center text-white shadow-xl hover:shadow-2xl transition-all duration-300 hover:-translate-y-2`}

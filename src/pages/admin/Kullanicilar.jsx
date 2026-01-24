@@ -7,6 +7,8 @@ import {
   getUserReservations,
   getUserActivityLogs,
   getUserTesis,
+  addTesis,
+  updateUserData,
   bulkUpdateUserStatus,
   updateUserDataAdmin,
   deleteUserAdmin,
@@ -34,16 +36,20 @@ import {
   Filter,
   ChevronDown,
   ChevronUp,
-  TrendingUp,
+  Trophy,
   Building2,
   Activity,
   FileText,
   Eye,
-  Trash2
+  Trash2,
+  Plus,
+  TrendingUp,
+  TrendingDown
 } from 'lucide-react';
 import { exportToCSV, exportToExcel, exportToPDF } from '../../utils/exportUtils';
 import { collection, query, onSnapshot, where } from 'firebase/firestore';
 import { db } from '../../config/firebase';
+import toast from '../../utils/toast';
 import { Line, Bar, Doughnut } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -255,6 +261,58 @@ const Kullanicilar = () => {
         }]
       }
     });
+  };
+
+  const handleCreateTesisFromProfile = async () => {
+    if (!selectedUser) return;
+    
+    setLoadingDetails(true);
+    try {
+      const tesisData = {
+        name: selectedUser.businessName || `${selectedUser.displayName} Tesisi`,
+        latitude: selectedUser.businessLocation?.lat || 41.0082,
+        longitude: selectedUser.businessLocation?.lng || 28.9784,
+        type: 'Futbol',
+        capacity: 14,
+        price: 0,
+        description: selectedUser.description || 'Yeni tesisimiz hizmetinizde.',
+        facilities: [
+          selectedUser.hasShower && 'Duş',
+          selectedUser.hasParking && 'Otopark',
+          selectedUser.hasCafeteria && 'Kafeterya'
+        ].filter(Boolean),
+        workingHours: '08:00 - 24:00',
+        phone: selectedUser.businessPhone || selectedUser.phone,
+        status: 'active',
+        isActive: true,
+        images: selectedUser.facilityPhotos || [],
+        ownerId: selectedUser.id,
+        rating: 0,
+        reservations: 0,
+        revenue: 0,
+        location: selectedUser.city && selectedUser.district ? `${selectedUser.district}, ${selectedUser.city}` : selectedUser.businessAddress || '',
+        address: selectedUser.businessAddress || '',
+        city: selectedUser.city || '',
+        district: selectedUser.district || '',
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+
+      const result = await addTesis(tesisData);
+      if (result.success) {
+        toast.success('Saha başarıyla oluşturuldu!');
+        // Tesisleri yeniden yükle
+        const tesisList = await getUserTesis(selectedUser.id);
+        if (tesisList.success) setUserTesis(tesisList.data);
+      } else {
+        toast.error('Saha oluşturulamadı: ' + result.error);
+      }
+    } catch (error) {
+      console.error('Saha oluşturma hatası:', error);
+      toast.error('Bir hata oluştu');
+    } finally {
+      setLoadingDetails(false);
+    }
   };
 
   const handleStatusUpdate = async (userId, status) => {
@@ -1276,6 +1334,67 @@ const Kullanicilar = () => {
                     </div>
                   </div>
 
+                  {/* Doğrulama Belgeleri */}
+                  {selectedUser.userType === 'owner' && (
+                    <div className="bg-gradient-to-br from-gray-50 to-white rounded-xl p-5 border border-gray-200">
+                      <h4 className="font-bold text-gray-900 mb-4 text-lg flex items-center">
+                        <div className="w-1 h-6 bg-blue-600 rounded-full mr-3"></div>
+                        Doğrulama Belgeleri
+                      </h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {(selectedUser.taxPlate || selectedUser.businessLicense) && (
+                          <div className="bg-white p-3 rounded-lg border border-gray-100 flex items-center justify-between">
+                            <div className="flex items-center text-left">
+                              <FileText className="w-8 h-8 text-blue-500 mr-3" />
+                              <div>
+                                <p className="text-[10px] text-gray-500 uppercase font-bold tracking-wider">{selectedUser.companyType === 'individual' ? 'Vergi Levhası' : 'İşletme Ruhsatı'}</p>
+                                <p className="text-sm font-semibold truncate max-w-[150px] text-gray-900">
+                                  {(selectedUser.taxPlate || selectedUser.businessLicense).original_name || (selectedUser.taxPlate || selectedUser.businessLicense).fileName || 'Belge'}
+                                </p>
+                              </div>
+                            </div>
+                            <a 
+                              href={(selectedUser.taxPlate || selectedUser.businessLicense).url} 
+                              target="_blank" 
+                              rel="noreferrer"
+                              className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors shadow-sm border border-blue-100 bg-blue-50/50"
+                              title="Görüntüle"
+                            >
+                              <Eye className="w-5 h-5" />
+                            </a>
+                          </div>
+                        )}
+                        {(selectedUser.activityCertificate || selectedUser.signatureCircular) && (
+                          <div className="bg-white p-3 rounded-lg border border-gray-100 flex items-center justify-between">
+                            <div className="flex items-center text-left">
+                              <FileText className="w-8 h-8 text-indigo-500 mr-3" />
+                              <div>
+                                <p className="text-[10px] text-gray-500 uppercase font-bold tracking-wider">{selectedUser.companyType === 'individual' ? 'Faaliyet Belgesi' : 'İmza Sirküleri'}</p>
+                                <p className="text-sm font-semibold truncate max-w-[150px] text-gray-900">
+                                  {(selectedUser.activityCertificate || selectedUser.signatureCircular).original_name || (selectedUser.activityCertificate || selectedUser.signatureCircular).fileName || 'Belge'}
+                                </p>
+                              </div>
+                            </div>
+                            <a 
+                              href={(selectedUser.activityCertificate || selectedUser.signatureCircular).url} 
+                              target="_blank" 
+                              rel="noreferrer"
+                              className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors shadow-sm border border-blue-100 bg-blue-50/50"
+                              title="Görüntüle"
+                            >
+                              <Eye className="w-5 h-5" />
+                            </a>
+                          </div>
+                        )}
+                        {(!selectedUser.taxPlate && !selectedUser.businessLicense && !selectedUser.activityCertificate && !selectedUser.signatureCircular) && (
+                          <div className="col-span-2 py-4 text-center text-gray-500 italic text-sm">
+                            Yüklenmiş belge bulunamadı.
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
                   {selectedUser.accountStatus !== 'banned' && (
                     <div className="bg-gradient-to-br from-yellow-50 to-white rounded-xl p-5 border border-yellow-200">
                       <h4 className="font-bold text-gray-900 mb-4 text-lg flex items-center">
@@ -1390,9 +1509,21 @@ const Kullanicilar = () => {
                       ))}
                     </div>
                   ) : (
-                    <div className="text-center py-8 text-gray-500">
-                      <Building2 className="w-12 h-12 mx-auto mb-2 text-gray-400" />
-                      <p>Henüz tesis yok</p>
+                    <div className="text-center py-12 bg-white rounded-xl border-2 border-dashed border-gray-200">
+                      <Building2 className="w-16 h-16 mx-auto mb-4 text-gray-300" />
+                      <p className="text-gray-900 font-bold text-lg">Henüz tesis yok</p>
+                      <p className="text-gray-500 text-sm max-w-xs mx-auto mb-6">
+                        Bu kullanıcıya ait herhangi bir tesis kaydı bulunamadı.
+                      </p>
+                      {selectedUser.onboardingCompleted && (
+                        <button
+                          onClick={handleCreateTesisFromProfile}
+                          className="px-6 py-3 bg-green-600 text-white rounded-xl font-bold hover:bg-green-700 transition-all shadow-lg hover:shadow-xl flex items-center gap-2 mx-auto"
+                        >
+                          <Plus className="w-5 h-5" />
+                          Profil Verilerinden Saha Oluştur
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>

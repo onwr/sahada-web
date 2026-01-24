@@ -165,6 +165,13 @@ const Dashboard = () => {
     loadFavoriteTesisler(reservations);
   }, [reservations, openMatches]);
 
+  const pendingPayments = openMatches.filter(m => 
+    m.status === 'open' && 
+    (m.pricePerPlayer || 0) > 0 && 
+    m.players?.includes(user?.uid) && 
+    !m.paidPlayers?.includes(user?.uid)
+  );
+
 
   const updateStats = (reservationsData) => {
     const today = new Date();
@@ -459,6 +466,33 @@ const Dashboard = () => {
         <div className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8">
           <div className="max-w-7xl mx-auto space-y-4 sm:space-y-6 md:space-y-8">
 
+            {/* Pending Payments Alert */}
+            {pendingPayments.length > 0 && (
+                <motion.div
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    className="bg-orange-50 border-l-4 border-orange-500 p-4 rounded-r-2xl shadow-sm flex items-center justify-between gap-4"
+                >
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 bg-orange-100 rounded-lg text-orange-600">
+                            <CreditCard className="w-6 h-6" />
+                        </div>
+                        <div>
+                            <h3 className="font-bold text-orange-900">Bekleyen Ödemeniz Var!</h3>
+                            <p className="text-sm text-orange-700">
+                                {pendingPayments.length} adet maç için katılım ödemeniz bekleniyor. Maça katılımınızın kesinleşmesi için lütfen ödemenizi tamamlayın.
+                            </p>
+                        </div>
+                    </div>
+                    <button 
+                        onClick={() => navigate(`/mac-detay/${pendingPayments[0].id}`)}
+                        className="bg-orange-600 text-white px-4 py-2 rounded-lg font-bold text-sm hover:bg-orange-700 transition-colors flex-shrink-0"
+                    >
+                        Hemen Öde
+                    </button>
+                </motion.div>
+            )}
+
 
 
 
@@ -516,7 +550,9 @@ const Dashboard = () => {
                               </div>
                               <div className="flex items-center gap-1">
                                 <MapPin className="w-3 h-3 sm:w-4 sm:h-4" />
-                                <span className="truncate max-w-[150px] sm:max-w-none">{reservation.tesisLocation || 'Konum'}</span>
+                                <span className="truncate max-w-[150px] sm:max-w-none">
+                                  {reservation.tesisName ? reservation.tesisLocation || reservation.location || 'Konum' : (reservation.location?.includes('(') ? 'Seçilen Konum 📍' : reservation.location || 'Konum')}
+                                </span>
                               </div>
                             </div>
                             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-0">

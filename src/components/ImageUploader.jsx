@@ -36,9 +36,16 @@ const ImageUploader = ({
   // Dosya validasyonu
   const validateFile = (file) => {
     const errors = [];
+    const fileExtension = '.' + file.name.split('.').pop().toLowerCase();
+    const isAcceptedMime = acceptedTypes.includes(file.type);
+    const isAcceptedExt = acceptedTypes.includes(fileExtension);
     
-    if (!acceptedTypes.includes(file.type)) {
-      errors.push(`${file.name}: Desteklenmeyen dosya tipi`);
+    if (!isAcceptedMime && !isAcceptedExt) {
+      const allowedExts = acceptedTypes
+        .map(t => t.includes('/') ? t.split('/')[1] : t.replace('.', ''))
+        .filter((v, i, a) => a.indexOf(v) === i)
+        .join(', ');
+      errors.push(`${file.name}: Geçersiz dosya tipi. İzin verilen: ${allowedExts}`);
     }
     
     if (file.size > maxSize * 1024 * 1024) {

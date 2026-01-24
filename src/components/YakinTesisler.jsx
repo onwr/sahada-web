@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
 import { Star, MapPin, Users, Heart, ArrowRight, Loader2, Filter, Clock, ChevronRight, UserPlus, Zap, ShoppingBag, MessageSquare } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
+import { toast } from 'react-hot-toast';
 import { getYakinTesisler, getUserOpenMatchesList, getOpenMatches, requestJoinMatch, getAllUsers } from '../services/firestoreService';
 import MatchAdCard from './MatchAdCard';
 import MatchDetailModal from './MatchDetailModal';
@@ -124,6 +124,7 @@ const YakinTesisler = () => {
                 .slice(0, 5) // Son 5 oyuncu
                 .map(u => ({
                     id: u.id,
+                    slug: u.slug,
                     player: { 
                         name: u.fullName || 'İsimsiz Oyuncu', 
                         avatar: u.photoURL || `https://ui-avatars.com/api/?name=${u.fullName || 'User'}&background=random` 
@@ -152,12 +153,28 @@ const YakinTesisler = () => {
       if(currentUser) navigate('/oyuncu/dashboard'); else navigate('/login');
   };
 
+  const handlePlayerClick = (ad) => {
+    const identifier = ad.slug || ad.id;
+    navigate(`/oyuncu-detay/${identifier}`);
+  };
+
+  const handleMessageClick = (e, playerId) => {
+    e.stopPropagation();
+    if (!currentUser) {
+      toast.error('Mesaj göndermek için giriş yapmalısınız');
+      navigate('/login', { state: { from: `/oyuncu/mesajlar?userId=${playerId}` } });
+    } else {
+      const basePath = currentUser.userType === 'owner' ? '/saha-sahibi' : '/oyuncu';
+      navigate(`${basePath}/mesajlar?userId=${playerId}`);
+    }
+  };
+
   return (
     <>
       {/* 1. SECTION: QUICK CATEGORIES */}
-      <section className="border-y border-gray-100 bg-gray-50/50 py-6 overflow-x-auto hide-scrollbar">
+      <section className="border-y border-gray-100 bg-gray-50/50 py-6">
           <div className="container mx-auto px-4">
-              <div className="flex md:justify-center gap-4 min-w-max">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:flex md:justify-center gap-3 md:gap-4">
                   {[
                       { icon: '⚽', name: 'Futbol', count: '320 Saha' },
                       { icon: '🏀', name: 'Basketbol', count: '145 Saha' },
@@ -165,11 +182,15 @@ const YakinTesisler = () => {
                       { icon: '🏐', name: 'Voleybol', count: '45 Salon' },
                       { icon: '🏊', name: 'Yüzme', count: '20 Havuz' },
                   ].map((cat, i) => (
-                      <button key={i} className="flex items-center gap-3 bg-white px-6 py-3.5 rounded-2xl border border-gray-200 hover:border-green-500 hover:shadow-lg hover:-translate-y-0.5 transition-all group min-w-[160px]">
-                          <span className="text-3xl group-hover:scale-110 transition-transform filter drop-shadow-sm">{cat.icon}</span>
-                          <div className="text-left">
-                              <div className="text-sm font-bold text-gray-900 leading-tight">{cat.name}</div>
-                              <div className="text-[10px] text-gray-400 font-medium mt-0.5">{cat.count}</div>
+                      <button 
+                        key={i} 
+                        onClick={() => navigate(`/yakin-sahalar?view=facilities&sport=${cat.name}`)}
+                        className="flex flex-col md:flex-row items-center md:items-start gap-2 md:gap-3 bg-white p-3 md:px-6 md:py-3.5 rounded-2xl border border-gray-200 hover:border-green-500 hover:shadow-lg hover:-translate-y-0.5 transition-all group w-full md:w-auto md:min-w-[160px]"
+                      >
+                          <span className="text-2xl md:text-3xl group-hover:scale-110 transition-transform filter drop-shadow-sm">{cat.icon}</span>
+                          <div className="text-center md:text-left">
+                              <div className="text-[11px] md:text-sm font-bold text-gray-900 leading-tight">{cat.name}</div>
+                              <div className="text-[9px] md:text-[10px] text-gray-400 font-medium mt-0.5">{cat.count}</div>
                           </div>
                       </button>
                   ))}
@@ -386,13 +407,21 @@ const YakinTesisler = () => {
                           {playerAds.length > 0 ? (
                               playerAds.map(ad => (
                                   <div key={ad.id} className="flex items-center gap-4 p-4 rounded-2xl border border-gray-100 hover:border-green-500/30 hover:bg-blue-50/30 transition-colors bg-white shadow-sm">
-                                      <div className="relative">
+                                      <div 
+                                        className="relative cursor-pointer"
+                                        onClick={() => handlePlayerClick(ad)}
+                                      >
                                           <img src={ad.player.avatar} className="w-14 h-14 rounded-full border-2 border-white shadow-sm" alt="avatar" />
                                           <div className="absolute -bottom-1 -right-1 bg-white text-[10px] font-bold px-1.5 py-0.5 rounded border border-gray-200 shadow-sm">{ad.level}</div>
                                       </div>
                                       <div className="flex-1">
                                           <div className="flex justify-between">
-                                              <h4 className="font-bold text-gray-900">{ad.player.name}</h4>
+                                              <h4 
+                                                className="font-bold text-gray-900 cursor-pointer hover:text-green-600 transition-colors"
+                                                onClick={() => handlePlayerClick(ad)}
+                                              >
+                                                {ad.player.name}
+                                              </h4>
                                               <span className="text-xs font-bold text-green-600 bg-blue-50 px-2 py-0.5 rounded">{ad.position}</span>
                                           </div>
                                           <p className="text-xs text-gray-500 mt-1 flex items-center gap-2">
@@ -401,7 +430,10 @@ const YakinTesisler = () => {
                                               <Clock size={12} /> {ad.availability}
                                           </p>
                                       </div>
-                                      <button className="p-2 bg-gray-50 rounded-lg text-gray-400 hover:text-green-600 hover:bg-white transition-colors">
+                                      <button 
+                                        onClick={(e) => handleMessageClick(e, ad.id)}
+                                        className="p-2 bg-gray-50 rounded-lg text-gray-400 hover:text-green-600 hover:bg-white transition-colors"
+                                      >
                                           <MessageSquare size={18} />
                                       </button>
                                   </div>

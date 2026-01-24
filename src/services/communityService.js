@@ -68,6 +68,21 @@ export const createPost = async (postData) => {
   }
 };
 
+// Update Post
+export const updatePost = async (postId, postData) => {
+  try {
+    const postRef = doc(db, 'posts', postId);
+    await updateDoc(postRef, {
+      ...postData,
+      updatedAt: serverTimestamp()
+    });
+    return { success: true };
+  } catch (error) {
+    console.error('Error updating post:', error);
+    return { success: false, error: error.message };
+  }
+};
+
 // Delete Post
 export const deletePost = async (postId) => {
   try {

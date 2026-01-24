@@ -97,9 +97,10 @@ const Hero = () => {
     const handleSearch = () => {
         const query = searchLocation ? encodeURIComponent(searchLocation) : '';
         if (searchTab === 'RENT') {
-            navigate(`/yakin-sahalar?search=${query}`);
+            navigate(`/yakin-sahalar?view=facilities&search=${query}`);
         } else {
-            navigate(`/oyuncu-bul?search=${query}`);
+            // "Oyuncu Bul" now goes to the map view with players selected
+            navigate(`/yakin-sahalar?view=players&search=${query}`);
         }
     };
 

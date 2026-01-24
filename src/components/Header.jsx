@@ -2,12 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { 
   Menu, X, User, LogOut, Settings, ChevronDown, MapPin,
 
-  LayoutDashboard, Building2, Search, BookOpen, Shield, Users
+  LayoutDashboard,
 } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { getPlatformSettings } from '../services/firestoreService';
+import { getPlatformSettings, markNotificationAsRead, markAllNotificationsAsRead } from '../services/firestoreService';
+import { collection, query, where, onSnapshot, limit, orderBy, updateDoc, doc, writeBatch } from 'firebase/firestore';
+import { db } from '../config/firebase';
+import { Bell, Info, Check } from 'lucide-react';
 
 const Header = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -15,23 +18,98 @@ const Header = () => {
   const { user, userData, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const [logoUrl, setLogoUrl] = useState(null); // Initialize as null to show skeleton
-  const [loadingLogo, setLoadingLogo] = useState(true);
-  const [dynamicMenu, setDynamicMenu] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [logoUrl, setLogoUrl] = useState(localStorage.getItem('platform_logo') || '/images/logo.png');
+  const [siteTitle, setSiteTitle] = useState(localStorage.getItem('platform_title') || 'Sahada');
+  const [loadingLogo, setLoadingLogo] = useState(false); // Default to false to show cached logo
+  const [dynamicMenu, setDynamicMenu] = useState(() => {
+    try {
+      const savedMenu = localStorage.getItem('platform_menu');
+      return savedMenu ? JSON.parse(savedMenu) : [];
+    } catch (e) {
+      return [];
+    }
+  });
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  const notificationRef = React.useRef(null);
+
+  // Listen for notifications
+  useEffect(() => {
+    if (!user) {
+      setUnreadCount(0);
+      setNotifications([]);
+      return;
+    }
+
+    const q = query(
+      collection(db, 'notifications'),
+      where('userId', '==', user.uid),
+      limit(20)
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const notifs = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+      
+      // Client-side sorting
+      notifs.sort((a, b) => {
+        const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt || 0);
+        const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt || 0);
+        return dateB - dateA;
+      });
+
+      setNotifications(notifs);
+      setUnreadCount(notifs.filter(n => !n.read).length);
+    }, (error) => {
+      console.error('Notification listener error in Header:', error);
+    });
+
+    return () => unsubscribe();
+  }, [user]);
+
+  const markAsRead = async (notificationId) => {
+    await markNotificationAsRead(notificationId);
+  };
+
+  const markAllAsRead = async () => {
+    if (!user) return;
+    await markAllNotificationsAsRead(user.uid);
+  };
+
+  const cleanMessage = (msg) => {
+    if (!msg || typeof msg !== 'string') return '';
+    return msg
+      .replace(/Ã¶/g, 'ö').replace(/Ã§/g, 'ç').replace(/ÅŸ/g, 'ş').replace(/ÄŸ/g, 'ğ')
+      .replace(/Ã¼/g, 'ü').replace(/Ä±/g, 'ı').replace(/Ä°/g, 'İ').replace(/Ã–/g, 'Ö')
+      .replace(/Ã‡/g, 'Ç').replace(/Åž/g, 'Ş').replace(/Äž/g, 'Ğ').replace(/Ãœ/g, 'Ü');
+  };
+
+  const formatNotificationDate = (timestamp) => {
+    if (!timestamp) return '';
+    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+    return date.toLocaleDateString('tr-TR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  };
 
   useEffect(() => {
     const fetchSettings = async () => {
        try {
          const result = await getPlatformSettings();
           if (result.success) {
-            if (result.data.logoUrl) setLogoUrl(result.data.logoUrl);
-            if (result.data.menus?.header) setDynamicMenu(result.data.menus.header);
-          } else {
-             setLogoUrl('/images/logo.png'); // Fallback
+            if (result.data.logoUrl) {
+                setLogoUrl(result.data.logoUrl);
+                localStorage.setItem('platform_logo', result.data.logoUrl);
+            }
+            if (result.data.siteTitle) {
+                setSiteTitle(result.data.siteTitle);
+                localStorage.setItem('platform_title', result.data.siteTitle);
+            }
+            if (result.data.menus?.header) {
+                setDynamicMenu(result.data.menus.header);
+                localStorage.setItem('platform_menu', JSON.stringify(result.data.menus.header));
+            }
           }
        } catch (error) {
          console.error('Header logo fetch error:', error);
-         setLogoUrl('/images/logo.png'); // Error fallback
        } finally {
          setLoadingLogo(false);
        }
@@ -113,6 +191,9 @@ const Header = () => {
       if (isUserDropdownOpen && !event.target.closest('.user-dropdown')) {
         setIsUserDropdownOpen(false);
       }
+      if (isNotificationsOpen && notificationRef.current && !notificationRef.current.contains(event.target)) {
+        setIsNotificationsOpen(false);
+      }
     };
 
     document.addEventListener('mousedown', handleClickOutside);
@@ -120,134 +201,223 @@ const Header = () => {
   }, [isUserDropdownOpen]);
 
   return (
-    <header className="sticky top-0 z-50 bg-white border-b border-gray-200 shadow-sm">
+    <header className="sticky top-0 z-[1001] bg-white border-b border-gray-200 shadow-sm">
       <div className="container mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="flex h-16 items-center justify-between">
-          {/* Logo */}
-          <div 
-            className="flex items-center cursor-pointer"
-            onClick={() => navigate('/')}
-          >
-            {loadingLogo ? (
-              <div className="h-12 w-32 bg-gray-200 animate-pulse rounded-md" />
-            ) : (
-              <img 
-                src={logoUrl} 
-                className="h-12 sm:h-14 w-auto object-contain" 
-                alt="Sahada Logo" 
-              />
-            )}
+        <div className="flex h-16 items-center">
+          {/* Left: Logo */}
+          <div className="flex-1 flex items-center justify-start min-w-0">
+            <div 
+              className="flex items-center cursor-pointer"
+              onClick={() => navigate('/')}
+            >
+              {loadingLogo ? (
+                <div className="h-10 sm:h-12 w-24 sm:w-32 bg-gray-100 animate-pulse rounded-full" />
+              ) : (
+                <img 
+                  src={logoUrl} 
+                  className="h-9 sm:h-11 w-auto max-w-[140px] sm:max-w-[200px] object-contain transition-opacity duration-300" 
+                  alt={`${siteTitle} Logo`} 
+                  onError={(e) => {
+                    e.target.src = '/images/logo.png';
+                  }}
+                />
+              )}
+            </div>
           </div>
 
-          {/* Desktop Navigation */}
-          <nav className="hidden md:flex items-center space-x-1">
-            {navigationItems.map((item) => {
-              const Icon = getIcon(item.icon);
-              return (
-                <button
-                  key={item.name}
-                  onClick={() => {
-                    navigate(item.href);
-                    setIsMobileMenuOpen(false);
-                  }}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    isActive(item.href)
-                      ? 'bg-green-50 text-green-600'
-                      : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
-                  }`}
-                >
-                  <Icon size={18} />
-                  <span>{item.name}</span>
-                </button>
-              );
-            })}
-          </nav>
+          {/* Center: Navigation (Desktop Only) */}
+          <div className="hidden md:flex flex-initial items-center justify-center">
+            <nav className="flex items-center space-x-1 lg:space-x-2">
+              {navigationItems.map((item) => {
+                const Icon = getIcon(item.icon);
+                return (
+                  <button
+                    key={item.name}
+                    onClick={() => {
+                      navigate(item.href);
+                      setIsMobileMenuOpen(false);
+                    }}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-bold transition-all duration-200 ${
+                      isActive(item.href)
+                        ? 'bg-green-600 text-white shadow-lg shadow-green-100'
+                        : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                    }`}
+                  >
+                    <Icon size={16} />
+                    <span>{item.name}</span>
+                  </button>
+                );
+              })}
+            </nav>
+          </div>
 
-          {/* Right Side - Auth Buttons or User Menu */}
-          <div className="flex items-center gap-3">
+          {/* Right: Auth & Mobile Toggle */}
+          <div className="flex-1 flex items-center justify-end gap-2 sm:gap-3">
             {user ? (
-              <div className="relative user-dropdown">
+              <div className="relative user-dropdown flex items-center gap-2" ref={notificationRef}>
                 <button
-                  onClick={() => setIsUserDropdownOpen(!isUserDropdownOpen)}
-                  className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors"
+                  onClick={() => {
+                    if (unreadCount > 0) {
+                      setIsNotificationsOpen(!isNotificationsOpen);
+                      setIsUserDropdownOpen(false);
+                    } else {
+                      setIsUserDropdownOpen(!isUserDropdownOpen);
+                      setIsNotificationsOpen(false);
+                    }
+                  }}
+                  className="flex items-center gap-2 pl-3 pr-2 py-1.5 rounded-full border border-gray-100 hover:border-green-200 bg-gray-50/50 hover:bg-white transition-all shadow-sm"
                 >
-                  <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center overflow-hidden">
-                    {userData?.photoURL || userData?.profilePhoto?.url ? (
-                      <img 
-                        src={userData.photoURL || userData.profilePhoto.url} 
-                        alt="Profil" 
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <User size={18} className="text-green-600" />
-                    )}
-                  </div>
-                  <span className="hidden sm:inline-block text-sm font-medium text-gray-700">
+                  <span className="hidden lg:inline-block text-xs font-bold text-gray-700">
                     {userData?.fullName || userData?.displayName || 'Kullanıcı'}
                   </span>
+                  <div className="relative">
+                    <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center overflow-hidden border-2 border-white shadow-sm">
+                      {userData?.photoURL || user?.photoURL || userData?.profilePhoto?.url ? (
+                        <img 
+                          src={userData?.photoURL || user?.photoURL || userData?.profilePhoto?.url} 
+                          alt="Profil" 
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <User size={18} className="text-green-600" />
+                      )}
+                    </div>
+                    {unreadCount > 0 && (
+                      <div className="absolute -top-1 -right-1 min-w-[17px] h-[17px] bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center px-1 border-2 border-white animate-pulse shadow-sm z-10">
+                        {unreadCount}
+                      </div>
+                    )}
+                  </div>
                   <ChevronDown 
-                    size={16} 
-                    className={`text-gray-500 transition-transform ${isUserDropdownOpen ? 'rotate-180' : ''}`} 
+                    size={14} 
+                    className={`text-gray-400 transition-transform duration-200 hidden sm:block ${isUserDropdownOpen ? 'rotate-180' : ''}`} 
                   />
                 </button>
 
+                {/* Notifications Dropdown */}
+                {isNotificationsOpen && (
+                  <div className="absolute right-0 mt-3 w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-gray-100 py-2 z-50 transform origin-top-right transition-all animate-in fade-in zoom-in-95">
+                    <div className="px-4 py-3 border-b border-gray-50 flex justify-between items-center">
+                      <h3 className="font-bold text-gray-900 text-sm">Bildirimler</h3>
+                      {unreadCount > 0 && (
+                        <button onClick={markAllAsRead} className="text-[10px] text-green-600 hover:text-green-700 font-bold uppercase tracking-wider">
+                          Tümünü Oku
+                        </button>
+                      )}
+                    </div>
+                    <div className="max-h-80 overflow-y-auto custom-scrollbar">
+                      {notifications.length > 0 ? (
+                        notifications.map((n) => (
+                          <div
+                            key={n.id}
+                            onClick={() => {
+                              markAsRead(n.id);
+                              if (n.link) navigate(n.link);
+                              setIsNotificationsOpen(false);
+                            }}
+                            className={`px-4 py-3 hover:bg-gray-50 cursor-pointer border-b border-gray-50 last:border-0 transition-colors ${!n.read ? 'bg-green-50/20' : ''}`}
+                          >
+                            <div className="flex gap-3">
+                              <div className={`mt-0.5 p-1.5 rounded-full flex-shrink-0 ${!n.read ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'}`}>
+                                <Info size={14} />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className={`text-xs ${!n.read ? 'font-bold text-gray-900' : 'text-gray-600'}`}>
+                                  {cleanMessage(n.title)}
+                                </p>
+                                <p className="text-[11px] text-gray-500 mt-0.5 line-clamp-2">
+                                  {cleanMessage(n.message)}
+                                </p>
+                                <p className="text-[9px] text-gray-400 mt-1 uppercase font-medium">
+                                  {formatNotificationDate(n.createdAt)}
+                                </p>
+                              </div>
+                              {!n.read && (
+                                <div className="flex flex-col items-center gap-2 self-center">
+                                    <button
+                                      onClick={(e) => {
+                                          e.stopPropagation();
+                                          markAsRead(n.id);
+                                      }}
+                                      className="p-1.5 hover:bg-green-100 text-green-600 rounded-full transition-colors"
+                                    >
+                                        <Check size={14} strokeWidth={3} />
+                                    </button>
+                                    <div className="w-1.5 h-1.5 bg-green-500 rounded-full flex-shrink-0 animate-pulse" />
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="px-4 py-10 text-center text-gray-400">
+                          <Bell size={24} className="mx-auto mb-2 opacity-20" />
+                          <p className="text-xs">Bildirim bulunmuyor</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
                 {/* Dropdown Menu */}
                 {isUserDropdownOpen && (
-                  <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
-                    <div className="px-4 py-3 border-b border-gray-100">
-                      <p className="text-sm font-medium text-gray-900">
+                  <div className="absolute right-0 mt-3 w-60 bg-white rounded-2xl shadow-2xl border border-gray-100 py-2 z-50 animate-in fade-in zoom-in-95 duration-200">
+                    <div className="px-5 py-4 border-b border-gray-50">
+                      <p className="text-sm font-black text-gray-900 truncate">
                         {userData?.fullName || userData?.displayName || 'Kullanıcı'}
                       </p>
-                      <p className="text-xs text-gray-500 mt-0.5">{userData?.email}</p>
+                      <p className="text-[10px] font-bold text-gray-400 mt-0.5 truncate uppercase tracking-wider">{userData?.email}</p>
                     </div>
-                    <button
-                      onClick={() => {
-                        navigate(getDashboardUrl());
-                        setIsUserDropdownOpen(false);
-                      }}
-                      className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
-                    >
-                      <LayoutDashboard size={16} />
-                      Panel
-                    </button>
-                    <button
-                      onClick={() => {
-                        navigate(getSettingsUrl());
-                        setIsUserDropdownOpen(false);
-                      }}
-                      className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
-                    >
-                      <Settings size={16} />
-                      Ayarlar
-                    </button>
-                    <button
-                      onClick={handleLogout}
-                      className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
-                    >
-                      <LogOut size={16} />
-                      Çıkış Yap
-                    </button>
+                    <div className="p-2 space-y-1">
+                      <button
+                        onClick={() => {
+                          navigate(getDashboardUrl());
+                          setIsUserDropdownOpen(false);
+                        }}
+                        className="w-full px-4 py-2.5 text-left text-sm font-bold text-gray-600 hover:bg-gray-50 hover:text-green-600 rounded-xl transition-all flex items-center gap-3"
+                      >
+                        <LayoutDashboard size={18} />
+                        Kontrol Paneli
+                      </button>
+                      <button
+                        onClick={() => {
+                          navigate(getSettingsUrl());
+                          setIsUserDropdownOpen(false);
+                        }}
+                        className="w-full px-4 py-2.5 text-left text-sm font-bold text-gray-600 hover:bg-gray-50 hover:text-green-600 rounded-xl transition-all flex items-center gap-3"
+                      >
+                        <Settings size={18} />
+                        Hesap Ayarları
+                      </button>
+                      <button
+                        onClick={handleLogout}
+                        className="w-full px-4 py-2.5 text-left text-sm font-bold text-red-500 hover:bg-red-50 rounded-xl transition-all flex items-center gap-3 mt-2 border-t border-gray-50 pt-3"
+                      >
+                        <LogOut size={18} />
+                        Güvenli Çıkış
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
             ) : (
-              <>
-        
-                <button
-                  onClick={() => navigate('/login')}
-                  className="inline-flex items-center px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors"
-                >
-                  Giriş Yap
-                </button>
-              </>
+              <button
+                onClick={() => navigate('/login', { state: { from: location.pathname } })}
+                className="inline-flex items-center px-6 py-2.5 bg-green-600 text-white text-sm font-black rounded-xl hover:bg-green-700 transition-all shadow-lg shadow-green-100 hover:shadow-green-200 transform hover:-translate-y-0.5 active:scale-95"
+              >
+                Giriş Yap
+              </button>
             )}
 
             {/* Mobile Menu Button */}
             <button
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="md:hidden p-2 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+              className="md:hidden p-2 rounded-xl text-gray-900 bg-gray-50 hover:bg-gray-100 transition-all border border-gray-200 relative"
             >
-              {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+              {isMobileMenuOpen ? <X size={22} /> : <Menu size={22} />}
+              {unreadCount > 0 && !isMobileMenuOpen && (
+                <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-red-500 border-2 border-white rounded-full"></span>
+              )}
             </button>
           </div>
         </div>
@@ -283,7 +453,7 @@ const Header = () => {
 
                   <button
                     onClick={() => {
-                      navigate('/login');
+                      navigate('/login', { state: { from: location.pathname } });
                       setIsMobileMenuOpen(false);
                     }}
                     className="flex items-center justify-center gap-3 px-4 py-3 rounded-lg text-sm font-medium bg-green-600 text-white hover:bg-green-700"

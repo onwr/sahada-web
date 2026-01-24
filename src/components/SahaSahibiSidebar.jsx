@@ -23,7 +23,8 @@ import {
   Menu,
   X,
   Home,
-  Globe
+  Globe,
+  Bell
 } from 'lucide-react';
 
 const SahaSahibiSidebar = () => {
@@ -33,6 +34,7 @@ const SahaSahibiSidebar = () => {
   const navigate = useNavigate();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [unreadMessageCount, setUnreadMessageCount] = useState(0);
+  const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
   const [hasNewMessage, setHasNewMessage] = useState(false);
   const [fieldCount, setFieldCount] = useState(0);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
@@ -113,6 +115,13 @@ const SahaSahibiSidebar = () => {
       badge: unreadMessageCount > 0 ? unreadMessageCount : null
     },
     {
+      name: 'Bildirimler',
+      href: '/saha-sahibi/bildirimler',
+      icon: Bell,
+      current: location.pathname === '/saha-sahibi/bildirimler',
+      badge: unreadNotificationCount > 0 ? unreadNotificationCount : null
+    },
+    {
       name: 'Destek',
       href: '/saha-sahibi/destek',
       icon: MessageSquare,
@@ -176,6 +185,23 @@ const SahaSahibiSidebar = () => {
     return () => unsubscribe();
   }, [user, location.pathname]);
 
+  // Bildirim sayısını getir
+  useEffect(() => {
+    if (!user) return;
+    const q = query(
+      collection(db, 'notifications'), 
+      where('userId', '==', user.uid), 
+      where('read', '==', false)
+    );
+    
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+        setUnreadNotificationCount(snapshot.size);
+    }, (error) => { 
+        console.error('Bildirim listener hatası:', error); 
+    });
+    return () => unsubscribe();
+  }, [user]);
+
   // Sayfa değiştiğinde mobili kapat
   useEffect(() => {
     setIsMobileOpen(false);
@@ -225,9 +251,9 @@ const SahaSahibiSidebar = () => {
               <div className="absolute bottom-0 left-0 w-16 h-16 bg-white/10 rounded-full -ml-8 -mb-8 transition-transform group-hover:scale-150 duration-700"></div>
               
               <div className="relative z-10 flex flex-col items-center text-center">
-                <div className="w-16 h-16 rounded-full border-2 border-white/20 p-1 mb-3 bg-white/10 backdrop-blur-sm shadow-inner group-hover:border-white/40 transition-colors">
-                    {userData?.photoURL ? (
-                        <img src={userData.photoURL} alt={userData.displayName} className="w-full h-full rounded-full object-cover" />
+                <div className="w-16 h-16 rounded-full border-2 border-white/20 p-1 mb-3 bg-white/10 backdrop-blur-sm shadow-inner group-hover:border-white/40 transition-colors flex items-center justify-center overflow-hidden">
+                    {userData?.photoURL || user?.photoURL || userData?.profilePhoto?.url ? (
+                        <img src={userData.photoURL || user.photoURL || userData.profilePhoto?.url} alt={userData?.fullName || userData?.displayName || 'Saha Sahibi'} className="w-full h-full rounded-full object-cover" />
                     ) : (
                         <div className="w-full h-full bg-green-500 rounded-full flex items-center justify-center">
                             <Building2 className="w-8 h-8 text-white" />

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Eye, EyeOff, User, Mail, Lock, Phone, MapPin, Building, UserCheck } from 'lucide-react';
 import { registerUser, loginUser } from '../services/authService';
 import { useAuth } from '../contexts/AuthContext';
@@ -8,6 +8,7 @@ import toast from '../utils/toast';
 
 const GirisKayit = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { setUserData, setNeedsOnboarding } = useAuth();
   const [activeTab, setActiveTab] = useState('giris');
   const [userType, setUserType] = useState('player'); // 'player' veya 'owner'
@@ -108,13 +109,15 @@ const GirisKayit = () => {
       
       if (result.success) {
         // Başarılı giriş/kayıt sonrası yönlendirme
-        const finalUserType = result.user?.userType || (activeTab === 'kayit' ? userType : 'player');
+        const user = result.user;
+        const finalUserType = user?.userType || (activeTab === 'kayit' ? userType : 'player');
+        const onboardingCompleted = user?.onboardingCompleted || false;
         
-        // Kayıt sonrası context'i güncelle (userData henüz yüklenmemiş olabilir)
-        if (activeTab === 'kayit' && result.user) {
+        // Kayıt sonrası context'i güncelle
+        if (activeTab === 'kayit' && user) {
           setUserData({
-            uid: result.user.uid,
-            email: result.user.email,
+            uid: user.uid,
+            email: user.email,
             userType: finalUserType,
             onboardingCompleted: false
           });
@@ -123,14 +126,17 @@ const GirisKayit = () => {
           }
         }
         
-        // Hemen yönlendir
-        if (finalUserType === 'player') {
-          navigate('/oyuncu/onboarding', { replace: true });
-        } else if (finalUserType === 'owner') {
-          navigate('/saha-sahibi/onboarding', { replace: true });
+        // Redirect logic
+        const locationState = window.history.state?.usr; // state passed via navigate (sometimes available this way in react-router v6+)
+        // Better way: use useLocation in the component
+        
+        if (!onboardingCompleted) {
+          const onboardingPath = finalUserType === 'owner' ? '/saha-sahibi/onboarding' : '/oyuncu/onboarding';
+          navigate(onboardingPath, { replace: true });
         } else {
-          // Varsayılan olarak player'a yönlendir
-          navigate('/oyuncu/onboarding', { replace: true });
+          // Check for redirect from state
+          const from = location.state?.from || (finalUserType === 'owner' ? '/saha-sahibi/dashboard' : '/oyuncu/dashboard');
+          navigate(from, { replace: true });
         }
       } else {
         setErrors({ submit: result.error || 'Bir hata oluştu' });

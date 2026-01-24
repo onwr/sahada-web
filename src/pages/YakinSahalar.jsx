@@ -162,10 +162,52 @@ const YakinSahalar = () => {
     setupPlayersListener();
   }, []);
 
+  // Sync with URL params
+  useEffect(() => {
+    const s = searchParams.get('search');
+    if (s !== null) {
+      setSearchQuery(s);
+    }
+    const v = searchParams.get('view');
+    if (v === 'facilities' || v === 'players' || v === 'both') {
+      setViewMode(v);
+    }
+    const sp = searchParams.get('sport');
+    if (sp) {
+      setSportFilter(sp);
+    }
+  }, [searchParams]);
+
   useEffect(() => {
     applyFilters();
     applyPlayerFilters();
   }, [tesisler, oyuncular, searchQuery, sportFilter, featureFilters, sortBy, userLocation, viewMode]);
+
+  // Center map on search results or city name
+  useEffect(() => {
+    if (searchQuery && !loading) {
+      if (viewMode === 'players' && filteredOyuncular.length > 0) {
+        setMapCenter({ 
+          lat: filteredOyuncular[0].latitude, 
+          lng: filteredOyuncular[0].longitude 
+        });
+        setMapZoom(13);
+      } else if (filteredTesisler.length > 0) {
+        setMapCenter({ 
+          lat: filteredTesisler[0].latitude, 
+          lng: filteredTesisler[0].longitude 
+        });
+        setMapZoom(13);
+      } else {
+        // If no direct results found, check if it's a known city name
+        const cityData = getCityCoordinates(searchQuery);
+        if (cityData.success) {
+          setMapCenter({ lat: cityData.lat, lng: cityData.lng });
+          setMapZoom(11);
+        }
+      }
+    }
+  }, [searchQuery, filteredTesisler.length, filteredOyuncular.length, loading]);
 
   const getUserLocation = async () => {
     setLocationLoading(true);
@@ -588,6 +630,7 @@ const YakinSahalar = () => {
             zoom={mapZoom}
             style={{ height: '100%', width: '100%' }}
             scrollWheelZoom={true}
+            zoomControl={false}
           >
             {mapLayer === 'standard' ? (
               <TileLayer
@@ -763,7 +806,7 @@ const YakinSahalar = () => {
                                   'volleyball': { label: 'Voleybol', emoji: '🏐', class: 'bg-purple-50 text-purple-700 border-purple-100' },
                                   'swimming': { label: 'Yüzme', emoji: '🏊', class: 'bg-cyan-50 text-cyan-700 border-cyan-100' },
                                 };
-                                const d = sportDetails[sport] || { label: sport, emoji: '�', class: 'bg-gray-50 text-gray-600 border-gray-100' };
+                                const d = sportDetails[sport] || { label: sport, emoji: '', class: 'bg-gray-50 text-gray-600 border-gray-100' };
                                 
                                 return (
                                   <span key={idx} className={`px-1.5 py-0.5 rounded border text-[10px] font-medium flex items-center gap-1 ${d.class}`}>
@@ -804,29 +847,31 @@ const YakinSahalar = () => {
           </MapContainer>
 
           {/* Harita kontrolleri */}
-          <div className="absolute top-4 left-4 z-[1000] bg-white rounded-lg shadow-lg p-2 flex flex-col gap-2">
+          <div className="absolute top-20 left-4 z-[1000] flex flex-col gap-2">
             <button
               onClick={getUserLocation}
               disabled={locationLoading}
-              className="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+              className="p-2.5 bg-blue-600 text-white rounded-xl shadow-lg hover:bg-blue-700 transition-all hover:scale-110 active:scale-95 disabled:opacity-50"
               title="Konumum"
             >
-              <Navigation size={20} />
+              <Navigation size={22} fill="currentColor" />
             </button>
-            <button
-              onClick={() => setMapZoom(mapZoom + 1)}
-              className="p-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-              title="Yakınlaştır"
-            >
-              +
-            </button>
-            <button
-              onClick={() => setMapZoom(mapZoom - 1)}
-              className="p-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-              title="Uzaklaştır"
-            >
-              −
-            </button>
+            <div className="flex flex-col bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden">
+              <button
+                onClick={() => setMapZoom(mapZoom + 1)}
+                className="p-2.5 hover:bg-gray-50 transition-colors border-b border-gray-100 font-bold text-lg text-gray-600"
+                title="Yakınlaştır"
+              >
+                +
+              </button>
+              <button
+                onClick={() => setMapZoom(mapZoom - 1)}
+                className="p-2.5 hover:bg-gray-50 transition-colors font-bold text-lg text-gray-600"
+                title="Uzaklaştır"
+              >
+                −
+              </button>
+            </div>
           </div>
 
           {/* Harita Katmanı Değiştirme */}

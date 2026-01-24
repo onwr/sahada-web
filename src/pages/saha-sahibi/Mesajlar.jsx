@@ -52,6 +52,7 @@ const Mesajlar = () => {
   const [availableUsers, setAvailableUsers] = useState([]);
   const [userSearchQuery, setUserSearchQuery] = useState('');
   const [loadingUsers, setLoadingUsers] = useState(false);
+  const [previewImage, setPreviewImage] = useState(null);
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
 
@@ -577,8 +578,8 @@ const Mesajlar = () => {
                                     <img
                                       src={att.url}
                                       alt={att.name}
-                                      className="max-w-full max-h-64 rounded-lg cursor-pointer"
-                                      onClick={() => window.open(att.url, '_blank')}
+                                      className="max-w-full max-h-64 rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
+                                      onClick={() => setPreviewImage(att.url)}
                                     />
                                   ) : (
                                     <a
@@ -860,6 +861,26 @@ const Mesajlar = () => {
               )}
             </div>
           </div>
+        </div>
+      )}
+      {/* Görsel Önizleme Modalı */}
+      {previewImage && (
+        <div 
+          className="fixed inset-0 bg-black/90 flex items-center justify-center z-[100] p-4 cursor-pointer animate-in fade-in"
+          onClick={() => setPreviewImage(null)}
+        >
+          <button 
+            className="absolute top-4 right-4 text-white hover:text-gray-300 p-2 transition-colors"
+            onClick={() => setPreviewImage(null)}
+          >
+            <X size={32} />
+          </button>
+          <img 
+            src={previewImage} 
+            alt="Önizleme" 
+            className="max-w-full max-h-full object-contain rounded-lg shadow-2xl animate-in zoom-in-95 duration-300"
+            onClick={(e) => e.stopPropagation()}
+          />
         </div>
       )}
     </div>
