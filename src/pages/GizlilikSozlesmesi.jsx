@@ -8,7 +8,7 @@ const GizlilikSozlesmesi = () => {
   return (
     <div className="min-h-screen bg-gray-50 font-sans">
       {/* Hero Section */}
-      <div className="bg-gradient-to-r from-green-900 to-green-800 text-white pt-24 pb-16 relative overflow-hidden">
+      <div className="bg-gradient-to-r from-green-600 to-green-700 text-white pt-24 pb-16 relative overflow-hidden">
         <div className="absolute top-0 left-0 w-full h-full opacity-10 pointer-events-none">
            <div className="absolute top-10 left-10 w-64 h-64 rounded-full bg-white blur-3xl"></div>
            <div className="absolute bottom-10 right-10 w-96 h-96 rounded-full bg-white blur-3xl"></div>

@@ -391,8 +391,8 @@ const Kullanicilar = () => {
       let bValue = b[sortField];
       
       if (sortField === 'displayName') {
-        aValue = a.displayName || '';
-        bValue = b.displayName || '';
+        aValue = a.displayName || a.fullName || '';
+        bValue = b.displayName || b.fullName || '';
       } else if (sortField === 'email') {
         aValue = a.email || '';
         bValue = b.email || '';
@@ -596,11 +596,14 @@ const Kullanicilar = () => {
     // Arama sorgusu
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(user =>
-        user.displayName?.toLowerCase().includes(query) ||
-        user.email?.toLowerCase().includes(query) ||
-        user.phone?.toLowerCase().includes(query)
-      );
+      filtered = filtered.filter(user => {
+        const name = user.displayName || user.fullName || '';
+        return (
+          name.toLowerCase().includes(query) ||
+          user.email?.toLowerCase().includes(query) ||
+          user.phone?.toLowerCase().includes(query)
+        );
+      });
     }
 
     // Gelişmiş filtreler
@@ -635,7 +638,7 @@ const Kullanicilar = () => {
     
     const headers = ['Kullanıcı Adı', 'E-posta', 'Telefon', 'Tip', 'Durum', 'Kayıt Tarihi'];
     const rows = filteredUsers.map(u => [
-      u.displayName || 'İsimsiz',
+      u.displayName || u.fullName || 'İsimsiz',
       u.email || '',
       u.phone || '',
       u.userType || 'player',
@@ -1112,7 +1115,7 @@ const Kullanicilar = () => {
                               <Users className="w-5 h-5 text-green-600" />
                             </div>
                             <div className="ml-4">
-                              <div className="text-sm font-medium text-gray-900">{user.displayName || 'İsimsiz'}</div>
+                              <div className="text-sm font-medium text-gray-900">{user.displayName || user.fullName || 'İsimsiz'}</div>
                               <div className="text-sm text-gray-500">{user.phone || 'Telefon yok'}</div>
                             </div>
                           </div>
@@ -1295,7 +1298,7 @@ const Kullanicilar = () => {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                       <div>
                         <p className="text-gray-500 font-medium mb-1">Ad Soyad</p>
-                        <p className="text-gray-900 font-semibold">{selectedUser.displayName || 'Belirtilmemiş'}</p>
+                        <p className="text-gray-900 font-semibold">{selectedUser.displayName || selectedUser.fullName || 'Belirtilmemiş'}</p>
                       </div>
                       <div>
                         <p className="text-gray-500 font-medium mb-1">E-posta</p>
@@ -1601,7 +1604,7 @@ const Kullanicilar = () => {
                     <input
                       type="text"
                       name="displayName"
-                      defaultValue={editingUser.displayName}
+                      defaultValue={editingUser.displayName || editingUser.fullName}
                       className="w-full px-4 py-2 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
                     />
                   </div>

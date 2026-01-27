@@ -31,7 +31,7 @@ const AppLoader = ({ onLoadingComplete }) => {
             {/* Logo */}
             <div className="w-64 h-auto mb-6">
                 <img 
-                   src="/images/logo.png" 
+                   src={localStorage.getItem('platform_logo') || "/images/logo.png"} 
                    alt="Sahada Logo" 
                    className="w-full h-full object-contain"
                 />

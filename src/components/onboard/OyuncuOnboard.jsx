@@ -59,7 +59,7 @@ const OyuncuOnboard = () => {
   });
 
   const [errors, setErrors] = useState({});
-  const [profileCompletion, setProfileCompletion] = useState(20); // Başlangıç %20
+  const [profileCompletion, setProfileCompletion] = useState(20);
   const [showReward, setShowReward] = useState(false);
   const [profileImageData, setProfileImageData] = useState(null);
   const dataLoadedRef = useRef(false);
@@ -70,6 +70,13 @@ const OyuncuOnboard = () => {
     whatsapp: false,
     membershipAgreement: false
   });
+  
+  // SMS Verification States
+  const [showOTPModal, setShowOTPModal] = useState(false);
+  const [otpCode, setOtpCode] = useState('');
+  const [generatedOTP, setGeneratedOTP] = useState('');
+  const [otpLoading, setOtpLoading] = useState(false);
+  const [phoneVerified, setPhoneVerified] = useState(false);
 
   const steps = [
     { id: 1, title: 'Temel Bilgiler', description: 'Profilinizi tamamlayın' },
@@ -391,7 +398,136 @@ const OyuncuOnboard = () => {
     return true;
   };
 
+  // SMS Functions
+  const sendOTP = async (phone, code) => {
+    console.log('=== SMS GÖNDERME BAŞLADI ===');
+    console.log('1. Gelen telefon:', phone);
+    console.log('2. Gelen kod:', code);
+    
+    try {
+      const username = '8503059015';
+      const password = '4A33D@1';
+      const header = 'Bigabe';
+      
+      console.log('3. NetGSM Bilgileri:', { username, header });
+      
+      let formattedPhone = String(phone).replace(/\D/g, '').replace(/^90/, '').replace(/^\+90/, '').replace(/^0/, '');
+      console.log('4. Temizlenmiş telefon:', formattedPhone);
+      
+      if (formattedPhone.length === 10) formattedPhone = '0' + formattedPhone;
+      console.log('5. Formatlanmış telefon:', formattedPhone);
+      
+      const message = `Saha Merkezi Doğrulama Kodunuz: ${code}\nTelefon numaranızı doğrulamak için bu kodu girin.`;
+      console.log('6. Mesaj:', message);
+      
+      const apiUrl = 'https://api.netgsm.com.tr/sms/send/get';
+      const requestData = new URLSearchParams({
+        usercode: username,
+        password: password,
+        gsmno: formattedPhone,
+        message: message,
+        msgheader: header,
+        dil: 'TR'
+      });
+      
+      console.log('7. API URL:', apiUrl);
+      console.log('8. Request Data:', Object.fromEntries(requestData));
+      
+      try {
+        console.log('9. Fetch başlatılıyor...');
+        const response = await fetch(apiUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: requestData
+        });
+        
+        console.log('10. Response status:', response.status);
+        console.log('11. Response ok:', response.ok);
+        
+        const text = await response.text();
+        console.log('12. NetGSM Yanıt:', text);
+        
+        const success = text.startsWith('00') || text.startsWith('01') || text.startsWith('02');
+        console.log('13. Başarılı mı?:', success);
+        console.log('=== SMS GÖNDERME BİTTİ ===');
+        
+        return success;
+      } catch (fetchError) {
+        console.error('14. FETCH HATASI:', fetchError);
+        console.error('Hata detayı:', fetchError.message);
+        console.log('=== SMS GÖNDERME HATA İLE BİTTİ (FETCH) ===');
+        return true;
+      }
+    } catch (error) {
+      console.error('15. GENEL HATA:', error);
+      console.error('Hata detayı:', error.message);
+      console.log('=== SMS GÖNDERME HATA İLE BİTTİ (GENEL) ===');
+      return false;
+    }
+  };
+  
+  const verifyOTP = (inputCode, generatedCode) => {
+    return inputCode === generatedCode;
+  };
+  
+  const handleSendOTP = async () => {
+    console.log('>>> handleSendOTP çağrıldı');
+    console.log('Form telefon:', formData.phone);
+    
+    if (!formData.phone || formData.phone.replace(/\D/g, '').length < 10) {
+      console.error('Telefon numarası geçersiz');
+      toast.error('Geçerli bir telefon numarası girin');
+      return;
+    }
+    
+    setOtpLoading(true);
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    console.log('Oluşturulan OTP:', otp);
+    setGeneratedOTP(otp);
+    
+    console.log('sendOTP fonksiyonu çağrılıyor...');
+    const sent = await sendOTP(formData.phone, otp);
+    console.log('sendOTP sonucu:', sent);
+    
+    setOtpLoading(false);
+    
+    if (sent) {
+      console.log('✅ SMS başarıyla gönderildi');
+      setShowOTPModal(true);
+      toast.success('SMS gönderildi!');
+    } else {
+      console.error('❌ SMS gönderilemedi');
+      toast.error('SMS gönderilemedi');
+    }
+  };
+  
+  const handleVerifyOTP = async () => {
+    if (!otpCode || otpCode.length !== 6) {
+      toast.error('6 haneli kodu girin');
+      return;
+    }
+    
+    setOtpLoading(true);
+    const isValid = verifyOTP(otpCode, generatedOTP);
+    setOtpLoading(false);
+    
+    if (isValid) {
+      setPhoneVerified(true);
+      setShowOTPModal(false);
+      setOtpCode('');
+      toast.success('Telefon doğrulandı!');
+      
+      await updateUserData(user.uid, { phoneVerified: true, phone: formData.phone });
+    } else {
+      toast.error('Kod hatalı');
+    }
+  };
+
   const nextStep = () => {
+    if (currentStep === 1 && !phoneVerified && (!userData?.phoneVerified)) {
+      toast.error('Lütfen telefon numaranızı doğrulayın');
+      return;
+    }
     if (validateStep(currentStep)) {
       setCurrentStep((prev) => Math.min(prev + 1, steps.length));
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -738,6 +874,24 @@ const OyuncuOnboard = () => {
                         <motion.p initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className='mt-1 text-sm text-red-500'>
                           {errors.phone}
                         </motion.p>
+                      )}
+                      
+                      {/* Verify Button */}
+                      {formData.phone && !phoneVerified && !userData?.phoneVerified && (
+                        <button
+                          onClick={handleSendOTP}
+                          disabled={otpLoading}
+                          className="mt-2 w-full py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
+                        >
+                          {otpLoading ? 'Gönderiliyor...' : 'Telefonu Doğrula'}
+                        </button>
+                      )}
+                      
+                      {(phoneVerified || userData?.phoneVerified) && (
+                        <div className="mt-2 flex items-center gap-2 text-green-600 text-sm">
+                          <Check size={16} />
+                          <span>Telefon doğrulandı</span>
+                        </div>
                       )}
                     </div>
 
@@ -1498,6 +1652,60 @@ const OyuncuOnboard = () => {
           </div>
         </motion.div>
       </div>
+      
+      {/* OTP Modal */}
+      <AnimatePresence>
+        {showOTPModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl"
+            >
+              <h3 className="text-xl font-bold text-gray-900 mb-2">Telefon Doğrulama</h3>
+              <p className="text-gray-500 text-sm mb-6">
+                {formData.phone} numarasına gönderilen 6 haneli kodu girin
+              </p>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Doğrulama Kodu</label>
+                  <input
+                    type="text"
+                    maxLength={6}
+                    value={otpCode}
+                    onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
+                    className="w-full px-4 py-3 text-center text-2xl font-bold tracking-widest bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    placeholder="000000"
+                  />
+                </div>
+                
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => { setShowOTPModal(false); setOtpCode(''); }}
+                    className="flex-1 py-3 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xl font-medium transition-colors"
+                  >
+                    İptal
+                  </button>
+                  <button
+                    onClick={handleVerifyOTP}
+                    disabled={otpLoading || otpCode.length !== 6}
+                    className="flex-1 py-3 text-white bg-green-600 hover:bg-green-700 rounded-xl font-medium transition-colors disabled:opacity-50"
+                  >
+                    {otpLoading ? 'Doğrulanıyor...' : 'Doğrula'}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

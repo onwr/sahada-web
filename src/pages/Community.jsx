@@ -2,13 +2,13 @@ import React, { useState, useEffect } from 'react';
 import {
   MessageSquare, ThumbsUp, UserPlus, MapPin, Calendar, Activity,
   TrendingUp, Rocket, Trophy, Share2, ImageIcon, BarChart2, Star,
-  Send, MoreHorizontal, Heart, Search, Edit, Loader2, ChevronDown
+  Send, MoreHorizontal, Heart, Search, Edit, Loader2, ChevronDown,
+  Globe, X, Plus, Trash2, Check
 } from 'lucide-react';
-import { X, Plus, Trash2 } from 'lucide-react';
 import { uploadImage } from '../services/cdnService';
 import { PostType } from '../utils/communityTypes';
 import { useAuth } from '../contexts/AuthContext';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import toast, { Toaster } from 'react-hot-toast';
 
 // Simple notification sound (Trink) generated with Web Audio API
@@ -21,14 +21,14 @@ const playNotificationSound = () => {
         const oscillator = ctx.createOscillator();
         const gainNode = ctx.createGain();
 
-        // "Trink" sound parameters (high pitch sine wave with decay)
+        // "Trink" sound components
         oscillator.type = 'sine';
         oscillator.frequency.setValueAtTime(1200, ctx.currentTime); 
         
         // Volume envelope
         gainNode.gain.setValueAtTime(0, ctx.currentTime);
         gainNode.gain.linearRampToValueAtTime(0.5, ctx.currentTime + 0.02); // Attack
-        gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5); // Decay
+        gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime +   0.5); // Decay
 
         oscillator.connect(gainNode);
         gainNode.connect(ctx.destination);
@@ -119,14 +119,60 @@ const WEEKLY_MVPS = [
   { id: 3, name: 'Alex de Souza', team: 'Efsaneler', goals: 15, matches: 6, avatar: 'https://ui-avatars.com/api/?name=Alex+D&background=FCB900&color=fff' },
 ];
 
-  const PostCard = ({ post, isLiked, commentsOpen, toggleLike, toggleComments, handleShare, currentUser, commentInputs, setCommentInputs, handleCreateComment, postComments, votedPolls, handleVote, handleDeletePost, handleDeleteComment, handleEditClick }) => {
+// Skeleton Loader Component
+const PostSkeleton = () => (
+  <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 mb-5 animate-pulse">
+    <div className="flex justify-between items-start mb-4">
+      <div className="flex gap-3">
+        <div className="w-10 h-10 rounded-full bg-gray-200"></div>
+        <div className="space-y-2">
+          <div className="h-3 w-32 bg-gray-200 rounded"></div>
+          <div className="h-2 w-20 bg-gray-100 rounded"></div>
+        </div>
+      </div>
+      <div className="w-16 h-6 bg-gray-100 rounded"></div>
+    </div>
+    <div className="space-y-3 mb-6">
+      <div className="h-4 w-3/4 bg-gray-200 rounded"></div>
+      <div className="h-4 w-full bg-gray-100 rounded"></div>
+      <div className="h-4 w-5/6 bg-gray-100 rounded"></div>
+    </div>
+    <div className="h-64 w-full bg-gray-200 rounded-xl mb-4"></div>
+    <div className="flex items-center justify-between pt-4 border-t border-gray-100">
+      <div className="flex gap-4">
+        <div className="h-8 w-12 bg-gray-100 rounded"></div>
+        <div className="h-8 w-20 bg-gray-100 rounded"></div>
+      </div>
+      <div className="h-8 w-16 bg-gray-100 rounded"></div>
+    </div>
+  </div>
+);
+
+  const PostCard = ({ post, isLiked, commentsOpen, toggleLike, toggleComments, handleShare, currentUser, commentInputs, setCommentInputs, handleCreateComment, postComments, votedPolls, handleVote, handleDeletePost, handleDeleteComment, handleEditClick, navigate, onAuthAction }) => {
     const isAuthor = currentUser?.uid === post.author.id;
+
+    const handleTournamentRegister = (post) => {
+        if (!currentUser) {
+            onAuthAction();
+            return;
+        }
+
+        // Redirect to messages with context
+        const basePath = currentUser.userType === 'owner' ? '/saha-sahibi' : '/oyuncu';
+        const messageTitle = `Turnuva Kayıt Başvurusu: ${post.tournamentName || post.title}`;
+        
+        navigate(`${basePath}/mesajlar?userId=${post.author.id}`, { state: { 
+            recipient: post.author, 
+            initialMessage: `Merhaba, "${post.tournamentName || post.title}" turnuvası için kayıt olmak istiyorum. Detaylı bilgi alabilir miyim?` 
+        }});
+        toast.success('Turnuva organizatörüne yönlendiriliyorsunuz...');
+    };
 
     return (
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 mb-5 hover:shadow-md transition-shadow relative">
         {/* Author Header */}
         <div className="flex justify-between items-start mb-4">
-          <Link to={`/oyuncu-detay/${post.author.id || post.author.uid}`} className="flex gap-3 group">
+          <Link to={`/oyuncu-detay/${post.author.slug || post.author.id || post.author.uid}`} className="flex gap-3 group">
             <img src={post.author.avatar} alt={post.author.name} className="w-10 h-10 rounded-full border border-gray-100" />
             <div>
               <div className="flex items-center gap-2">
@@ -263,7 +309,7 @@ const WEEKLY_MVPS = [
 
           {/* SCOREBOARD RENDER */}
           {post.type === PostType.SCOREBOARD && post.homeTeam && (
-            <div className="bg-[#0f172a] text-white rounded-xl overflow-hidden mt-3 relative">
+            <div className="bg-gradient-to-br from-green-600 to-green-800 text-white rounded-xl overflow-hidden mt-3 relative shadow-lg shadow-green-100">
               {post.image && (
                 <div className="absolute inset-0 opacity-20">
                   <img src={post.image} className="w-full h-full object-cover" alt="Match bg" />
@@ -273,14 +319,14 @@ const WEEKLY_MVPS = [
                 <div className="flex justify-between items-center mb-6">
                    <div className="text-center flex-1">
                        <h4 className="font-bold text-lg md:text-xl text-white mb-1">{post.homeTeam}</h4>
-                       <span className="text-xs text-slate-400">Ev Sahibi</span>
+                       <span className="text-xs text-green-100 opacity-60">Ev Sahibi</span>
                    </div>
                    <div className="bg-white/10 backdrop-blur-md px-4 py-2 rounded-lg border border-white/20 mx-2">
                        <span className="text-2xl md:text-3xl font-black text-green-400 tracking-widest whitespace-nowrap">{post.score}</span>
                    </div>
                    <div className="text-center flex-1">
                        <h4 className="font-bold text-lg md:text-xl text-white mb-1">{post.awayTeam}</h4>
-                       <span className="text-xs text-slate-400">Deplasman</span>
+                       <span className="text-xs text-green-100 opacity-60">Deplasman</span>
                    </div>
                 </div>
                 
@@ -360,9 +406,22 @@ const WEEKLY_MVPS = [
                 </div>
               </div>
               
-              <button className="w-full py-3 bg-indigo-600 text-white font-black rounded-xl shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition-all flex items-center justify-center gap-2 group">
-                Kayıt Ol <Rocket size={18} className="group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
-              </button>
+              {!isAuthor ? (
+                <button 
+                  onClick={() => handleTournamentRegister(post)}
+                  className="w-full py-3 bg-indigo-600 text-white font-black rounded-xl shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition-all flex items-center justify-center gap-2 group"
+                >
+                  <Rocket size={18} className="group-hover:-translate-y-1 transition-transform" />
+                  Kayıt Ol
+                </button>
+              ) : (
+                <button 
+                  className="w-full py-3 bg-indigo-100 text-indigo-600 font-black rounded-xl cursor-default flex items-center justify-center gap-2"
+                >
+                   <Check size={18} />
+                   Turnuva Sahibisiniz
+                </button>
+              )}
             </div>
           )}
 
@@ -448,11 +507,11 @@ const WEEKLY_MVPS = [
                   return (
                 <div key={comment.id} className="flex items-start justify-between group/comment text-sm">
                   <div className="flex items-start gap-2">
-                      <Link to={`/oyuncu-detay/${comment.authorId || comment.authorUid}`} className="flex-shrink-0">
+                      <Link to={`/oyuncu-detay/${comment.authorSlug || comment.authorId || comment.authorUid}`} className="flex-shrink-0">
                         <img src={comment.authorAvatar || `https://ui-avatars.com/api/?name=${comment.authorName}&background=random`} alt={comment.authorName} className="w-6 h-6 rounded-full object-cover" />
                       </Link>
                       <div>
-                        <Link to={`/oyuncu-detay/${comment.authorId || comment.authorUid}`} className="font-bold text-gray-900 mr-2 hover:text-green-600 transition-colors">
+                        <Link to={`/oyuncu-detay/${comment.authorSlug || comment.authorId || comment.authorUid}`} className="font-bold text-gray-900 mr-2 hover:text-green-600 transition-colors">
                           {comment.authorName}
                         </Link>
                         <span className="text-gray-600">{comment.text}</span>
@@ -493,6 +552,7 @@ import AuthModal from '../components/AuthModal';
 
 const Community = () => {
   const { user: currentUser } = useAuth();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('ALL');
   const [posts, setPosts] = useState([]); // Dynamic posts
   const [loading, setLoading] = useState(true);
@@ -899,8 +959,9 @@ const Community = () => {
         type: finalPostType,
         author: {
             id: currentUser.uid,
-            name: currentUser.displayName || 'Kullanıcı',
-            avatar: currentUser.photoURL || `https://ui-avatars.com/api/?name=${currentUser.email}&background=random`,
+            name: (userData?.fullName || currentUser.displayName || 'Kullanıcı').replace(/\s+/g, ' ').trim(),
+            avatar: userData?.photoURL || currentUser.photoURL || `https://ui-avatars.com/api/?name=${currentUser.email}&background=random`,
+            slug: userData?.slug || null,
             badges: ['Üye'] 
         },
         title: defaultTitle,
@@ -1094,8 +1155,9 @@ const Community = () => {
     const newComment = {
         id: 'temp-' + Date.now(), // Temporary ID
         text: text,
-        authorName: currentUser.displayName || 'Kullanıcı',
-        authorAvatar: currentUser.photoURL || `https://ui-avatars.com/api/?name=${currentUser.email}&background=random`,
+        authorName: userData?.fullName || currentUser.displayName || 'Kullanıcı',
+        authorAvatar: userData?.photoURL || currentUser.photoURL || `https://ui-avatars.com/api/?name=${currentUser.email}&background=random`,
+        authorSlug: userData?.slug || null,
         createdAt: new Date().toISOString() // Use ISO string for consistency
     };
     
@@ -1111,8 +1173,9 @@ const Community = () => {
     const commentData = {
         text: text,
         authorId: currentUser.uid,
-        authorName: currentUser.displayName || 'Kullanıcı',
-        authorAvatar: currentUser.photoURL 
+        authorName: userData?.fullName || currentUser.displayName || 'Kullanıcı',
+        authorAvatar: userData?.photoURL || currentUser.photoURL || null,
+        authorSlug: userData?.slug || null
     };
     
     const result = await addComment(postId, commentData);
@@ -1622,7 +1685,11 @@ const Community = () => {
 
             {/* Posts Feed */}
             <div className="space-y-6">
-              {filteredPosts.length > 0 ? (
+              {loading ? (
+                 <>
+                    {[...Array(3)].map((_, i) => <PostSkeleton key={i} />)}
+                 </>
+              ) : filteredPosts.length > 0 ? (
                   filteredPosts.map(post => (
                         <PostCard
                             key={post.id}
@@ -1642,6 +1709,8 @@ const Community = () => {
                             handleDeletePost={handleDeletePost}
                             handleDeleteComment={handleDeleteComment}
                             handleEditClick={handleEditClick}
+                            navigate={navigate}
+                            onAuthAction={() => setShowAuthModal(true)}
                         />
                   ))
               ) : (

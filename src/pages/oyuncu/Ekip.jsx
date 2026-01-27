@@ -58,6 +58,28 @@ const Ekip = () => {
   });
   const [teamImageFile, setTeamImageFile] = useState(null);
   const [invitations, setInvitations] = useState([]);
+  const [inviteLoading, setInviteLoading] = useState(null);
+
+  const cleanMessage = (msg) => {
+    if (!msg || typeof msg !== 'string') return '';
+    
+    // Fix UTF-8 encoding issues (Mojibake)
+    let cleaned = msg
+      .replace(/Ã¶/g, 'ö')
+      .replace(/Ã§/g, 'ç')
+      .replace(/ÅŸ/g, 'ş')
+      .replace(/ÄŸ/g, 'ğ')
+      .replace(/Ã¼/g, 'ü')
+      .replace(/Ä±/g, 'ı')
+      .replace(/Ä°/g, 'İ')
+      .replace(/Ã–/g, 'Ö')
+      .replace(/Ã‡/g, 'Ç')
+      .replace(/Åž/g, 'Ş')
+      .replace(/Äž/g, 'Ğ')
+      .replace(/Ãœ/g, 'Ü');
+
+    return cleaned;
+  };
 
   useEffect(() => {
     if (!user) return;
@@ -477,16 +499,19 @@ const Ekip = () => {
   };
 
   const handleInvitation = async (invitationId, action) => {
+      setInviteLoading(invitationId);
       try {
           const result = await respondToTeamInvitation(invitationId, action, user.uid);
           if (result.success) {
-              toast.success(action === 'accepted' ? 'Davet kabul edildi' : 'Davet reddedildi');
+              toast.success(action === 'accept' ? 'Davet kabul edildi' : 'Davet reddedildi');
           } else {
               toast.error(result.error);
           }
       } catch (err) {
           console.error(err);
           toast.error('İşlem başarısız');
+      } finally {
+          setInviteLoading(null);
       }
   };
 
@@ -526,24 +551,26 @@ const Ekip = () => {
                       {invitations.map(inv => (
                           <div key={inv.id} className="bg-white p-3 rounded-lg shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                               <div>
-                                  <p className="font-medium text-gray-900 text-sm">{inv.message}</p>
+                                  <p className="font-medium text-gray-900 text-sm">{cleanMessage(inv.message)}</p>
                                   <p className="text-xs text-gray-500 mt-1">
                                       {inv.createdAt?.toDate ? inv.createdAt.toDate().toLocaleDateString('tr-TR') : 'Yeni'}
                                   </p>
                               </div>
                               <div className="flex items-center gap-2 w-full sm:w-auto">
                                   <button 
-                                    onClick={() => handleInvitation(inv.id, 'accepted')} 
-                                    className="flex-1 sm:flex-none flex items-center justify-center gap-1 px-3 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors text-sm font-medium"
+                                    onClick={() => handleInvitation(inv.id, 'accept')} 
+                                    disabled={inviteLoading === inv.id}
+                                    className="flex-1 sm:flex-none flex items-center justify-center gap-1 px-3 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors text-sm font-medium disabled:opacity-50"
                                   >
-                                      <Check className="w-4 h-4" />
+                                      {inviteLoading === inv.id ? <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-green-700"></div> : <Check className="w-4 h-4" />}
                                       Kabul Et
                                   </button>
                                   <button 
-                                    onClick={() => handleInvitation(inv.id, 'rejected')} 
-                                    className="flex-1 sm:flex-none flex items-center justify-center gap-1 px-3 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors text-sm font-medium"
+                                    onClick={() => handleInvitation(inv.id, 'reject')} 
+                                    disabled={inviteLoading === inv.id}
+                                    className="flex-1 sm:flex-none flex items-center justify-center gap-1 px-3 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors text-sm font-medium disabled:opacity-50"
                                   >
-                                      <X className="w-4 h-4" />
+                                      {inviteLoading === inv.id ? <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-700"></div> : <X className="w-4 h-4" />}
                                       Reddet
                                   </button>
                               </div>

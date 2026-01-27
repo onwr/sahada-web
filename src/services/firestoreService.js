@@ -51,14 +51,14 @@ export const slugify = (text) => {
         .replace(/--+/g, "-");
 };
 
-// TÃ¼m oyuncularÄ± getir
+// Tüm oyuncuları getir
 export const getPlayers = async (filters = {}) => {
   try {  
     const usersRef = collection(db, 'users');
     let q = query(usersRef); 
 
-    // Filtreler uygulanabilir (Ã¶rneÄŸin ÅŸehir, vb.)
-    // Not: Firestore'da text search sÄ±nÄ±rlÄ±dÄ±r, basit filtreler eklenebilir
+    // Filtreler uygulanabilir (örneğin şehir, vb.)
+    // Not: Firestore'da text search sınırlıdır, basit filtreler eklenebilir
     if (filters.city) {
       q = query(q, where('city', '==', filters.city));
     }
@@ -68,7 +68,7 @@ export const getPlayers = async (filters = {}) => {
 
     querySnapshot.forEach((doc) => {
       const userData = doc.data();
-      // Sadece temel kontrol, detaylÄ± filtreleme component tarafÄ±nda
+      // Sadece temel kontrol, detaylı filtreleme component tarafında
       players.push({
         id: doc.id,
         ...userData
@@ -80,7 +80,7 @@ export const getPlayers = async (filters = {}) => {
       data: players
     };
   } catch (error) {
-    console.error('Oyuncular getirme hatasÄ±:', error);
+    console.error('Oyuncular getirme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -137,9 +137,19 @@ export const getUserData = async (uidOrSlug) => {
     // Önce UID olarak dene
     const userDoc = await getDoc(doc(db, 'users', uidOrSlug));
     if (userDoc.exists()) {
+      const data = userDoc.data();
+      // Eğer kullanıcının slug'ı yoksa, çalışma anında oluşturup kaydet (Lazy update)
+      if (!data.slug && (data.fullName || data.displayName)) {
+        const newSlug = `${slugify(data.fullName || data.displayName)}-${userDoc.id.slice(0, 5)}`;
+        updateDoc(userDoc.ref, { slug: newSlug }).catch(err => console.error("Slug backfill error:", err));
+        return {
+          success: true,
+          data: { id: userDoc.id, ...data, slug: newSlug }
+        };
+      }
       return {
         success: true,
-        data: { id: userDoc.id, ...userDoc.data() }
+        data: { id: userDoc.id, ...data }
       };
     }
     
@@ -171,7 +181,7 @@ export const getUserBySlug = async (slug) => {
   return getUserData(slug);
 };
 
-// KullanÄ±cÄ± verilerini gÃ¼ncelle
+// Kullanıcı verilerini güncelle
 export const updateUserData = async (uid, userData) => {
   try {
     await updateDoc(doc(db, 'users', uid), {
@@ -180,7 +190,7 @@ export const updateUserData = async (uid, userData) => {
     });
     return { success: true };
   } catch (error) {
-    console.error('KullanÄ±cÄ± gÃ¼ncelleme hatasÄ±:', error);
+    console.error('Kullanıcı güncelleme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -188,7 +198,7 @@ export const updateUserData = async (uid, userData) => {
   }
 };
 
-// 15 GÃ¼nlÃ¼k Demo BaÅŸlat
+// 15 Günlük Demo Başlat
 export const activateDemoSubscription = async (uid) => {
   try {
     const trialStartDate = new Date();
@@ -196,7 +206,7 @@ export const activateDemoSubscription = async (uid) => {
     trialEndDate.setDate(trialStartDate.getDate() + 15);
 
     await updateDoc(doc(db, 'users', uid), {
-      subscriptionStatus: 'active', // Direkt active yapÄ±yoruz ki blok kalksÄ±n
+      subscriptionStatus: 'active', // Direkt active yapıyoruz ki blok kalksın
       subscriptionType: 'trial',
       trialStartDate: Timestamp.fromDate(trialStartDate),
       trialEndDate: Timestamp.fromDate(trialEndDate),
@@ -204,7 +214,7 @@ export const activateDemoSubscription = async (uid) => {
     });
     return { success: true };
   } catch (error) {
-    console.error('Demo baÅŸlatma hatasÄ±:', error);
+    console.error('Demo başlatma hatası:', error);
     return {
       success: false,
       error: error.message
@@ -214,7 +224,7 @@ export const activateDemoSubscription = async (uid) => {
 
 
 
-// Favori ekle/Ã§Ä±kar
+// Favori ekle/çıkar
 export const toggleFavoriteTesis = async (uid, tesisId) => {
   try {
     const userRef = doc(db, 'users', uid);
@@ -237,9 +247,9 @@ export const toggleFavoriteTesis = async (uid, tesisId) => {
         return { success: true, isFavorite: true };
       }
     }
-    return { success: false, error: 'KullanÄ±cÄ± bulunamadÄ±' };
+    return { success: false, error: 'Kullanıcı bulunamadı' };
   } catch (error) {
-    console.error('Favori iÅŸlem hatasÄ±:', error);
+    console.error('Favori işlem hatası:', error);
     return { success: false, error: error.message };
   }
 };
@@ -268,7 +278,7 @@ export const getTesisler = async (ownerId) => {
       data: tesisler
     };
   } catch (error) {
-    console.error('Tesisler getirme hatasÄ±:', error);
+    console.error('Tesisler getirme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -290,7 +300,7 @@ export const addTesis = async (tesisData) => {
       id: docRef.id
     };
   } catch (error) {
-    console.error('Tesis ekleme hatasÄ±:', error);
+    console.error('Tesis ekleme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -298,7 +308,7 @@ export const addTesis = async (tesisData) => {
   }
 };
 
-// Tesis gÃ¼ncelle
+// Tesis güncelle
 export const updateTesis = async (tesisId, tesisData) => {
   try {
     await updateDoc(doc(db, 'tesisler', tesisId), {
@@ -308,7 +318,7 @@ export const updateTesis = async (tesisId, tesisData) => {
     
     return { success: true };
   } catch (error) {
-    console.error('Tesis gÃ¼ncelleme hatasÄ±:', error);
+    console.error('Tesis güncelleme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -322,7 +332,7 @@ export const deleteTesis = async (tesisId) => {
     await deleteDoc(doc(db, 'tesisler', tesisId));
     return { success: true };
   } catch (error) {
-    console.error('Tesis silme hatasÄ±:', error);
+    console.error('Tesis silme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -375,7 +385,7 @@ export const getTesisBySlug = async (slug) => {
   return getTesis(slug);
 };
 
-// RezervasyonlarÄ± getir
+// Rezervasyonları getir
 export const getRezervasyonlar = async (ownerId) => {
   try {
     const rezervasyonlarRef = collection(db, 'rezervasyonlar');
@@ -406,7 +416,7 @@ export const getRezervasyonlar = async (ownerId) => {
       data: rezervasyonlar
     };
   } catch (error) {
-    console.error('Rezervasyonlar getirme hatasÄ±:', error);
+    console.error('Rezervasyonlar getirme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -414,9 +424,9 @@ export const getRezervasyonlar = async (ownerId) => {
   }
 };
 
-// Rezervasyon ekle (basit versiyon - saha sahibi manuel rezervasyon iÃ§in)
-// Not: Bakiye gÃ¼ncellemesi yapmaz, sadece rezervasyon oluÅŸturur
-// Online Ã¶deme ile rezervasyon iÃ§in createRezervasyon veya createRezervasyonWithTransaction kullanÄ±n
+// Rezervasyon ekle (basit versiyon - saha sahibi manuel rezervasyon için)
+// Not: Bakiye güncellemesi yapmaz, sadece rezervasyon oluşturur
+// Online ödeme ile rezervasyon için createRezervasyon veya createRezervasyonWithTransaction kullanın
 export const addRezervasyon = async (rezervasyonData) => {
   try {
     const docRef = await addDoc(collection(db, 'rezervasyonlar'), {
@@ -430,7 +440,7 @@ export const addRezervasyon = async (rezervasyonData) => {
       id: docRef.id
     };
   } catch (error) {
-    console.error('Rezervasyon ekleme hatasÄ±:', error);
+    console.error('Rezervasyon ekleme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -438,7 +448,7 @@ export const addRezervasyon = async (rezervasyonData) => {
   }
 };
 
-// Rezervasyon gÃ¼ncelle
+// Rezervasyon güncelle
 export const updateRezervasyon = async (rezervasyonId, rezervasyonData) => {
   try {
     await updateDoc(doc(db, 'rezervasyonlar', rezervasyonId), {
@@ -448,7 +458,7 @@ export const updateRezervasyon = async (rezervasyonId, rezervasyonData) => {
     
     return { success: true };
   } catch (error) {
-    console.error('Rezervasyon gÃ¼ncelleme hatasÄ±:', error);
+    console.error('Rezervasyon güncelleme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -465,13 +475,13 @@ export const deleteRezervasyon = async (rezervasyonId) => {
     if (!reservationDoc.exists()) {
       return {
         success: false,
-        error: 'Rezervasyon bulunamadÄ±'
+        error: 'Rezervasyon bulunamadı'
       };
     }
     
     const reservationData = reservationDoc.data();
     
-    // EÄŸer rezervasyon confirmed ise, bakiyeden dÃ¼ÅŸ
+    // Eğer rezervasyon confirmed ise, bakiyeden düş
     if (reservationData.status === 'confirmed' && reservationData.ownerAmount && reservationData.ownerId) {
       await updateOwnerBalance(
         reservationData.ownerId,
@@ -490,7 +500,7 @@ export const deleteRezervasyon = async (rezervasyonId) => {
     
     return { success: true };
   } catch (error) {
-    console.error('Rezervasyon silme hatasÄ±:', error);
+    console.error('Rezervasyon silme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -498,32 +508,32 @@ export const deleteRezervasyon = async (rezervasyonId) => {
   }
 };
 
-// Rezervasyon durumu gÃ¼ncelle
+// Rezervasyon durumu güncelle
 export const updateReservationStatus = async (rezervasyonId, status) => {
   try {
-    // Ã–nce rezervasyon verisini getir
+    // Önce rezervasyon verisini getir
     const reservationDoc = await getDoc(doc(db, 'rezervasyonlar', rezervasyonId));
     
     if (!reservationDoc.exists()) {
       return {
         success: false,
-        error: 'Rezervasyon bulunamadÄ±'
+        error: 'Rezervasyon bulunamadı'
       };
     }
     
     const reservationData = reservationDoc.data();
     const previousStatus = reservationData.status;
     
-    // Rezervasyon durumunu gÃ¼ncelle
+    // Rezervasyon durumunu güncelle
     await updateDoc(doc(db, 'rezervasyonlar', rezervasyonId), {
       status: status,
       updatedAt: serverTimestamp()
     });
 
-    // KullanÄ±cÄ±ya bildirim gÃ¶nder (userId varsa)
+    // Kullanıcıya bildirim gönder (userId varsa)
     if (reservationData.userId && reservationData.userId !== 'unknown') {
         try {
-            let title = 'Rezervasyon GÃ¼ncellemesi';
+            let title = 'Rezervasyon Güncellemesi';
             
             // Tarihi formatla
             let formattedDate = '';
@@ -536,17 +546,17 @@ export const updateReservationStatus = async (rezervasyonId, status) => {
                 formattedDate = 'Tarih belirtilmedi';
             }
 
-            let message = `${reservationData.tesisName || 'Saha'} rezervasyonunuzun durumu gÃ¼ncellendi: ${status === 'confirmed' ? 'OnaylandÄ±' : status === 'cancelled' ? 'Ä°ptal Edildi' : status}`;
+            let message = `${reservationData.tesisName || 'Saha'} rezervasyonunuzun durumu güncellendi: ${status === 'confirmed' ? 'Onaylandı' : status === 'cancelled' ? 'İptal Edildi' : status}`;
             
             if (status === 'confirmed') {
-                title = 'Rezervasyon OnaylandÄ±';
-                message = `${reservationData.tesisName} iÃ§in ${formattedDate} ${reservationData.timeSlot} rezervasyonunuz onaylandÄ±.`;
+                title = 'Rezervasyon Onaylandı';
+                message = `${reservationData.tesisName} için ${formattedDate} ${reservationData.timeSlot} rezervasyonunuz onaylandı.`;
             } else if (status === 'cancelled') {
-                title = 'Rezervasyon Ä°ptal Edildi';
-                message = `${reservationData.tesisName} iÃ§in ${formattedDate} ${reservationData.timeSlot} rezervasyonunuz iptal edildi.`;
+                title = 'Rezervasyon İptal Edildi';
+                message = `${reservationData.tesisName} için ${formattedDate} ${reservationData.timeSlot} rezervasyonunuz iptal edildi.`;
             } else if (status === 'rejected') {
                 title = 'Rezervasyon Reddedildi';
-                message = `${reservationData.tesisName} iÃ§in ${formattedDate} ${reservationData.timeSlot} rezervasyonunuz reddedildi.`;
+                message = `${reservationData.tesisName} için ${formattedDate} ${reservationData.timeSlot} rezervasyonunuz reddedildi.`;
             }
 
             await addDoc(collection(db, 'notifications'), {
@@ -558,15 +568,15 @@ export const updateReservationStatus = async (rezervasyonId, status) => {
                 createdAt: serverTimestamp()
             });
         } catch (notifError) {
-             console.error('Bildirim gÃ¶nderme hatasÄ± (ihmal edilebilir):', notifError);
+             console.error('Bildirim gönderme hatası (ihmal edilebilir):', notifError);
         }
     }
     
-    // EÄŸer rezervasyon iptal edildiyse ve Ã¶nceden confirmed ise, bakiyeden dÃ¼ÅŸ
+    // Eğer rezervasyon iptal edildiyse ve önceden confirmed ise, bakiyeden düş
     if (status === 'cancelled' && previousStatus === 'confirmed' && reservationData.ownerAmount && reservationData.ownerId) {
       await updateOwnerBalance(
         reservationData.ownerId,
-        -reservationData.ownerAmount, // Negatif tutar (dÃ¼ÅŸme)
+        -reservationData.ownerAmount, // Negatif tutar (düşme)
         {
           type: 'refund',
           reservationId: rezervasyonId,
@@ -578,7 +588,7 @@ export const updateReservationStatus = async (rezervasyonId, status) => {
     
     return { success: true };
   } catch (error) {
-    console.error('Rezervasyon durumu gÃ¼ncelleme hatasÄ±:', error);
+    console.error('Rezervasyon durumu güncelleme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -586,13 +596,13 @@ export const updateReservationStatus = async (rezervasyonId, status) => {
   }
 };
 
-// RezervasyonlarÄ± getir (alias)
+// Rezervasyonları getir (alias)
 export const getReservations = getRezervasyonlar;
 
-// MÃ¼ÅŸterileri getir (saha sahibi iÃ§in)
+// Müşterileri getir (saha sahibi için)
 export const getCustomers = async (ownerId) => {
   try {
-    // Ã–nce tesisleri getir
+    // Önce tesisleri getir
     const tesislerRef = collection(db, 'tesisler');
     const tesislerQuery = query(
       tesislerRef,
@@ -613,7 +623,7 @@ export const getCustomers = async (ownerId) => {
       };
     }
 
-    // Bu tesislerde rezervasyon yapan mÃ¼ÅŸterileri getir
+    // Bu tesislerde rezervasyon yapan müşterileri getir
     const rezervasyonlarRef = collection(db, 'rezervasyonlar');
     const q = query(
       rezervasyonlarRef,
@@ -626,20 +636,20 @@ export const getCustomers = async (ownerId) => {
     querySnapshot.forEach((doc) => {
       const reservation = doc.data();
       
-      // MÃ¼ÅŸteri bilgilerini al
+      // Müşteri bilgilerini al
       const customerId = reservation.customerId || reservation.customerName || 'unknown';
-      const customerName = reservation.customerName || 'MÃ¼ÅŸteri';
+      const customerName = reservation.customerName || 'Müşteri';
       const customerPhone = reservation.customerPhone || '';
       const customerEmail = reservation.customerEmail || '';
       
       if (customerMap.has(customerId)) {
-        // Mevcut mÃ¼ÅŸteriyi gÃ¼ncelle
+        // Mevcut müşteriyi güncelle
         const existingCustomer = customerMap.get(customerId);
         existingCustomer.totalReservations += 1;
         existingCustomer.totalSpent += reservation.totalAmount || reservation.price || 0;
         existingCustomer.lastReservation = reservation.date;
         
-        // RezervasyonlarÄ± ekle
+        // Rezervasyonları ekle
         existingCustomer.reservations.push({
           id: doc.id,
           date: reservation.date,
@@ -649,7 +659,7 @@ export const getCustomers = async (ownerId) => {
           amount: reservation.totalAmount || reservation.price || 0
         });
       } else {
-        // Yeni mÃ¼ÅŸteri oluÅŸtur
+        // Yeni müşteri oluştur
         customerMap.set(customerId, {
           id: customerId,
           name: customerName,
@@ -671,10 +681,10 @@ export const getCustomers = async (ownerId) => {
       }
     });
     
-    // Map'i array'e Ã§evir ve sÄ±rala
+    // Map'i array'e çevir ve sırala
     const customers = Array.from(customerMap.values());
     
-    // Toplam harcamaya gÃ¶re sÄ±rala
+    // Toplam harcamaya göre sırala
     customers.sort((a, b) => b.totalSpent - a.totalSpent);
     
     return {
@@ -682,7 +692,7 @@ export const getCustomers = async (ownerId) => {
       data: customers
     };
   } catch (error) {
-    console.error('MÃ¼ÅŸteriler getirme hatasÄ±:', error);
+    console.error('Müşteriler getirme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -690,10 +700,10 @@ export const getCustomers = async (ownerId) => {
   }
 };
 
-// MÃ¼ÅŸteri detaylarÄ±nÄ± getir
+// Müşteri detaylarını getir
 export const getCustomerDetails = async (customerId, ownerId) => {
   try {
-    // Ã–nce tesisleri getir
+    // Önce tesisleri getir
     const tesislerRef = collection(db, 'tesisler');
     const tesislerQuery = query(
       tesislerRef,
@@ -714,7 +724,7 @@ export const getCustomerDetails = async (customerId, ownerId) => {
       };
     }
 
-    // Bu mÃ¼ÅŸterinin rezervasyonlarÄ±nÄ± getir
+    // Bu müşterinin rezervasyonlarını getir
     const rezervasyonlarRef = collection(db, 'rezervasyonlar');
     const q = query(
       rezervasyonlarRef,
@@ -732,10 +742,10 @@ export const getCustomerDetails = async (customerId, ownerId) => {
       });
     });
     
-    // RezervasyonlarÄ± tarihe gÃ¶re sÄ±rala
+    // Rezervasyonları tarihe göre sırala
     reservations.sort((a, b) => new Date(b.date) - new Date(a.date));
     
-    // MÃ¼ÅŸteri bilgilerini hesapla
+    // Müşteri bilgilerini hesapla
     const totalReservations = reservations.length;
     const totalSpent = reservations.reduce((sum, res) => sum + (res.totalAmount || res.price || 0), 0);
     const firstReservation = reservations.length > 0 ? reservations[reservations.length - 1].date : null;
@@ -756,7 +766,7 @@ export const getCustomerDetails = async (customerId, ownerId) => {
       data: customerData
     };
   } catch (error) {
-    console.error('MÃ¼ÅŸteri detaylarÄ± getirme hatasÄ±:', error);
+    console.error('Müşteri detayları getirme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -769,7 +779,7 @@ export const getFinancialData = async (ownerId, period = 'month') => {
   try {
 
     
-    // Ã–nce tesisleri getir
+    // Önce tesisleri getir
     const tesislerRef = collection(db, 'tesisler');
     const tesislerQuery = query(
       tesislerRef,
@@ -815,11 +825,11 @@ export const getFinancialData = async (ownerId, period = 'month') => {
         break;
       case 'month':
         startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-        endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59); // AyÄ±n son gÃ¼nÃ¼
+        endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59); // Ayın son günü
         break;
       case 'year':
         startDate = new Date(now.getFullYear(), 0, 1);
-        endDate = new Date(now.getFullYear(), 11, 31, 23, 59, 59); // YÄ±lÄ±n son gÃ¼nÃ¼
+        endDate = new Date(now.getFullYear(), 11, 31, 23, 59, 59); // Yılın son günü
         break;
       default:
         startDate = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -860,7 +870,7 @@ export const getFinancialData = async (ownerId, period = 'month') => {
       });
     });
 
-    // Tarih aralÄ±ÄŸÄ±na gÃ¶re filtrele
+    // Tarih aralığına göre filtrele
     const filteredRevenues = revenues.filter(rev => {
       const revDate = new Date(rev.date);
       return revDate >= startDate && revDate <= endDate;
@@ -891,11 +901,11 @@ export const getFinancialData = async (ownerId, period = 'month') => {
       sum + (exp.amount || 0), 0
     );
 
-    // AylÄ±k veri oluÅŸtur
+    // Aylık veri oluştur
     const monthlyData = [];
     const monthlyMap = new Map();
     
-    // Son 12 ay iÃ§in boÅŸ veri oluÅŸtur
+    // Son 12 ay için boş veri oluştur
     for (let i = 11; i >= 0; i--) {
       const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
       const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
@@ -939,7 +949,7 @@ export const getFinancialData = async (ownerId, period = 'month') => {
     
     monthlyData.sort((a, b) => a.month.localeCompare(b.month));
 
-    // GÃ¼nlÃ¼k veri oluÅŸtur (son 30 gÃ¼n)
+    // Günlük veri oluştur (son 30 gün)
     const dailyData = [];
     const dailyMap = new Map();
     
@@ -1006,7 +1016,7 @@ export const getFinancialData = async (ownerId, period = 'month') => {
       }
     };
   } catch (error) {
-    console.error('Finansal veri getirme hatasÄ±:', error);
+    console.error('Finansal veri getirme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -1028,7 +1038,7 @@ export const addExpense = async (expenseData) => {
       id: docRef.id
     };
   } catch (error) {
-    console.error('Gider ekleme hatasÄ±:', error);
+    console.error('Gider ekleme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -1055,7 +1065,7 @@ export const getExpenses = async (ownerId) => {
       });
     });
     
-    // Client-side sÄ±ralama (tarihe gÃ¶re azalan)
+    // Client-side sıralama (tarihe göre azalan)
     expenses.sort((a, b) => {
       if (a.createdAt && b.createdAt) {
         return b.createdAt.toDate() - a.createdAt.toDate();
@@ -1068,7 +1078,7 @@ export const getExpenses = async (ownerId) => {
       data: expenses
     };
   } catch (error) {
-    console.error('Giderler getirme hatasÄ±:', error);
+    console.error('Giderler getirme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -1076,7 +1086,7 @@ export const getExpenses = async (ownerId) => {
   }
 };
 
-// Gider gÃ¼ncelle
+// Gider güncelle
 export const updateExpense = async (expenseId, expenseData) => {
   try {
     await updateDoc(doc(db, 'expenses', expenseId), {
@@ -1086,7 +1096,7 @@ export const updateExpense = async (expenseId, expenseData) => {
     
     return { success: true };
   } catch (error) {
-    console.error('Gider gÃ¼ncelleme hatasÄ±:', error);
+    console.error('Gider güncelleme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -1100,7 +1110,7 @@ export const deleteExpense = async (expenseId) => {
     await deleteDoc(doc(db, 'expenses', expenseId));
     return { success: true };
   } catch (error) {
-    console.error('Gider silme hatasÄ±:', error);
+    console.error('Gider silme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -1122,7 +1132,7 @@ export const addRevenue = async (revenueData) => {
       id: docRef.id
     };
   } catch (error) {
-    console.error('Gelir ekleme hatasÄ±:', error);
+    console.error('Gelir ekleme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -1149,7 +1159,7 @@ export const getRevenues = async (ownerId) => {
       });
     });
     
-    // Client-side sÄ±ralama (tarihe gÃ¶re azalan)
+    // Client-side sıralama (tarihe göre azalan)
     revenues.sort((a, b) => {
       if (a.createdAt && b.createdAt) {
         return b.createdAt.toDate() - a.createdAt.toDate();
@@ -1162,7 +1172,7 @@ export const getRevenues = async (ownerId) => {
       data: revenues
     };
   } catch (error) {
-    console.error('Gelirler getirme hatasÄ±:', error);
+    console.error('Gelirler getirme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -1170,7 +1180,7 @@ export const getRevenues = async (ownerId) => {
   }
 };
 
-// Gelir gÃ¼ncelle
+// Gelir güncelle
 export const updateRevenue = async (revenueId, revenueData) => {
   try {
     await updateDoc(doc(db, 'revenues', revenueId), {
@@ -1180,7 +1190,7 @@ export const updateRevenue = async (revenueId, revenueData) => {
     
     return { success: true };
   } catch (error) {
-    console.error('Gelir gÃ¼ncelleme hatasÄ±:', error);
+    console.error('Gelir güncelleme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -1194,7 +1204,7 @@ export const deleteRevenue = async (revenueId) => {
     await deleteDoc(doc(db, 'revenues', revenueId));
     return { success: true };
   } catch (error) {
-    console.error('Gelir silme hatasÄ±:', error);
+    console.error('Gelir silme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -1202,17 +1212,17 @@ export const deleteRevenue = async (revenueId) => {
   }
 };
 
-// MÃ¼saitlik kontrolÃ¼
+// Müsaitlik kontrolü
 export const checkAvailability = async (tesisId, date, timeSlot) => {
   try {
-    // Tarihi Timestamp'e Ã§evir (eÄŸer string veya Date ise)
+    // Tarihi Timestamp'e çevir (eğer string veya Date ise)
     let dateTimestamp;
     if (date instanceof Timestamp) {
       dateTimestamp = date;
     } else if (date instanceof Date) {
       dateTimestamp = Timestamp.fromDate(date);
     } else if (typeof date === 'string') {
-      // YYYY-MM-DD format kontrolÃ¼ ve gÃ¼venli parse
+      // YYYY-MM-DD format kontrolü ve güvenli parse
       if (/^\d{4}-\d{2}-\d{2}$/.test(date)) {
         const [year, month, day] = date.split('-').map(Number);
         dateTimestamp = Timestamp.fromDate(new Date(year, month - 1, day));
@@ -1222,7 +1232,7 @@ export const checkAvailability = async (tesisId, date, timeSlot) => {
     } else {
       return {
         success: false,
-        error: 'GeÃ§ersiz tarih formatÄ±',
+        error: 'Geçersiz tarih formatı',
         available: false
       };
     }
@@ -1242,11 +1252,11 @@ export const checkAvailability = async (tesisId, date, timeSlot) => {
       available: querySnapshot.empty
     };
   } catch (error) {
-    console.error('MÃ¼saitlik kontrolÃ¼ hatasÄ±:', error);
+    console.error('Müsaitlik kontrolü hatası:', error);
     return {
       success: false,
       error: error.message,
-      available: false // Hata durumunda mÃ¼sait deÄŸil olarak dÃ¶ndÃ¼r
+      available: false // Hata durumunda müsait değil olarak döndür
     };
   }
 };
@@ -1305,6 +1315,28 @@ export const createRezervasyonWithTransaction = async (rezervasyonData, tesisId,
       const docRef = doc(collection(db, 'rezervasyonlar'));
       reservationId = docRef.id;
       
+      // Tesis verilerini güncellemek için oku
+      const tesisRef = doc(db, 'tesisler', tesisId);
+      const tesisDoc = await transaction.get(tesisRef);
+      
+      if (tesisDoc.exists()) {
+          const currentReservations = tesisDoc.data().reservations || 0;
+          const currentRevenue = tesisDoc.data().revenue || 0;
+          
+          let newRevenue = currentRevenue;
+          // Gelir ekleme durumu: Onaylı, Tamamlanmış veya Sahada Ödeme
+          if (['confirmed', 'completed', 'partial_payment', 'pending_payment_at_facility', 'active'].includes(rezervasyonData.status)) {
+              const amountToAdd = calculatedOwnerAmount || rezervasyonData.totalAmount || rezervasyonData.price || 0;
+              newRevenue += Number(amountToAdd);
+          }
+
+          transaction.update(tesisRef, {
+              reservations: currentReservations + 1,
+              revenue: newRevenue,
+              updatedAt: serverTimestamp()
+          });
+      }
+
       transaction.set(docRef, {
         ...rezervasyonData,
         ownerAmount: calculatedOwnerAmount, // Calculated amount overwrite
@@ -1387,6 +1419,29 @@ export const createRezervasyon = async (rezervasyonData) => {
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp()
     });
+
+    // Tesis isatistiklerini güncelle (Atomik değil ama gerekli)
+    if (rezervasyonData.tesisId) {
+        try {
+            const tesisRef = doc(db, 'tesisler', rezervasyonData.tesisId);
+            const price = rezervasyonData.totalAmount || rezervasyonData.price || 0;
+            
+            // Increment reservations
+            await updateDoc(tesisRef, {
+                reservations: increment(1),
+                updatedAt: serverTimestamp()
+            });
+
+            // Increment revenue if applicable
+            if (['confirmed', 'completed', 'partial_payment', 'pending_payment_at_facility', 'active'].includes(rezervasyonData.status)) {
+                await updateDoc(tesisRef, {
+                    revenue: increment(Number(price))
+                });
+            }
+        } catch (statsError) {
+            console.error('Tesis istatistik güncelleme hatası:', statsError);
+        }
+    }
     
     // Rezervasyon başarıyla oluşturulduysa ve confirmed status'ü varsa, saha sahibi bakiyesini güncelle
     if (rezervasyonData.status === 'confirmed' && calculatedOwnerAmount && rezervasyonData.ownerId) {
@@ -1436,7 +1491,7 @@ export const createRezervasyon = async (rezervasyonData) => {
   }
 };
 
-// TÃ¼m tesisleri getir
+// Tüm tesisleri getir
 export const getYakinTesisler = async (lat = null, lng = null, radius = null) => {
   try {
     const tesislerRef = collection(db, 'tesisler');
@@ -1452,7 +1507,7 @@ export const getYakinTesisler = async (lat = null, lng = null, radius = null) =>
       const data = doc.data();
       let distance = null;
       
-      // EÄŸer koordinat verilmiÅŸse mesafe hesapla
+      // Eğer koordinat verilmişse mesafe hesapla
       if (lat && lng && data.latitude && data.longitude) {
         distance = calculateDistance(lat, lng, data.latitude, data.longitude);
       }
@@ -1464,7 +1519,7 @@ export const getYakinTesisler = async (lat = null, lng = null, radius = null) =>
       });
     });
     
-    // Client-side sÄ±ralama (tarihe gÃ¶re)
+    // Client-side sıralama (tarihe göre)
     tesisler.sort((a, b) => {
       if (a.createdAt && b.createdAt) {
         return b.createdAt.toDate() - a.createdAt.toDate();
@@ -1477,7 +1532,7 @@ export const getYakinTesisler = async (lat = null, lng = null, radius = null) =>
       data: tesisler
     };
   } catch (error) {
-    console.error('Tesisler getirme hatasÄ±:', error);
+    console.error('Tesisler getirme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -1485,8 +1540,8 @@ export const getYakinTesisler = async (lat = null, lng = null, radius = null) =>
   }
 };
 
-// KullanÄ±cÄ±larÄ± ara (sadece player tipindeki kullanÄ±cÄ±lar)
-// KullanÄ±cÄ±larÄ± ara (Optimize edilmiÅŸ)
+// Kullanıcıları ara (sadece player tipindeki kullanıcılar)
+// Kullanıcıları ara (Optimize edilmiş)
 // Tesis Değerlendirme Ekle
 export const addReview = async (tesisId, reviewData) => {
   try {
@@ -1647,7 +1702,7 @@ export const searchUsers = async (queryText) => {
     const usersRef = collection(db, 'users');
     const results = new Map();
     
-    // 1. Email/Phone tam eÅŸleÅŸme
+    // 1. Email/Phone tam eşleşme
     const emailQuery = query(usersRef, where('email', '==', queryText));
     const phoneQuery = query(usersRef, where('phone', '==', queryText));
     
@@ -1659,16 +1714,16 @@ export const searchUsers = async (queryText) => {
     emailSnap.forEach(doc => results.set(doc.id, { id: doc.id, ...doc.data() }));
     phoneSnap.forEach(doc => results.set(doc.id, { id: doc.id, ...doc.data() }));
     
-    // 2. Ä°sim ile arama (en az 3 karakter)
+    // 2. İsim ile arama (en az 3 karakter)
     if (queryText.length >= 3) {
-        // BaÅŸ harfi bÃ¼yÃ¼k yaparak arama (Basit Ã§Ã¶zÃ¼m: Ã‡oÄŸu isim BaÅŸ harfi bÃ¼yÃ¼k kayÄ±tlÄ±dÄ±r)
-        // Daha geliÅŸmiÅŸ arama iÃ§in lowercase bir 'searchKey' alanÄ± tutulmalÄ±dÄ±r.
+        // Baş harfi büyük yaparak arama (Basit çözüm: Çoğu isim Baş harfi büyük kayıtlıdır)
+        // Daha gelişmiş arama için lowercase bir 'searchKey' alanı tutulmalıdır.
         const titleCase = queryText.charAt(0).toUpperCase() + queryText.slice(1).toLowerCase();
         const endTitle = titleCase + '\uf8ff';
         
-        // Sadece 'player' tipindeki kullanÄ±cÄ±larÄ± ara (Ä°steÄŸe baÄŸlÄ±, kaldÄ±rÄ±labilir)
-        // Performans iÃ§in ÅŸimdilik userType filtresi eklemiyoruz, kompozit index gerektirebilir.
-        // EÄŸer index hatasÄ± verirse userType'Ä± kaldÄ±rÄ±n veya index oluÅŸturun.
+        // Sadece 'player' tipindeki kullanıcıları ara (İsteğe bağlı, kaldırılabilir)
+        // Performans için şimdilik userType filtresi eklemiyoruz, kompozit index gerektirebilir.
+        // Eğer index hatası verirse userType'ı kaldırın veya index oluşturun.
         
         const nameQuery = query(usersRef, 
             where('fullName', '>=', titleCase), 
@@ -1680,14 +1735,14 @@ export const searchUsers = async (queryText) => {
         nameSnap.forEach(doc => results.set(doc.id, { id: doc.id, ...doc.data() }));
     }
     
-    // SonuÃ§larÄ± array'e Ã§evir
+    // Sonuçları array'e çevir
     return {
       success: true,
       data: Array.from(results.values())
     };
     
   } catch (error) {
-    console.error('KullanÄ±cÄ± arama hatasÄ±:', error);
+    console.error('Kullanıcı arama hatası:', error);
     return { success: false, error: error.message };
   }
 };
@@ -1695,7 +1750,7 @@ export const searchUsers = async (queryText) => {
 // Dashboard istatistiklerini getir
 export const getDashboardStats = async (ownerId) => {
   try {
-    // Ã–nce tesisleri getir
+    // Önce tesisleri getir
     const tesislerRef = collection(db, 'tesisler');
     const tesislerQuery = query(
       tesislerRef,
@@ -1723,12 +1778,12 @@ export const getDashboardStats = async (ownerId) => {
       };
     }
 
-    // TÃ¼m rezervasyonlarÄ± getir (tesisId ile) - client-side filtreleme yapacaÄŸÄ±z
+    // Tüm rezervasyonları getir (tesisId ile) - client-side filtreleme yapacağız
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const todayEnd = new Date(today);
     todayEnd.setHours(23, 59, 59, 999);
-    const todayString = today.toISOString().split('T')[0]; // YYYY-MM-DD formatÄ±
+    const todayString = today.toISOString().split('T')[0]; // YYYY-MM-DD formatı
 
     const rezervasyonlarRef = collection(db, 'rezervasyonlar');
     const allQuery = query(
@@ -1738,22 +1793,22 @@ export const getDashboardStats = async (ownerId) => {
 
     const allSnapshot = await getDocs(allQuery);
     
-    // Date helper function - Timestamp veya string'i Date'e Ã§evir
+    // Date helper function - Timestamp veya string'i Date'e çevir
     const getDateFromField = (dateField) => {
       if (!dateField) return null;
       if (dateField.toDate) return dateField.toDate(); // Timestamp
       if (typeof dateField === 'string') return new Date(dateField); // String
-      return new Date(dateField); // DiÄŸer formatlar
+      return new Date(dateField); // Diğer formatlar
     };
 
-    // Bu haftaki rezervasyonlarÄ± hesapla
+    // Bu haftaki rezervasyonları hesapla
     const weekStart = new Date(today);
     weekStart.setDate(today.getDate() - today.getDay());
     const weekEnd = new Date(weekStart);
     weekEnd.setDate(weekStart.getDate() + 7);
     weekEnd.setHours(23, 59, 59, 999);
 
-    // BugÃ¼nkÃ¼ rezervasyon sayÄ±sÄ± (client-side filtreleme)
+    // Bugünkü rezervasyon sayısı (client-side filtreleme)
     let todayReservations = 0;
     const weekReservations = [];
     const allReservations = [];
@@ -1765,12 +1820,12 @@ export const getDashboardStats = async (ownerId) => {
       if (reservationDate) {
         allReservations.push(data);
         
-        // BugÃ¼nkÃ¼ rezervasyonlarÄ± filtrele
+        // Bugünkü rezervasyonları filtrele
         if (reservationDate >= today && reservationDate <= todayEnd) {
           todayReservations++;
         }
         
-        // Bu haftaki rezervasyonlarÄ± filtrele
+        // Bu haftaki rezervasyonları filtrele
         if (reservationDate >= weekStart && reservationDate <= weekEnd) {
           weekReservations.push(data);
         }
@@ -1785,10 +1840,10 @@ export const getDashboardStats = async (ownerId) => {
       }
     });
 
-    // Toplam rezervasyon sayÄ±sÄ±
+    // Toplam rezervasyon sayısı
     const totalReservations = allReservations.length;
 
-    // Aktif mÃ¼ÅŸteri sayÄ±sÄ± (benzersiz mÃ¼ÅŸteri ID'leri)
+    // Aktif müşteri sayısı (benzersiz müşteri ID'leri)
     const uniqueCustomers = new Set();
     allReservations.forEach((data) => {
       if (data.customerId) {
@@ -1807,10 +1862,10 @@ export const getDashboardStats = async (ownerId) => {
     });
     const activeCustomers = uniqueCustomers.size;
 
-    // Tesis sayÄ±sÄ±
+    // Tesis sayısı
     const totalTesisler = tesislerSnapshot.size;
 
-    // Doluluk oranÄ± hesapla (bu haftaki rezervasyon / toplam kapasite)
+    // Doluluk oranı hesapla (bu haftaki rezervasyon / toplam kapasite)
     let totalCapacity = 0;
     let usedCapacity = 0;
     
@@ -1839,7 +1894,7 @@ export const getDashboardStats = async (ownerId) => {
       }
     };
   } catch (error) {
-    console.error('Dashboard istatistikleri getirme hatasÄ±:', error);
+    console.error('Dashboard istatistikleri getirme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -1847,10 +1902,10 @@ export const getDashboardStats = async (ownerId) => {
   }
 };
 
-// BugÃ¼nkÃ¼ rezervasyon programÄ±nÄ± getir
+// Bugünkü rezervasyon programını getir
 export const getTodaySchedule = async (ownerId) => {
   try {
-    // Ã–nce tesisleri getir
+    // Önce tesisleri getir
     const tesislerRef = collection(db, 'tesisler');
     const tesislerQuery = query(
       tesislerRef,
@@ -1885,19 +1940,19 @@ export const getTodaySchedule = async (ownerId) => {
     const querySnapshot = await getDocs(q);
     const rezervasyonlar = [];
 
-    // Date helper function - Timestamp veya string'i Date'e Ã§evir
+    // Date helper function - Timestamp veya string'i Date'e çevir
     const getDateFromField = (dateField) => {
       if (!dateField) return null;
       if (dateField.toDate) return dateField.toDate(); // Timestamp
       if (typeof dateField === 'string') return new Date(dateField); // String
-      return new Date(dateField); // DiÄŸer formatlar
+      return new Date(dateField); // Diğer formatlar
     };
 
     querySnapshot.forEach((doc) => {
       const data = doc.data();
       const reservationDate = getDateFromField(data.date);
       
-      // BugÃ¼nkÃ¼ rezervasyonlarÄ± filtrele (client-side)
+      // Bugünkü rezervasyonları filtrele (client-side)
       if (reservationDate && reservationDate >= today && reservationDate <= todayEnd) {
         rezervasyonlar.push({
           id: doc.id,
@@ -1906,7 +1961,7 @@ export const getTodaySchedule = async (ownerId) => {
       }
     });
 
-    // Client-side sÄ±ralama (zaman dilimine gÃ¶re)
+    // Client-side sıralama (zaman dilimine göre)
     rezervasyonlar.sort((a, b) => {
       if (a.timeSlot && b.timeSlot) {
         return a.timeSlot.localeCompare(b.timeSlot);
@@ -1919,7 +1974,7 @@ export const getTodaySchedule = async (ownerId) => {
       data: rezervasyonlar
     };
   } catch (error) {
-    console.error('BugÃ¼nkÃ¼ program getirme hatasÄ±:', error);
+    console.error('Bugünkü program getirme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -1927,10 +1982,10 @@ export const getTodaySchedule = async (ownerId) => {
   }
 };
 
-// HaftalÄ±k rezervasyon programÄ±nÄ± getir
+// Haftalık rezervasyon programını getir
 export const getWeekSchedule = async (ownerId) => {
   try {
-    // Ã–nce tesisleri getir
+    // Önce tesisleri getir
     const tesislerRef = collection(db, 'tesisler');
     const tesislerQuery = query(
       tesislerRef,
@@ -1953,10 +2008,10 @@ export const getWeekSchedule = async (ownerId) => {
 
     const today = new Date();
     const weekStart = new Date(today);
-    weekStart.setDate(today.getDate() - today.getDay()); // HaftanÄ±n baÅŸlangÄ±cÄ± (Pazar)
+    weekStart.setDate(today.getDate() - today.getDay()); // Haftanın başlangıcı (Pazar)
     weekStart.setHours(0, 0, 0, 0);
     const weekEnd = new Date(weekStart);
-    weekEnd.setDate(weekStart.getDate() + 7); // HaftanÄ±n sonu (Cumartesi)
+    weekEnd.setDate(weekStart.getDate() + 7); // Haftanın sonu (Cumartesi)
     weekEnd.setHours(23, 59, 59, 999);
 
     const rezervasyonlarRef = collection(db, 'rezervasyonlar');
@@ -1980,7 +2035,7 @@ export const getWeekSchedule = async (ownerId) => {
       const data = doc.data();
       const reservationDate = getDateFromField(data.date);
       
-      // Bu haftaki rezervasyonlarÄ± filtrele (client-side)
+      // Bu haftaki rezervasyonları filtrele (client-side)
       if (reservationDate && reservationDate >= weekStart && reservationDate <= weekEnd) {
         rezervasyonlar.push({
           id: doc.id,
@@ -1989,7 +2044,7 @@ export const getWeekSchedule = async (ownerId) => {
       }
     });
 
-    // Client-side sÄ±ralama (tarih ve zaman dilimine gÃ¶re)
+    // Client-side sıralama (tarih ve zaman dilimine göre)
     rezervasyonlar.sort((a, b) => {
       const dateA = getDateFromField(a.date);
       const dateB = getDateFromField(b.date);
@@ -1998,7 +2053,7 @@ export const getWeekSchedule = async (ownerId) => {
         const dateDiff = dateA - dateB;
         if (dateDiff !== 0) return dateDiff;
         
-        // AynÄ± tarihte ise zaman dilimine gÃ¶re sÄ±rala
+        // Aynı tarihte ise zaman dilimine göre sırala
         if (a.timeSlot && b.timeSlot) {
           return a.timeSlot.localeCompare(b.timeSlot);
         }
@@ -2011,7 +2066,7 @@ export const getWeekSchedule = async (ownerId) => {
       data: rezervasyonlar
     };
   } catch (error) {
-    console.error('HaftalÄ±k program getirme hatasÄ±:', error);
+    console.error('Haftalık program getirme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -2019,10 +2074,10 @@ export const getWeekSchedule = async (ownerId) => {
   }
 };
 
-// AylÄ±k rezervasyon programÄ±nÄ± getir
+// Aylık rezervasyon programını getir
 export const getMonthSchedule = async (ownerId) => {
   try {
-    // Ã–nce tesisleri getir
+    // Önce tesisleri getir
     const tesislerRef = collection(db, 'tesisler');
     const tesislerQuery = query(
       tesislerRef,
@@ -2046,7 +2101,7 @@ export const getMonthSchedule = async (ownerId) => {
     const today = new Date();
     const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
     monthStart.setHours(0, 0, 0, 0);
-    const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0); // AyÄ±n son gÃ¼nÃ¼
+    const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0); // Ayın son günü
     monthEnd.setHours(23, 59, 59, 999);
 
     const rezervasyonlarRef = collection(db, 'rezervasyonlar');
@@ -2070,7 +2125,7 @@ export const getMonthSchedule = async (ownerId) => {
       const data = doc.data();
       const reservationDate = getDateFromField(data.date);
       
-      // Bu ayki rezervasyonlarÄ± filtrele (client-side)
+      // Bu ayki rezervasyonları filtrele (client-side)
       if (reservationDate && reservationDate >= monthStart && reservationDate <= monthEnd) {
         rezervasyonlar.push({
           id: doc.id,
@@ -2079,7 +2134,7 @@ export const getMonthSchedule = async (ownerId) => {
       }
     });
 
-    // Client-side sÄ±ralama (tarih ve zaman dilimine gÃ¶re)
+    // Client-side sıralama (tarih ve zaman dilimine göre)
     rezervasyonlar.sort((a, b) => {
       const dateA = getDateFromField(a.date);
       const dateB = getDateFromField(b.date);
@@ -2088,7 +2143,7 @@ export const getMonthSchedule = async (ownerId) => {
         const dateDiff = dateA - dateB;
         if (dateDiff !== 0) return dateDiff;
         
-        // AynÄ± tarihte ise zaman dilimine gÃ¶re sÄ±rala
+        // Aynı tarihte ise zaman dilimine göre sırala
         if (a.timeSlot && b.timeSlot) {
           return a.timeSlot.localeCompare(b.timeSlot);
         }
@@ -2101,7 +2156,7 @@ export const getMonthSchedule = async (ownerId) => {
       data: rezervasyonlar
     };
   } catch (error) {
-    console.error('AylÄ±k program getirme hatasÄ±:', error);
+    console.error('Aylık program getirme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -2109,23 +2164,23 @@ export const getMonthSchedule = async (ownerId) => {
   }
 };
 
-// Belirli bir tesisin belirli bir tarih iÃ§in rezervasyonlarÄ±nÄ± getir
+// Belirli bir tesisin belirli bir tarih için rezervasyonlarını getir
 export const getReservationsByTesisId = async (tesisId, date) => {
   try {
     const rezervasyonlarRef = collection(db, 'rezervasyonlar');
     
-    // Tarih formatÄ±nÄ± ayarla (string olarak geliyorsa)
+    // Tarih formatını ayarla (string olarak geliyorsa)
     let dateStart, dateEnd;
     
-    // EÄŸer string ise Date objesine Ã§evir
+    // Eğer string ise Date objesine çevir
     // Tarihi string olarak 'YYYY-MM-DD' bekliyoruz, ama firestore'da Date/Timestamp veya String olabilir
-    // En gÃ¼venlisi tÃ¼mÃ¼nÃ¼ Ã§ekip client-side filtrelemek ya da firestore formatÄ±na uydurmak
-    // Åimdilik client-side filter yapalÄ±m daha esnek olsun Ã§Ã¼nkÃ¼ tarih formatlarÄ± karÄ±ÅŸÄ±k olabilir
+    // En güvenlisi tümünü çekip client-side filtrelemek ya da firestore formatına uydurmak
+    // Åimdilik client-side filter yapalım daha esnek olsun çünkü tarih formatları karışık olabilir
     
     const q = query(
       rezervasyonlarRef,
       where('tesisId', '==', tesisId),
-      where('status', 'in', ['confirmed', 'completed', 'pending', 'pending_payment']) // Ä°ptal edilenleri alma
+      where('status', 'in', ['confirmed', 'completed', 'pending', 'pending_payment']) // İptal edilenleri alma
     );
     
     const querySnapshot = await getDocs(q);
@@ -2137,7 +2192,7 @@ export const getReservationsByTesisId = async (tesisId, date) => {
     querySnapshot.forEach((doc) => {
       const data = doc.data();
       
-      // Tarih kontrolÃ¼
+      // Tarih kontrolü
       let resDateStr = '';
       if (data.date && data.date.toDate) {
         resDateStr = data.date.toDate().toISOString().split('T')[0];
@@ -2158,7 +2213,7 @@ export const getReservationsByTesisId = async (tesisId, date) => {
       data: reservations
     };
   } catch (error) {
-    console.error('Tesis rezervasyonlarÄ± getirme hatasÄ±:', error);
+    console.error('Tesis rezervasyonları getirme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -2168,10 +2223,10 @@ export const getReservationsByTesisId = async (tesisId, date) => {
 
 
 
-// Son rezervasyonlarÄ± getir
+// Son rezervasyonları getir
 export const getRecentReservations = async (ownerId, limitCount = 10) => {
   try {
-    // Ã–nce tesisleri getir
+    // Önce tesisleri getir
     const tesislerRef = collection(db, 'tesisler');
     const tesislerQuery = query(
       tesislerRef,
@@ -2208,7 +2263,7 @@ export const getRecentReservations = async (ownerId, limitCount = 10) => {
       });
     });
 
-    // Client-side sÄ±ralama (tarihe gÃ¶re azalan)
+    // Client-side sıralama (tarihe göre azalan)
     rezervasyonlar.sort((a, b) => {
       const getCreatedAt = (item) => {
         if (!item.createdAt) return new Date(0);
@@ -2231,7 +2286,7 @@ export const getRecentReservations = async (ownerId, limitCount = 10) => {
       data: limitedRezervasyonlar
     };
   } catch (error) {
-    console.error('Son rezervasyonlar getirme hatasÄ±:', error);
+    console.error('Son rezervasyonlar getirme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -2242,7 +2297,7 @@ export const getRecentReservations = async (ownerId, limitCount = 10) => {
 // Rapor verilerini getir
 export const getReportData = async (ownerId, startDate, endDate) => {
   try {
-    // Ã–nce tesisleri getir
+    // Önce tesisleri getir
     const tesislerRef = collection(db, 'tesisler');
     const tesislerQuery = query(
       tesislerRef,
@@ -2268,7 +2323,7 @@ export const getReportData = async (ownerId, startDate, endDate) => {
       };
     }
 
-    // RezervasyonlarÄ± getir
+    // Rezervasyonları getir
     const rezervasyonlarRef = collection(db, 'rezervasyonlar');
     const q = query(
       rezervasyonlarRef,
@@ -2316,7 +2371,7 @@ export const getReportData = async (ownerId, startDate, endDate) => {
       data: reportData
     };
   } catch (error) {
-    console.error('Rapor veri getirme hatasÄ±:', error);
+    console.error('Rapor veri getirme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -2324,7 +2379,7 @@ export const getReportData = async (ownerId, startDate, endDate) => {
   }
 };
 
-// BoÅŸ rapor verisi
+// Boş rapor verisi
 function getEmptyReportData() {
   return {
     totalRevenue: 0,
@@ -2363,7 +2418,7 @@ function calculateReportMetrics(currentReservations, previousReservations, tesis
   const totalReservations = confirmedReservations.length;
   const cancelledReservations = reservations.filter(res => res.status === 'cancelled').length;
   
-  // MÃ¼ÅŸteri analizi
+  // Müşteri analizi
   const customerMap = new Map();
   confirmedReservations.forEach(res => {
     const customerId = res.customerId || res.customerName || 'unknown';
@@ -2375,7 +2430,7 @@ function calculateReportMetrics(currentReservations, previousReservations, tesis
     } else {
       customerMap.set(customerId, {
         id: customerId,
-        name: res.customerName || 'MÃ¼ÅŸteri',
+        name: res.customerName || 'Müşteri',
         phone: res.customerPhone || '',
         reservations: 1,
         totalSpent: res.totalAmount || res.price || 0,
@@ -2395,9 +2450,9 @@ function calculateReportMetrics(currentReservations, previousReservations, tesis
       segment: getCustomerSegment(customer.totalSpent, customer.reservations)
     }));
 
-  // HaftalÄ±k gelir analizi
+  // Haftalık gelir analizi
   const weeklyRevenue = [];
-  const days = ['Pzt', 'Sal', 'Ã‡ar', 'Per', 'Cum', 'Cmt', 'Paz'];
+  const days = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'];
   
   for (let i = 0; i < 7; i++) {
     const dayReservations = confirmedReservations.filter(res => {
@@ -2418,7 +2473,7 @@ function calculateReportMetrics(currentReservations, previousReservations, tesis
     });
   }
 
-  // Saatlere gÃ¶re doluluk
+  // Saatlere göre doluluk
   const hourlyOccupancy = [];
   const hours = ['09:00', '11:00', '13:00', '15:00', '17:00', '19:00', '21:00'];
   
@@ -2441,11 +2496,11 @@ function calculateReportMetrics(currentReservations, previousReservations, tesis
     });
   }
 
-  // MÃ¼ÅŸteri segmentleri
+  // Müşteri segmentleri
   const customerSegments = [
     { name: 'VIP', count: 0, percentage: 0 },
-    { name: 'DÃ¼zenli', count: 0, percentage: 0 },
-    { name: 'HaftalÄ±k', count: 0, percentage: 0 },
+    { name: 'Düzenli', count: 0, percentage: 0 },
+    { name: 'Haftalık', count: 0, percentage: 0 },
     { name: 'Tek Seferlik', count: 0, percentage: 0 }
   ];
 
@@ -2457,20 +2512,20 @@ function calculateReportMetrics(currentReservations, previousReservations, tesis
     }
   });
 
-  // YÃ¼zdelik hesapla
+  // Yüzdelik hesapla
   customerSegments.forEach(segment => {
     segment.percentage = activeCustomers > 0 ? Math.round((segment.count / activeCustomers) * 100) : 0;
   });
 
-  // Ã–deme yÃ¶ntemleri (varsayÄ±lan veriler)
+  // Ödeme yöntemleri (varsayılan veriler)
   const paymentMethods = [
     { name: 'Nakit', percentage: 60 },
-    { name: 'Kredi KartÄ±', percentage: 25 },
+    { name: 'Kredi Kartı', percentage: 25 },
     { name: 'Havale', percentage: 10 },
-    { name: 'DiÄŸer', percentage: 5 }
+    { name: 'Diğer', percentage: 5 }
   ];
 
-  // Saha bazlÄ± performans
+  // Saha bazlı performans
   const sahaPerformance = tesisler.map(tesis => {
     const tesisReservations = confirmedReservations.filter(res => res.tesisId === tesis.id);
     const tesisRevenue = tesisReservations.reduce((sum, res) => 
@@ -2501,7 +2556,7 @@ function calculateReportMetrics(currentReservations, previousReservations, tesis
     };
   }).sort((a, b) => b.revenue - a.revenue);
 
-  // DiÄŸer metrikler
+  // Diğer metrikler
   const averagePrice = totalReservations > 0 ? Math.round(totalRevenue / totalReservations) : 0;
   const cancellationRate = reservations.length > 0 ? 
     Math.round((cancelledReservations / reservations.length) * 100 * 10) / 10 : 0;
@@ -2556,19 +2611,19 @@ function calculateReportMetrics(currentReservations, previousReservations, tesis
   };
 };
 
-// MÃ¼ÅŸteri segmentini belirle
+// Müşteri segmentini belirle
 function getCustomerSegment(totalSpent, reservations) {
   if (totalSpent >= 5000 || reservations >= 20) return 'VIP';
-  if (totalSpent >= 2000 || reservations >= 10) return 'DÃ¼zenli';
-  if (reservations >= 5) return 'HaftalÄ±k';
+  if (totalSpent >= 2000 || reservations >= 10) return 'Düzenli';
+  if (reservations >= 5) return 'Haftalık';
   return 'Tek Seferlik';
 }
 
 // Performans seviyesini belirle
 function getPerformanceLevel(occupancy, cancellationRate) {
-  if (occupancy >= 75 && cancellationRate <= 5) return 'YÃ¼ksek';
+  if (occupancy >= 75 && cancellationRate <= 5) return 'Yüksek';
   if (occupancy >= 50 && cancellationRate <= 10) return 'Orta';
-  return 'DÃ¼ÅŸÃ¼k';
+  return 'Düşük';
 }
 
 // Marketing Servisleri
@@ -2587,7 +2642,7 @@ export const addCampaign = async (campaignData) => {
       id: docRef.id
     };
   } catch (error) {
-    console.error('Kampanya ekleme hatasÄ±:', error);
+    console.error('Kampanya ekleme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -2595,7 +2650,7 @@ export const addCampaign = async (campaignData) => {
   }
 };
 
-// KampanyalarÄ± getir
+// Kampanyaları getir
 export const getCampaigns = async (ownerId) => {
   try {
     const campaignsRef = collection(db, 'campaigns');
@@ -2614,7 +2669,7 @@ export const getCampaigns = async (ownerId) => {
       });
     });
     
-    // Client-side sÄ±ralama (tarihe gÃ¶re azalan)
+    // Client-side sıralama (tarihe göre azalan)
     campaigns.sort((a, b) => {
       if (a.createdAt && b.createdAt) {
         return b.createdAt.toDate() - a.createdAt.toDate();
@@ -2627,7 +2682,7 @@ export const getCampaigns = async (ownerId) => {
       data: campaigns
     };
   } catch (error) {
-    console.error('Kampanyalar getirme hatasÄ±:', error);
+    console.error('Kampanyalar getirme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -2635,7 +2690,7 @@ export const getCampaigns = async (ownerId) => {
   }
 };
 
-// Kampanya gÃ¼ncelle
+// Kampanya güncelle
 export const updateCampaign = async (campaignId, campaignData) => {
   try {
     await updateDoc(doc(db, 'campaigns', campaignId), {
@@ -2645,7 +2700,7 @@ export const updateCampaign = async (campaignId, campaignData) => {
     
     return { success: true };
   } catch (error) {
-    console.error('Kampanya gÃ¼ncelleme hatasÄ±:', error);
+    console.error('Kampanya güncelleme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -2659,7 +2714,7 @@ export const deleteCampaign = async (campaignId) => {
     await deleteDoc(doc(db, 'campaigns', campaignId));
     return { success: true };
   } catch (error) {
-    console.error('Kampanya silme hatasÄ±:', error);
+    console.error('Kampanya silme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -2667,7 +2722,7 @@ export const deleteCampaign = async (campaignId) => {
   }
 };
 
-// Mesaj ÅŸablonu ekle
+// Mesaj şablonu ekle
 export const addMessageTemplate = async (templateData) => {
   try {
     const docRef = await addDoc(collection(db, 'messageTemplates'), {
@@ -2681,7 +2736,7 @@ export const addMessageTemplate = async (templateData) => {
       id: docRef.id
     };
   } catch (error) {
-    console.error('Mesaj ÅŸablonu ekleme hatasÄ±:', error);
+    console.error('Mesaj şablonu ekleme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -2689,7 +2744,7 @@ export const addMessageTemplate = async (templateData) => {
   }
 };
 
-// Mesaj ÅŸablonlarÄ±nÄ± getir
+// Mesaj şablonlarını getir
 export const getMessageTemplates = async (ownerId) => {
   try {
     const templatesRef = collection(db, 'messageTemplates');
@@ -2708,7 +2763,7 @@ export const getMessageTemplates = async (ownerId) => {
       });
     });
     
-    // Client-side sÄ±ralama
+    // Client-side sıralama
     templates.sort((a, b) => {
       if (a.createdAt && b.createdAt) {
         return b.createdAt.toDate() - a.createdAt.toDate();
@@ -2721,7 +2776,7 @@ export const getMessageTemplates = async (ownerId) => {
       data: templates
     };
   } catch (error) {
-    console.error('Mesaj ÅŸablonlarÄ± getirme hatasÄ±:', error);
+    console.error('Mesaj şablonları getirme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -2729,10 +2784,10 @@ export const getMessageTemplates = async (ownerId) => {
   }
 };
 
-// MÃ¼ÅŸteri segmentlerini getir
+// Müşteri segmentlerini getir
 export const getCustomerSegments = async (ownerId) => {
   try {
-    // Ã–nce tesisleri getir
+    // Önce tesisleri getir
     const tesislerRef = collection(db, 'tesisler');
     const tesislerQuery = query(
       tesislerRef,
@@ -2752,7 +2807,7 @@ export const getCustomerSegments = async (ownerId) => {
       };
     }
 
-    // RezervasyonlarÄ± getir
+    // Rezervasyonları getir
     const rezervasyonlarRef = collection(db, 'rezervasyonlar');
     const q = query(
       rezervasyonlarRef,
@@ -2769,7 +2824,7 @@ export const getCustomerSegments = async (ownerId) => {
       });
     });
 
-    // MÃ¼ÅŸteri segmentlerini hesapla
+    // Müşteri segmentlerini hesapla
     const segments = calculateCustomerSegments(reservations);
 
     return {
@@ -2777,7 +2832,7 @@ export const getCustomerSegments = async (ownerId) => {
       data: segments
     };
   } catch (error) {
-    console.error('MÃ¼ÅŸteri segmentleri getirme hatasÄ±:', error);
+    console.error('Müşteri segmentleri getirme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -2785,11 +2840,11 @@ export const getCustomerSegments = async (ownerId) => {
   }
 };
 
-// MÃ¼ÅŸteri segmentlerini hesapla
+// Müşteri segmentlerini hesapla
 const calculateCustomerSegments = (reservations) => {
   const customerMap = new Map();
   
-  // RezervasyonlarÄ± mÃ¼ÅŸteri bazÄ±nda grupla
+  // Rezervasyonları müşteri bazında grupla
   reservations.forEach(res => {
     if (res.status === 'confirmed' || res.status === 'completed') {
       const customerId = res.customerId || res.customerName || 'unknown';
@@ -2801,7 +2856,7 @@ const calculateCustomerSegments = (reservations) => {
       } else {
         customerMap.set(customerId, {
           id: customerId,
-          name: res.customerName || 'MÃ¼ÅŸteri',
+          name: res.customerName || 'Müşteri',
           phone: res.customerPhone || '',
           reservations: 1,
           totalSpent: res.totalAmount || res.price || 0,
@@ -2814,10 +2869,10 @@ const calculateCustomerSegments = (reservations) => {
 
   // Segmentleri hesapla
   const segments = [
-    { name: 'VIP MÃ¼ÅŸteriler', count: 0, criteria: 'totalSpent >= 5000 || reservations >= 20' },
-    { name: 'DÃ¼zenli Gelenler', count: 0, criteria: 'totalSpent >= 2000 || reservations >= 10' },
-    { name: 'KayÄ±p MÃ¼ÅŸteriler', count: 0, criteria: 'lastVisit < 30 days ago' },
-    { name: 'Yeni Ãœyeler', count: 0, criteria: 'firstVisit < 7 days ago' },
+    { name: 'VIP Müşteriler', count: 0, criteria: 'totalSpent >= 5000 || reservations >= 20' },
+    { name: 'Düzenli Gelenler', count: 0, criteria: 'totalSpent >= 2000 || reservations >= 10' },
+    { name: 'Kayıp Müşteriler', count: 0, criteria: 'lastVisit < 30 days ago' },
+    { name: 'Yeni Üyeler', count: 0, criteria: 'firstVisit < 7 days ago' },
     { name: 'Hafta Sonu', count: 0, criteria: 'weekend reservations' },
     { name: 'Kurumsal', count: 0, criteria: 'corporate customers' }
   ];
@@ -2830,21 +2885,21 @@ const calculateCustomerSegments = (reservations) => {
     const lastVisitDate = new Date(customer.lastVisit);
     const firstVisitDate = new Date(customer.firstVisit);
 
-    // VIP MÃ¼ÅŸteriler
+    // VIP Müşteriler
     if (customer.totalSpent >= 5000 || customer.reservations >= 20) {
       segments[0].count++;
     }
-    // DÃ¼zenli Gelenler
+    // Düzenli Gelenler
     else if (customer.totalSpent >= 2000 || customer.reservations >= 10) {
       segments[1].count++;
     }
     
-    // KayÄ±p MÃ¼ÅŸteriler
+    // Kayıp Müşteriler
     if (lastVisitDate < thirtyDaysAgo) {
       segments[2].count++;
     }
     
-    // Yeni Ãœyeler
+    // Yeni Üyeler
     if (firstVisitDate > sevenDaysAgo) {
       segments[3].count++;
     }
@@ -2863,10 +2918,10 @@ const calculateCustomerSegments = (reservations) => {
   return segments.map(segment => ({
     name: segment.name,
     count: segment.count,
-    action: segment.name === 'KayÄ±p MÃ¼ÅŸteriler' ? 'Geri Kazan â†’' :
-            segment.name === 'Yeni Ãœyeler' ? 'HoÅŸgeldin MesajÄ± â†’' :
-            segment.name === 'Kurumsal' ? 'Ã–zel Teklif â†’' :
-            'Kampanya GÃ¶nder â†’'
+    action: segment.name === 'Kayıp Müşteriler' ? 'Geri Kazan â†’' :
+            segment.name === 'Yeni Üyeler' ? 'Hoşgeldin Mesajı â†’' :
+            segment.name === 'Kurumsal' ? 'Özel Teklif â†’' :
+            'Kampanya Gönder â†’'
   }));
 };
 
@@ -2881,7 +2936,7 @@ export const getMarketingStats = async (ownerId) => {
     const campaigns = campaignsResult.success ? campaignsResult.data : [];
     const templates = templatesResult.success ? templatesResult.data : [];
 
-    // Ä°statistikleri hesapla
+    // İstatistikleri hesapla
     const activeCampaigns = campaigns.filter(c => c.status === 'active').length;
     const totalReach = campaigns.reduce((sum, c) => sum + (c.reached || 0), 0);
     const totalConversion = campaigns.reduce((sum, c) => sum + (c.conversion || 0), 0);
@@ -2905,7 +2960,7 @@ export const getMarketingStats = async (ownerId) => {
       }
     };
   } catch (error) {
-    console.error('Marketing istatistikleri getirme hatasÄ±:', error);
+    console.error('Marketing istatistikleri getirme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -2915,7 +2970,7 @@ export const getMarketingStats = async (ownerId) => {
 
 // Ayarlar Servisleri
 
-// KullanÄ±cÄ± ayarlarÄ±nÄ± gÃ¼ncelle (updateUserData'ya ek olarak)
+// Kullanıcı ayarlarını güncelle (updateUserData'ya ek olarak)
 export const updateUserSettings = async (userId, settingsData) => {
   try {
     await updateDoc(doc(db, 'users', userId), {
@@ -2925,7 +2980,7 @@ export const updateUserSettings = async (userId, settingsData) => {
     
     return { success: true };
   } catch (error) {
-    console.error('KullanÄ±cÄ± ayarlarÄ± gÃ¼ncelleme hatasÄ±:', error);
+    console.error('Kullanıcı ayarları güncelleme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -2933,38 +2988,38 @@ export const updateUserSettings = async (userId, settingsData) => {
   }
 };
 
-// Åifre gÃ¼ncelleme (Firebase Auth kullanarak)
+// Åifre güncelleme (Firebase Auth kullanarak)
 export const updateUserPassword = async (currentPassword, newPassword) => {
   try {
     const user = auth.currentUser;
     if (!user) {
       return {
         success: false,
-        error: 'KullanÄ±cÄ± oturum aÃ§mamÄ±ÅŸ'
+        error: 'Kullanıcı oturum açmamış'
       };
     }
 
-    // Mevcut ÅŸifreyi doÄŸrula (email/password ile giriÅŸ yapmÄ±ÅŸ kullanÄ±cÄ±lar iÃ§in)
+    // Mevcut şifreyi doğrula (email/password ile giriş yapmış kullanıcılar için)
     const credential = EmailAuthProvider.credential(user.email, currentPassword);
     await reauthenticateWithCredential(user, credential);
 
-    // Yeni ÅŸifreyi ayarla
+    // Yeni şifreyi ayarla
     await updatePassword(user, newPassword);
 
     return { success: true };
   } catch (error) {
-    console.error('Åifre gÃ¼ncelleme hatasÄ±:', error);
-    let errorMessage = 'Åifre gÃ¼ncellenirken hata oluÅŸtu';
+    console.error('Åifre güncelleme hatası:', error);
+    let errorMessage = 'Åifre güncellenirken hata oluştu';
     
     switch (error.code) {
       case 'auth/wrong-password':
-        errorMessage = 'Mevcut ÅŸifre yanlÄ±ÅŸ';
+        errorMessage = 'Mevcut şifre yanlış';
         break;
       case 'auth/weak-password':
-        errorMessage = 'Yeni ÅŸifre Ã§ok zayÄ±f';
+        errorMessage = 'Yeni şifre çok zayıf';
         break;
       case 'auth/requires-recent-login':
-        errorMessage = 'Bu iÅŸlem iÃ§in tekrar giriÅŸ yapmanÄ±z gerekiyor';
+        errorMessage = 'Bu işlem için tekrar giriş yapmanız gerekiyor';
         break;
       default:
         errorMessage = error.message;
@@ -2979,7 +3034,7 @@ export const updateUserPassword = async (currentPassword, newPassword) => {
 
 // Turnuva Servisleri
 
-// Turnuva oluÅŸtur (admin ve saha sahibi)
+// Turnuva oluştur (admin ve saha sahibi)
 export const createTournament = async (tournamentData) => {
   try {
     const tournamentDoc = {
@@ -3025,7 +3080,7 @@ export const createTournament = async (tournamentData) => {
       id: docRef.id
     };
   } catch (error) {
-    console.error('Turnuva oluÅŸturma hatasÄ±:', error);
+    console.error('Turnuva oluşturma hatası:', error);
     return {
       success: false,
       error: error.message
@@ -3033,10 +3088,10 @@ export const createTournament = async (tournamentData) => {
   }
 };
 
-// Eski addTournament fonksiyonu iÃ§in geriye dÃ¶nÃ¼k uyumluluk
+// Eski addTournament fonksiyonu için geriye dönük uyumluluk
 export const addTournament = createTournament;
 
-// Turnuva detaylarÄ±nÄ± getir
+// Turnuva detaylarını getir
 export const getTournament = async (tournamentId) => {
   try {
     const tournamentDoc = await getDoc(doc(db, 'tournaments', tournamentId));
@@ -3048,11 +3103,11 @@ export const getTournament = async (tournamentId) => {
     } else {
       return {
         success: false,
-        error: 'Turnuva bulunamadÄ±'
+        error: 'Turnuva bulunamadı'
       };
     }
   } catch (error) {
-    console.error('Turnuva getirme hatasÄ±:', error);
+    console.error('Turnuva getirme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -3060,7 +3115,7 @@ export const getTournament = async (tournamentId) => {
   }
 };
 
-// Saha sahibi/admin turnuvalarÄ±nÄ± getir
+// Saha sahibi/admin turnuvalarını getir
 export const getTournamentsByOwner = async (ownerId) => {
   try {
     const tournamentsRef = collection(db, 'tournaments');
@@ -3079,7 +3134,7 @@ export const getTournamentsByOwner = async (ownerId) => {
       });
     });
     
-    // Client-side sÄ±ralama (tarihe gÃ¶re azalan)
+    // Client-side sıralama (tarihe göre azalan)
     tournaments.sort((a, b) => {
       if (a.createdAt && b.createdAt) {
         const dateA = a.createdAt.toDate ? a.createdAt.toDate() : new Date(a.createdAt);
@@ -3094,7 +3149,7 @@ export const getTournamentsByOwner = async (ownerId) => {
       data: tournaments
     };
   } catch (error) {
-    console.error('Turnuvalar getirme hatasÄ±:', error);
+    console.error('Turnuvalar getirme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -3102,7 +3157,7 @@ export const getTournamentsByOwner = async (ownerId) => {
   }
 };
 
-// TÃ¼m turnuvalarÄ± getir (filtreleme ile)
+// Tüm turnuvaları getir (filtreleme ile)
 export const getAllTournaments = async (filters = {}) => {
   try {
     const tournamentsRef = collection(db, 'tournaments');
@@ -3129,7 +3184,7 @@ export const getAllTournaments = async (filters = {}) => {
       });
     });
     
-    // Client-side sÄ±ralama
+    // Client-side sıralama
     tournaments.sort((a, b) => {
       if (a.createdAt && b.createdAt) {
         const dateA = a.createdAt.toDate ? a.createdAt.toDate() : new Date(a.createdAt);
@@ -3144,7 +3199,7 @@ export const getAllTournaments = async (filters = {}) => {
       data: tournaments
     };
   } catch (error) {
-    console.error('Turnuvalar getirme hatasÄ±:', error);
+    console.error('Turnuvalar getirme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -3152,10 +3207,10 @@ export const getAllTournaments = async (filters = {}) => {
   }
 };
 
-// Eski getTournaments fonksiyonu iÃ§in geriye dÃ¶nÃ¼k uyumluluk
+// Eski getTournaments fonksiyonu için geriye dönük uyumluluk
 export const getTournaments = getTournamentsByOwner;
 
-// Turnuva gÃ¼ncelle
+// Turnuva güncelle
 export const updateTournament = async (tournamentId, tournamentData) => {
   try {
     await updateDoc(doc(db, 'tournaments', tournamentId), {
@@ -3165,7 +3220,7 @@ export const updateTournament = async (tournamentId, tournamentData) => {
     
     return { success: true };
   } catch (error) {
-    console.error('Turnuva gÃ¼ncelleme hatasÄ±:', error);
+    console.error('Turnuva güncelleme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -3179,7 +3234,7 @@ export const deleteTournament = async (tournamentId) => {
     await deleteDoc(doc(db, 'tournaments', tournamentId));
     return { success: true };
   } catch (error) {
-    console.error('Turnuva silme hatasÄ±:', error);
+    console.error('Turnuva silme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -3187,7 +3242,7 @@ export const deleteTournament = async (tournamentId) => {
   }
 };
 
-// Turnuva takÄ±mÄ± ekle
+// Turnuva takımı ekle
 export const addTournamentTeam = async (tournamentId, teamData) => {
   try {
     const docRef = await addDoc(collection(db, 'tournamentTeams'), {
@@ -3202,7 +3257,7 @@ export const addTournamentTeam = async (tournamentId, teamData) => {
       id: docRef.id
     };
   } catch (error) {
-    console.error('Turnuva takÄ±mÄ± ekleme hatasÄ±:', error);
+    console.error('Turnuva takımı ekleme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -3210,7 +3265,7 @@ export const addTournamentTeam = async (tournamentId, teamData) => {
   }
 };
 
-// Turnuva takÄ±mlarÄ±nÄ± getir
+// Turnuva takımlarını getir
 export const getTournamentTeams = async (tournamentId) => {
   try {
     const teamsRef = collection(db, 'tournamentTeams');
@@ -3234,7 +3289,7 @@ export const getTournamentTeams = async (tournamentId) => {
       data: teams
     };
   } catch (error) {
-    console.error('Turnuva takÄ±mlarÄ± getirme hatasÄ±:', error);
+    console.error('Turnuva takımları getirme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -3242,7 +3297,7 @@ export const getTournamentTeams = async (tournamentId) => {
   }
 };
 
-// Turnuva katÄ±lÄ±mcÄ±larÄ±nÄ± getir (bireysel veya takÄ±m)
+// Turnuva katılımcılarını getir (bireysel veya takım)
 export const getTournamentParticipants = async (tournamentId) => {
   try {
     const participantsRef = collection(db, 'tournamentParticipants');
@@ -3266,7 +3321,7 @@ export const getTournamentParticipants = async (tournamentId) => {
       data: participants
     };
   } catch (error) {
-    console.error('Turnuva katÄ±lÄ±mcÄ±larÄ± getirme hatasÄ±:', error);
+    console.error('Turnuva katılımcıları getirme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -3279,32 +3334,32 @@ export const registerToTournament = async (tournamentId, participantData) => {
   try {
     const tournamentDoc = await getDoc(doc(db, 'tournaments', tournamentId));
     if (!tournamentDoc.exists()) {
-      return { success: false, error: 'Turnuva bulunamadÄ±' };
+      return { success: false, error: 'Turnuva bulunamadı' };
     }
     
     const tournament = tournamentDoc.data();
     
-    // KayÄ±t durumunu kontrol et
+    // Kayıt durumunu kontrol et
     if (tournament.status !== 'registration_open') {
-      return { success: false, error: 'Turnuva kayÄ±tlarÄ± aÃ§Ä±k deÄŸil' };
+      return { success: false, error: 'Turnuva kayıtları açık değil' };
     }
     
-    // KayÄ±t son tarihi kontrolÃ¼ (deadline gÃ¼n sonuna kadar geÃ§erli)
+    // Kayıt son tarihi kontrolü (deadline gün sonuna kadar geçerli)
     if (tournament.registrationDeadline) {
       const deadlineDate = tournament.registrationDeadline.toDate ? 
         tournament.registrationDeadline.toDate() : 
         new Date(tournament.registrationDeadline);
       
-      // Deadline'Ä± gÃ¼n sonuna ayarla (23:59:59.999)
+      // Deadline'ı gün sonuna ayarla (23:59:59.999)
       const deadline = new Date(deadlineDate);
       deadline.setHours(23, 59, 59, 999);
       
       if (new Date() > deadline) {
-        return { success: false, error: 'KayÄ±t sÃ¼resi dolmuÅŸ' };
+        return { success: false, error: 'Kayıt süresi dolmuş' };
       }
     }
     
-    // Mevcut katÄ±lÄ±mcÄ± sayÄ±sÄ±nÄ± kontrol et
+    // Mevcut katılımcı sayısını kontrol et
     const participantsResult = await getTournamentParticipants(tournamentId);
     const participants = participantsResult.success ? participantsResult.data : [];
     const confirmedParticipants = participants.filter(p => p.status === 'confirmed');
@@ -3313,13 +3368,13 @@ export const registerToTournament = async (tournamentId, participantData) => {
       return { success: false, error: 'Turnuva dolu' };
     }
     
-    // Zaten kayÄ±tlÄ± mÄ± kontrol et
+    // Zaten kayıtlı mı kontrol et
     const existingParticipant = participants.find(p => p.participantId === participantData.participantId);
     if (existingParticipant) {
-      return { success: false, error: 'Zaten bu turnuvaya kayÄ±tlÄ±sÄ±nÄ±z' };
+      return { success: false, error: 'Zaten bu turnuvaya kayıtlısınız' };
     }
     
-    // KatÄ±lÄ±mcÄ±yÄ± ekle
+    // Katılımcıyı ekle
     const participantDoc = {
       tournamentId,
       participantId: participantData.participantId,
@@ -3341,7 +3396,7 @@ export const registerToTournament = async (tournamentId, participantData) => {
       requiresPayment: tournament.registrationFee > 0
     };
   } catch (error) {
-    console.error('Turnuva kayÄ±t hatasÄ±:', error);
+    console.error('Turnuva kayıt hatası:', error);
     return {
       success: false,
       error: error.message
@@ -3349,7 +3404,7 @@ export const registerToTournament = async (tournamentId, participantData) => {
   }
 };
 
-// Turnuva kaydÄ±nÄ± iptal et
+// Turnuva kaydını iptal et
 export const cancelTournamentRegistration = async (tournamentId, participantId) => {
   try {
     const participantsResult = await getTournamentParticipants(tournamentId);
@@ -3357,14 +3412,14 @@ export const cancelTournamentRegistration = async (tournamentId, participantId) 
     
     const participant = participants.find(p => p.participantId === participantId);
     if (!participant) {
-      return { success: false, error: 'KayÄ±t bulunamadÄ±' };
+      return { success: false, error: 'Kayıt bulunamadı' };
     }
     
     await deleteDoc(doc(db, 'tournamentParticipants', participant.id));
     
     return { success: true };
   } catch (error) {
-    console.error('Turnuva kayÄ±t iptal hatasÄ±:', error);
+    console.error('Turnuva kayıt iptal hatası:', error);
     return {
       success: false,
       error: error.message
@@ -3372,7 +3427,7 @@ export const cancelTournamentRegistration = async (tournamentId, participantId) 
   }
 };
 
-// Turnuva kaydÄ±nÄ± onayla
+// Turnuva kaydını onayla
 export const confirmTournamentRegistration = async (tournamentId, participantId) => {
   try {
     const participantsResult = await getTournamentParticipants(tournamentId);
@@ -3380,7 +3435,7 @@ export const confirmTournamentRegistration = async (tournamentId, participantId)
     
     const participant = participants.find(p => p.participantId === participantId);
     if (!participant) {
-      return { success: false, error: 'KayÄ±t bulunamadÄ±' };
+      return { success: false, error: 'Kayıt bulunamadı' };
     }
     
     await updateDoc(doc(db, 'tournamentParticipants', participant.id), {
@@ -3390,7 +3445,7 @@ export const confirmTournamentRegistration = async (tournamentId, participantId)
     
     return { success: true };
   } catch (error) {
-    console.error('Turnuva kayÄ±t onay hatasÄ±:', error);
+    console.error('Turnuva kayıt onay hatası:', error);
     return {
       success: false,
       error: error.message
@@ -3398,7 +3453,7 @@ export const confirmTournamentRegistration = async (tournamentId, participantId)
   }
 };
 
-// Turnuva maÃ§Ä± oluÅŸtur
+// Turnuva maçı oluştur
 export const addTournamentMatch = async (tournamentId, matchData) => {
   try {
     const matchDoc = {
@@ -3436,7 +3491,7 @@ export const addTournamentMatch = async (tournamentId, matchData) => {
       id: docRef.id
     };
   } catch (error) {
-    console.error('Turnuva maÃ§Ä± ekleme hatasÄ±:', error);
+    console.error('Turnuva maçı ekleme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -3444,7 +3499,7 @@ export const addTournamentMatch = async (tournamentId, matchData) => {
   }
 };
 
-// Birden fazla maÃ§ oluÅŸtur
+// Birden fazla maç oluştur
 export const createTournamentMatches = async (tournamentId, matchesData) => {
   try {
     const batch = [];
@@ -3482,7 +3537,7 @@ export const createTournamentMatches = async (tournamentId, matchesData) => {
       batch.push({ data: matchDoc });
     }
     
-    // Firestore batch write limit (500) - eÄŸer daha fazlaysa bÃ¶l
+    // Firestore batch write limit (500) - eğer daha fazlaysa böl
     const batchSize = 500;
     for (let i = 0; i < batch.length; i += batchSize) {
       const chunk = batch.slice(i, i + batchSize);
@@ -3498,7 +3553,7 @@ export const createTournamentMatches = async (tournamentId, matchesData) => {
       ids: createdMatches
     };
   } catch (error) {
-    console.error('MaÃ§lar oluÅŸturma hatasÄ±:', error);
+    console.error('Maçlar oluşturma hatası:', error);
     return {
       success: false,
       error: error.message
@@ -3506,7 +3561,7 @@ export const createTournamentMatches = async (tournamentId, matchesData) => {
   }
 };
 
-// Turnuva maÃ§larÄ±nÄ± getir
+// Turnuva maçlarını getir
 export const getTournamentMatches = async (tournamentId) => {
   try {
     const matchesRef = collection(db, 'tournamentMatches');
@@ -3525,7 +3580,7 @@ export const getTournamentMatches = async (tournamentId) => {
       });
     });
     
-    // Round ve matchNumber'a gÃ¶re sÄ±rala
+    // Round ve matchNumber'a göre sırala
     matches.sort((a, b) => {
       if (a.round !== b.round) {
         return a.round - b.round;
@@ -3538,7 +3593,7 @@ export const getTournamentMatches = async (tournamentId) => {
       data: matches
     };
   } catch (error) {
-    console.error('Turnuva maÃ§larÄ± getirme hatasÄ±:', error);
+    console.error('Turnuva maçları getirme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -3546,7 +3601,7 @@ export const getTournamentMatches = async (tournamentId) => {
   }
 };
 
-// Turnuva maÃ§Ä±nÄ± getir
+// Turnuva maçını getir
 export const getTournamentMatch = async (matchId) => {
   try {
     const matchDoc = await getDoc(doc(db, 'tournamentMatches', matchId));
@@ -3558,11 +3613,11 @@ export const getTournamentMatch = async (matchId) => {
     } else {
       return {
         success: false,
-        error: 'MaÃ§ bulunamadÄ±'
+        error: 'Maç bulunamadı'
       };
     }
   } catch (error) {
-    console.error('Turnuva maÃ§Ä± getirme hatasÄ±:', error);
+    console.error('Turnuva maçı getirme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -3570,7 +3625,7 @@ export const getTournamentMatch = async (matchId) => {
   }
 };
 
-// Turnuva maÃ§Ä±nÄ± gÃ¼ncelle
+// Turnuva maçını güncelle
 export const updateTournamentMatch = async (matchId, updates) => {
   try {
     await updateDoc(doc(db, 'tournamentMatches', matchId), {
@@ -3580,7 +3635,7 @@ export const updateTournamentMatch = async (matchId, updates) => {
     
     return { success: true };
   } catch (error) {
-    console.error('Turnuva maÃ§Ä± gÃ¼ncelleme hatasÄ±:', error);
+    console.error('Turnuva maçı güncelleme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -3588,7 +3643,7 @@ export const updateTournamentMatch = async (matchId, updates) => {
   }
 };
 
-// TakÄ±m Ã¼yesi kontrolÃ¼ yardÄ±mcÄ± fonksiyonu
+// Takım üyesi kontrolü yardımcı fonksiyonu
 const checkIfTeamMember = async (userId, teamId) => {
   try {
     const teamDoc = await getDoc(doc(db, 'teams', teamId));
@@ -3602,31 +3657,31 @@ const checkIfTeamMember = async (userId, teamId) => {
   }
 };
 
-// Skor gÃ¶nder (iki taraf da gÃ¶nderebilir)
+// Skor gönder (iki taraf da gönderebilir)
 export const submitMatchScore = async (matchId, userId, scoreData) => {
   try {
     const matchDoc = await getDoc(doc(db, 'tournamentMatches', matchId));
     if (!matchDoc.exists()) {
-      return { success: false, error: 'MaÃ§ bulunamadÄ±' };
+      return { success: false, error: 'Maç bulunamadı' };
     }
     
     const match = matchDoc.data();
     
-    // KullanÄ±cÄ±nÄ±n bu maÃ§ta yer alÄ±p almadÄ±ÄŸÄ±nÄ± kontrol et
+    // Kullanıcının bu maçta yer alıp almadığını kontrol et
     const isParticipant1 = match.participant1Id === userId;
     const isParticipant2 = match.participant2Id === userId;
     
     if (!isParticipant1 && !isParticipant2) {
-      // EÄŸer takÄ±m ise, takÄ±m Ã¼yelerini kontrol et
+      // Eğer takım ise, takım üyelerini kontrol et
       const isTeamMember1 = await checkIfTeamMember(userId, match.participant1Id);
       const isTeamMember2 = await checkIfTeamMember(userId, match.participant2Id);
       
       if (!isTeamMember1 && !isTeamMember2) {
-        return { success: false, error: 'Bu maÃ§ iÃ§in skor gÃ¶nderme yetkiniz yok' };
+        return { success: false, error: 'Bu maç için skor gönderme yetkiniz yok' };
       }
     }
     
-    // Skor giriÅŸi ekle
+    // Skor girişi ekle
     const scoreEntry = {
       userId,
       score1: scoreData.score1,
@@ -3637,7 +3692,7 @@ export const submitMatchScore = async (matchId, userId, scoreData) => {
     
     const currentScoreEntries = match.scoreEntries || [];
     
-    // EÄŸer bu kullanÄ±cÄ± daha Ã¶nce skor gÃ¶ndermiÅŸse gÃ¼ncelle, yoksa ekle
+    // Eğer bu kullanıcı daha önce skor göndermişse güncelle, yoksa ekle
     const existingEntryIndex = currentScoreEntries.findIndex(entry => entry.userId === userId);
     let updatedScoreEntries;
     
@@ -3648,7 +3703,7 @@ export const submitMatchScore = async (matchId, userId, scoreData) => {
       updatedScoreEntries = [...currentScoreEntries, scoreEntry];
     }
     
-    // SkorlarÄ±n uyuÅŸup uyuÅŸmadÄ±ÄŸÄ±nÄ± kontrol et
+    // Skorların uyuşup uyuşmadığını kontrol et
     let finalScore1 = null;
     let finalScore2 = null;
     let needsVerification = false;
@@ -3667,7 +3722,7 @@ export const submitMatchScore = async (matchId, userId, scoreData) => {
       needsVerification = true;
     }
     
-    // MaÃ§Ä± gÃ¼ncelle
+    // Maçı güncelle
     const updateData = {
       scoreEntries: updatedScoreEntries,
       updatedAt: serverTimestamp()
@@ -3677,7 +3732,7 @@ export const submitMatchScore = async (matchId, userId, scoreData) => {
       updateData.score1 = finalScore1;
       updateData.score2 = finalScore2;
       
-      // PuanlarÄ± hesapla
+      // Puanları hesapla
       const tournamentDoc = await getDoc(doc(db, 'tournaments', match.tournamentId));
       const tournament = tournamentDoc.data();
       const settings = tournament.settings || {};
@@ -3705,7 +3760,7 @@ export const submitMatchScore = async (matchId, userId, scoreData) => {
     
     await updateDoc(doc(db, 'tournamentMatches', matchId), updateData);
     
-    // EÄŸer skor onaylandÄ±ysa puan durumunu gÃ¼ncelle
+    // Eğer skor onaylandıysa puan durumunu güncelle
     if (finalScore1 !== null && finalScore2 !== null) {
       await updateTournamentStandings(match.tournamentId);
     }
@@ -3716,7 +3771,7 @@ export const submitMatchScore = async (matchId, userId, scoreData) => {
       verified: finalScore1 !== null && finalScore2 !== null
     };
   } catch (error) {
-    console.error('Skor gÃ¶nderme hatasÄ±:', error);
+    console.error('Skor gönderme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -3724,12 +3779,12 @@ export const submitMatchScore = async (matchId, userId, scoreData) => {
   }
 };
 
-// OrganizatÃ¶r skor doÄŸrulama
+// Organizatör skor doğrulama
 export const verifyMatchScore = async (matchId, verifiedScore) => {
   try {
     const matchDoc = await getDoc(doc(db, 'tournamentMatches', matchId));
     if (!matchDoc.exists()) {
-      return { success: false, error: 'MaÃ§ bulunamadÄ±' };
+      return { success: false, error: 'Maç bulunamadı' };
     }
     
     const match = matchDoc.data();
@@ -3737,7 +3792,7 @@ export const verifyMatchScore = async (matchId, verifiedScore) => {
     const tournament = tournamentDoc.data();
     const settings = tournament.settings || {};
     
-    // PuanlarÄ± hesapla
+    // Puanları hesapla
     let points1 = settings.pointsLoss || 0;
     let points2 = settings.pointsLoss || 0;
     let winnerId = null;
@@ -3753,7 +3808,7 @@ export const verifyMatchScore = async (matchId, verifiedScore) => {
       points2 = settings.pointsDraw || 1;
     }
     
-    // Skor giriÅŸlerini verified olarak iÅŸaretle
+    // Skor girişlerini verified olarak işaretle
     const updatedScoreEntries = (match.scoreEntries || []).map(entry => ({
       ...entry,
       verified: true
@@ -3770,12 +3825,12 @@ export const verifyMatchScore = async (matchId, verifiedScore) => {
       updatedAt: serverTimestamp()
     });
     
-    // Puan durumunu gÃ¼ncelle
+    // Puan durumunu güncelle
     await updateTournamentStandings(match.tournamentId);
     
     return { success: true };
   } catch (error) {
-    console.error('Skor doÄŸrulama hatasÄ±:', error);
+    console.error('Skor doğrulama hatası:', error);
     return {
       success: false,
       error: error.message
@@ -3789,7 +3844,7 @@ export const getTournamentStats = async (ownerId) => {
     const tournamentsResult = await getTournamentsByOwner(ownerId);
     const tournaments = tournamentsResult.success ? tournamentsResult.data : [];
 
-    // Ä°statistikleri hesapla
+    // İstatistikleri hesapla
     const activeTournaments = tournaments.filter(t => t.status === 'ongoing' || t.status === 'registration_open').length;
     const totalTeams = tournaments.reduce((sum, t) => {
       const count = Array.isArray(t.registeredTeams) ? t.registeredTeams.length : (Number(t.registeredTeams) || 0);
@@ -3813,7 +3868,7 @@ export const getTournamentStats = async (ownerId) => {
       }
     };
   } catch (error) {
-    console.error('Turnuva istatistikleri getirme hatasÄ±:', error);
+    console.error('Turnuva istatistikleri getirme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -3822,7 +3877,7 @@ export const getTournamentStats = async (ownerId) => {
 };
 
 // ==========================================
-// Puan Durumu ve Ä°statistikler
+// Puan Durumu ve İstatistikler
 // ==========================================
 
 // Puan durumunu hesapla
@@ -3830,21 +3885,21 @@ export const calculateTournamentStandings = async (tournamentId) => {
   try {
     const tournamentDoc = await getDoc(doc(db, 'tournaments', tournamentId));
     if (!tournamentDoc.exists()) {
-      return { success: false, error: 'Turnuva bulunamadÄ±' };
+      return { success: false, error: 'Turnuva bulunamadı' };
     }
     
     const tournament = tournamentDoc.data();
     const settings = tournament.settings || {};
     
-    // KatÄ±lÄ±mcÄ±larÄ± getir
+    // Katılımcıları getir
     const participantsResult = await getTournamentParticipants(tournamentId);
     const participants = participantsResult.success ? participantsResult.data : [];
     
-    // MaÃ§larÄ± getir
+    // Maçları getir
     const matchesResult = await getTournamentMatches(tournamentId);
     const matches = matchesResult.success ? matchesResult.data : [];
     
-    // Puan durumu map'i oluÅŸtur
+    // Puan durumu map'i oluştur
     const standingsMap = new Map();
     
     participants.forEach(participant => {
@@ -3863,7 +3918,7 @@ export const calculateTournamentStandings = async (tournamentId) => {
       });
     });
     
-    // TamamlanmÄ±ÅŸ maÃ§larÄ± iÅŸle
+    // Tamamlanmış maçları işle
     matches.forEach(match => {
       if (match.status === 'completed' && match.score1 !== null && match.score2 !== null) {
         const participant1 = standingsMap.get(match.participant1Id);
@@ -3906,7 +3961,7 @@ export const calculateTournamentStandings = async (tournamentId) => {
       standing.goalDifference = standing.goalsFor - standing.goalsAgainst;
     });
     
-    // SÄ±ralamaya gÃ¶re sÄ±rala (points, goalDifference, goalsFor)
+    // Sıralamaya göre sırala (points, goalDifference, goalsFor)
     const standingsArray = Array.from(standingsMap.values());
     standingsArray.sort((a, b) => {
       if (b.points !== a.points) return b.points - a.points;
@@ -3924,7 +3979,7 @@ export const calculateTournamentStandings = async (tournamentId) => {
       data: standingsArray
     };
   } catch (error) {
-    console.error('Puan durumu hesaplama hatasÄ±:', error);
+    console.error('Puan durumu hesaplama hatası:', error);
     return {
       success: false,
       error: error.message
@@ -3932,7 +3987,7 @@ export const calculateTournamentStandings = async (tournamentId) => {
   }
 };
 
-// Puan durumunu gÃ¼ncelle (Firestore'a kaydet)
+// Puan durumunu güncelle (Firestore'a kaydet)
 export const updateTournamentStandings = async (tournamentId) => {
   try {
     const standingsResult = await calculateTournamentStandings(tournamentId);
@@ -3962,7 +4017,7 @@ export const updateTournamentStandings = async (tournamentId) => {
     
     return { success: true };
   } catch (error) {
-    console.error('Puan durumu gÃ¼ncelleme hatasÄ±:', error);
+    console.error('Puan durumu güncelleme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -3974,7 +4029,7 @@ export const updateTournamentStandings = async (tournamentId) => {
 export const getTournamentStandings = async (tournamentId) => {
   try {
     const standingsRef = collection(db, 'tournamentStandings');
-    // Index hatasÄ± nedeniyle orderBy kaldÄ±rÄ±ldÄ±, client-side sorting yapÄ±lacak
+    // Index hatası nedeniyle orderBy kaldırıldı, client-side sorting yapılacak
     const q = query(
       standingsRef,
       where('tournamentId', '==', tournamentId)
@@ -3990,10 +4045,10 @@ export const getTournamentStandings = async (tournamentId) => {
       });
     });
     
-    // Client-side sorting (rank'e gÃ¶re)
+    // Client-side sorting (rank'e göre)
     standings.sort((a, b) => (a.rank || 0) - (b.rank || 0));
     
-    // EÄŸer standings yoksa hesapla
+    // Eğer standings yoksa hesapla
     if (standings.length === 0) {
       const calculated = await calculateTournamentStandings(tournamentId);
       if (calculated.success) {
@@ -4007,8 +4062,8 @@ export const getTournamentStandings = async (tournamentId) => {
       data: standings
     };
   } catch (error) {
-    console.error('Puan durumu getirme hatasÄ±:', error);
-    // Index hatasÄ± durumunda standings hesaplanmaya Ã§alÄ±ÅŸÄ±lÄ±r
+    console.error('Puan durumu getirme hatası:', error);
+    // Index hatası durumunda standings hesaplanmaya çalışılır
     if (error.code === 'failed-precondition' && error.message.includes('index')) {
       try {
         const calculated = await calculateTournamentStandings(tournamentId);
@@ -4016,7 +4071,7 @@ export const getTournamentStandings = async (tournamentId) => {
           return calculated;
         }
       } catch (calcError) {
-        console.error('Standings hesaplama hatasÄ±:', calcError);
+        console.error('Standings hesaplama hatası:', calcError);
       }
     }
     return {
@@ -4031,7 +4086,7 @@ export const getTournamentStatistics = async (tournamentId) => {
   try {
     const tournamentDoc = await getDoc(doc(db, 'tournaments', tournamentId));
     if (!tournamentDoc.exists()) {
-      return { success: false, error: 'Turnuva bulunamadÄ±' };
+      return { success: false, error: 'Turnuva bulunamadı' };
     }
     
     const matchesResult = await getTournamentMatches(tournamentId);
@@ -4051,7 +4106,7 @@ export const getTournamentStatistics = async (tournamentId) => {
       }
     };
   } catch (error) {
-    console.error('Turnuva istatistikleri getirme hatasÄ±:', error);
+    console.error('Turnuva istatistikleri getirme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -4059,26 +4114,26 @@ export const getTournamentStatistics = async (tournamentId) => {
   }
 };
 
-// Round Robin maÃ§larÄ±nÄ± otomatik oluÅŸtur
+// Round Robin maçlarını otomatik oluştur
 export const generateRoundRobinMatches = async (tournamentId) => {
   try {
     const tournamentDoc = await getDoc(doc(db, 'tournaments', tournamentId));
     if (!tournamentDoc.exists()) {
-      return { success: false, error: 'Turnuva bulunamadÄ±' };
+      return { success: false, error: 'Turnuva bulunamadı' };
     }
     
     const tournament = tournamentDoc.data();
     
-    // KatÄ±lÄ±mcÄ±larÄ± getir
+    // Katılımcıları getir
     const participantsResult = await getTournamentParticipants(tournamentId);
     const participants = participantsResult.success ? participantsResult.data.filter(p => p.status === 'confirmed') : [];
     
     if (participants.length < 2) {
-      return { success: false, error: 'En az 2 katÄ±lÄ±mcÄ± olmalÄ±dÄ±r' };
+      return { success: false, error: 'En az 2 katılımcı olmalıdır' };
     }
     
-    // Round Robin: Her katÄ±lÄ±mcÄ± diÄŸerleriyle bir kez oynar
-    // N katÄ±lÄ±mcÄ± iÃ§in N*(N-1)/2 maÃ§ oluÅŸturulur
+    // Round Robin: Her katılımcı diğerleriyle bir kez oynar
+    // N katılımcı için N*(N-1)/2 maç oluşturulur
     const matches = [];
     let matchNumber = 1;
     
@@ -4098,10 +4153,10 @@ export const generateRoundRobinMatches = async (tournamentId) => {
       }
     }
     
-    // MaÃ§larÄ± oluÅŸtur
+    // Maçları oluştur
     const createResult = await createTournamentMatches(tournamentId, matches);
     
-    // Turnuva durumunu gÃ¼ncelle
+    // Turnuva durumunu güncelle
     await updateDoc(doc(db, 'tournaments', tournamentId), {
       status: 'ongoing',
       updatedAt: serverTimestamp()
@@ -4113,7 +4168,7 @@ export const generateRoundRobinMatches = async (tournamentId) => {
       matchIds: createResult.ids
     };
   } catch (error) {
-    console.error('Round Robin maÃ§ oluÅŸturma hatasÄ±:', error);
+    console.error('Round Robin maç oluşturma hatası:', error);
     return {
       success: false,
       error: error.message
@@ -4122,10 +4177,10 @@ export const generateRoundRobinMatches = async (tournamentId) => {
 };
 
 // ==========================================
-// Ã–deme Ä°ÅŸlemleri
+// Ödeme İşlemleri
 // ==========================================
 
-// Turnuva kayÄ±t Ã¼creti Ã¶deme iÅŸlemi
+// Turnuva kayıt ücreti ödeme işlemi
 export const processTournamentPayment = async (tournamentId, participantId, paymentData) => {
   try {
     const participantResult = await getTournamentParticipants(tournamentId);
@@ -4133,10 +4188,10 @@ export const processTournamentPayment = async (tournamentId, participantId, paym
     
     const participant = participants.find(p => p.participantId === participantId);
     if (!participant) {
-      return { success: false, error: 'KayÄ±t bulunamadÄ±' };
+      return { success: false, error: 'Kayıt bulunamadı' };
     }
     
-    // Payment data'yÄ± Firestore'a kaydet
+    // Payment data'yı Firestore'a kaydet
     await updateDoc(doc(db, 'tournamentParticipants', participant.id), {
       paymentStatus: 'paid',
       paymentId: paymentData.paymentId || null,
@@ -4153,7 +4208,7 @@ export const processTournamentPayment = async (tournamentId, participantId, paym
     
     return { success: true };
   } catch (error) {
-    console.error('Turnuva Ã¶deme iÅŸlemi hatasÄ±:', error);
+    console.error('Turnuva ödeme işlemi hatası:', error);
     return {
       success: false,
       error: error.message
@@ -4161,22 +4216,22 @@ export const processTournamentPayment = async (tournamentId, participantId, paym
   }
 };
 
-// Turnuva Ã¶dÃ¼l daÄŸÄ±tÄ±mÄ±
+// Turnuva ödül dağıtımı
 export const distributeTournamentPrizes = async (tournamentId) => {
   try {
     const tournamentDoc = await getDoc(doc(db, 'tournaments', tournamentId));
     if (!tournamentDoc.exists()) {
-      return { success: false, error: 'Turnuva bulunamadÄ±' };
+      return { success: false, error: 'Turnuva bulunamadı' };
     }
     
     const tournament = tournamentDoc.data();
     
     if (tournament.status !== 'completed') {
-      return { success: false, error: 'Turnuva henÃ¼z tamamlanmadÄ±' };
+      return { success: false, error: 'Turnuva henüz tamamlanmadı' };
     }
     
     if (tournament.prizePool <= 0) {
-      return { success: false, error: 'Ã–dÃ¼l havuzu bulunmuyor' };
+      return { success: false, error: 'Ödül havuzu bulunmuyor' };
     }
     
     // Puan durumunu getir
@@ -4195,7 +4250,7 @@ export const distributeTournamentPrizes = async (tournamentId) => {
       if (standing) {
         const prizeAmount = (tournament.prizePool * prizeRule.percentage) / 100;
         
-        // Ã–dÃ¼lÃ¼ participant'a kaydet (Ã¶deme iÅŸlemi iÃ§in)
+        // Ödülü participant'a kaydet (ödeme işlemi için)
         prizeResults.push({
           participantId: standing.participantId,
           participantName: standing.participantName,
@@ -4206,7 +4261,7 @@ export const distributeTournamentPrizes = async (tournamentId) => {
       }
     }
     
-    // Tournament'a prize distribution kaydÄ±nÄ± ekle
+    // Tournament'a prize distribution kaydını ekle
     await updateDoc(doc(db, 'tournaments', tournamentId), {
       prizeDistributed: true,
       prizeDistributionResults: prizeResults,
@@ -4219,7 +4274,7 @@ export const distributeTournamentPrizes = async (tournamentId) => {
       data: prizeResults
     };
   } catch (error) {
-    console.error('Ã–dÃ¼l daÄŸÄ±tÄ±m hatasÄ±:', error);
+    console.error('Ödül dağıtım hatası:', error);
     return {
       success: false,
       error: error.message
@@ -4227,7 +4282,7 @@ export const distributeTournamentPrizes = async (tournamentId) => {
   }
 };
 
-// Turnuva kayÄ±t iadesi
+// Turnuva kayıt iadesi
 export const refundTournamentRegistration = async (tournamentId, participantId) => {
   try {
     const participantResult = await getTournamentParticipants(tournamentId);
@@ -4235,14 +4290,14 @@ export const refundTournamentRegistration = async (tournamentId, participantId) 
     
     const participant = participants.find(p => p.participantId === participantId);
     if (!participant) {
-      return { success: false, error: 'KayÄ±t bulunamadÄ±' };
+      return { success: false, error: 'Kayıt bulunamadı' };
     }
     
     if (participant.paymentStatus !== 'paid') {
-      return { success: false, error: 'Ã–deme yapÄ±lmamÄ±ÅŸ' };
+      return { success: false, error: 'Ödeme yapılmamış' };
     }
     
-    // Participant'Ä± refunded olarak iÅŸaretle
+    // Participant'ı refunded olarak işaretle
     await updateDoc(doc(db, 'tournamentParticipants', participant.id), {
       paymentStatus: 'refunded',
       refundedAt: serverTimestamp(),
@@ -4251,7 +4306,7 @@ export const refundTournamentRegistration = async (tournamentId, participantId) 
     
     return { success: true };
   } catch (error) {
-    console.error('Ä°ade iÅŸlemi hatasÄ±:', error);
+    console.error('İade işlemi hatası:', error);
     return {
       success: false,
       error: error.message
@@ -4259,9 +4314,9 @@ export const refundTournamentRegistration = async (tournamentId, participantId) 
   }
 };
 
-// Ä°ki nokta arasÄ±ndaki mesafeyi hesapla (km)
+// İki nokta arasındaki mesafeyi hesapla (km)
 const calculateDistance = (lat1, lng1, lat2, lng2) => {
-  const R = 6371; // DÃ¼nya'nÄ±n yarÄ±Ã§apÄ± (km)
+  const R = 6371; // Dünya'nın yarıçapı (km)
   const dLat = (lat2 - lat1) * Math.PI / 180;
   const dLng = (lng2 - lng1) * Math.PI / 180;
   const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
@@ -4271,14 +4326,14 @@ const calculateDistance = (lat1, lng1, lat2, lng2) => {
   return R * c;
 };
 
-// ========== OYUNCU FONKSÄ°YONLARI ==========
+// ========== OYUNCU FONKSİYONLARI ==========
 
-// Oyuncu rezervasyonlarÄ±nÄ± getir
+// Oyuncu rezervasyonlarını getir
 export const getPlayerReservations = async (playerId) => {
   try {
     const rezervasyonlarRef = collection(db, 'rezervasyonlar');
-    // orderBy'Ä± kaldÄ±rÄ±p client-side sÄ±ralama yapacaÄŸÄ±z (index hatasÄ± Ã¶nlemek iÃ§in)
-    // Sadece userId (oluÅŸturan) deÄŸil, tÃ¼m katÄ±lÄ±mcÄ±lar (playerIds) gÃ¶rebilmeli
+    // orderBy'ı kaldırıp client-side sıralama yapacağız (index hatası önlemek için)
+    // Sadece userId (oluşturan) değil, tüm katılımcılar (playerIds) görebilmeli
     const q = query(
       rezervasyonlarRef, 
       where('playerIds', 'array-contains', playerId)
@@ -4294,7 +4349,7 @@ export const getPlayerReservations = async (playerId) => {
       });
     });
     
-    // Client-side sÄ±ralama - en yeni tarih Ã¶nce
+    // Client-side sıralama - en yeni tarih önce
     rezervasyonlar.sort((a, b) => {
       const dateA = new Date(a.date);
       const dateB = new Date(b.date);
@@ -4306,7 +4361,7 @@ export const getPlayerReservations = async (playerId) => {
       data: rezervasyonlar
     };
   } catch (error) {
-    console.error('Oyuncu rezervasyonlarÄ± getirme hatasÄ±:', error);
+    console.error('Oyuncu rezervasyonları getirme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -4330,7 +4385,7 @@ export const getPlayerStats = async (playerId) => {
         return resDate >= today && (r.status === 'confirmed' || r.status === 'pending');
       }).length,
       completedMatches: reservations.filter(r => r.status === 'completed').length,
-      activeTournaments: 0 // TODO: Turnuva verisi eklendiÄŸinde gÃ¼ncellenecek
+      activeTournaments: 0 // TODO: Turnuva verisi eklendiğinde güncellenecek
     };
     
     return {
@@ -4338,7 +4393,7 @@ export const getPlayerStats = async (playerId) => {
       data: stats
     };
   } catch (error) {
-    console.error('Oyuncu istatistikleri getirme hatasÄ±:', error);
+    console.error('Oyuncu istatistikleri getirme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -4346,7 +4401,7 @@ export const getPlayerStats = async (playerId) => {
   }
 };
 
-// TÃ¼m tesisleri getir (oyuncu iÃ§in)
+// Tüm tesisleri getir (oyuncu için)
 export const getAllTesisler = async () => {
   try {
     const tesislerRef = collection(db, 'tesisler');
@@ -4367,7 +4422,7 @@ export const getAllTesisler = async () => {
       data: tesisler
     };
   } catch (error) {
-    console.error('Tesisler getirme hatasÄ±:', error);
+    console.error('Tesisler getirme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -4375,7 +4430,7 @@ export const getAllTesisler = async () => {
   }
 };
 
-// Ekip oluÅŸtur
+// Ekip oluştur
 export const createTeam = async (teamData) => {
   try {
     const docRef = await addDoc(collection(db, 'teams'), {
@@ -4389,7 +4444,7 @@ export const createTeam = async (teamData) => {
       id: docRef.id
     };
   } catch (error) {
-    console.error('Ekip oluÅŸturma hatasÄ±:', error);
+    console.error('Ekip oluşturma hatası:', error);
     return {
       success: false,
       error: error.message
@@ -4421,7 +4476,7 @@ export const getPlayerTeams = async (playerId) => {
       data: teams
     };
   } catch (error) {
-    console.error('Ekipler getirme hatasÄ±:', error);
+    console.error('Ekipler getirme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -4429,7 +4484,7 @@ export const getPlayerTeams = async (playerId) => {
   }
 };
 
-// Ekipe Ã¼ye ekle
+// Ekipe üye ekle
 export const addTeamMember = async (teamId, memberId) => {
   try {
     const teamDoc = doc(db, 'teams', teamId);
@@ -4438,7 +4493,7 @@ export const addTeamMember = async (teamId, memberId) => {
     if (!teamData.exists()) {
       return {
         success: false,
-        error: 'Ekip bulunamadÄ±'
+        error: 'Ekip bulunamadı'
       };
     }
     
@@ -4447,7 +4502,7 @@ export const addTeamMember = async (teamId, memberId) => {
     if (currentMembers.includes(memberId)) {
       return {
         success: false,
-        error: 'KullanÄ±cÄ± zaten ekibe dahil'
+        error: 'Kullanıcı zaten ekibe dahil'
       };
     }
     
@@ -4455,7 +4510,7 @@ export const addTeamMember = async (teamId, memberId) => {
     if (currentMembers.length >= maxMembers) {
       return {
         success: false,
-        error: 'Ekip kapasitesi dolmuÅŸ'
+        error: 'Ekip kapasitesi dolmuş'
       };
     }
     
@@ -4468,7 +4523,7 @@ export const addTeamMember = async (teamId, memberId) => {
       success: true
     };
   } catch (error) {
-    console.error('Ãœye ekleme hatasÄ±:', error);
+    console.error('Üye ekleme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -4476,29 +4531,29 @@ export const addTeamMember = async (teamId, memberId) => {
   }
 };
 
-// TakÄ±m daveti gÃ¶nder
+// Takım daveti gönder
 export const sendTeamInvitation = async (teamId, inviterId, invitedUserId) => {
   try {
-    // 1. TakÄ±m bilgilerini al
+    // 1. Takım bilgilerini al
     const teamDoc = await getDoc(doc(db, 'teams', teamId));
     if (!teamDoc.exists()) {
-      return { success: false, error: 'TakÄ±m bulunamadÄ±' };
+      return { success: false, error: 'Takım bulunamadı' };
     }
     const teamData = teamDoc.data();
 
-    // 2. KullanÄ±cÄ±nÄ±n zaten takÄ±mda olup olmadÄ±ÄŸÄ±nÄ± kontrol et
+    // 2. Kullanıcının zaten takımda olup olmadığını kontrol et
     if (teamData.members && teamData.members.includes(invitedUserId)) {
-      return { success: false, error: 'KullanÄ±cÄ± zaten bu takÄ±mda.' };
+      return { success: false, error: 'Kullanıcı zaten bu takımda.' };
     }
 
-    // 3. Davet oluÅŸtur (Bildirim olarak)
+    // 3. Davet oluştur (Bildirim olarak)
     const notificationData = {
       userId: invitedUserId,
       type: 'team_invitation',
       link: '/oyuncu/ekip',
-      title: 'TakÄ±m Daveti',
-      message: `${teamData.name} takÄ±mÄ±na katÄ±lmaya davet edildiniz.`,
-      relatedId: teamId, // TakÄ±m ID'si
+      title: 'Takım Daveti',
+      message: `${teamData.name} takımına katılmaya davet edildiniz.`,
+      relatedId: teamId, // Takım ID'si
       senderId: inviterId,
       status: 'pending', // pending, accepted, rejected
       read: false,
@@ -4509,66 +4564,66 @@ export const sendTeamInvitation = async (teamId, inviterId, invitedUserId) => {
     
     return { success: true };
   } catch (error) {
-    console.error('TakÄ±m daveti gÃ¶nderme hatasÄ±:', error);
+    console.error('Takım daveti gönderme hatası:', error);
     return { success: false, error: error.message };
   }
 };
 
-// TakÄ±m davetine yanÄ±t ver
+// Takım davetine yanıt ver
 export const respondToTeamInvitation = async (notificationId, action, userId) => {
   try {
     const notifRef = doc(db, 'notifications', notificationId);
     const notifDoc = await getDoc(notifRef);
 
     if (!notifDoc.exists()) {
-      return { success: false, error: 'Bildirim bulunamadÄ±' };
+      return { success: false, error: 'Bildirim bulunamadı' };
     }
 
     const notifData = notifDoc.data();
     
-    // GÃ¼venlik kontrolÃ¼ kaldÄ±rÄ±ldÄ± veya hafifletildi.
-    // notifData.userId === userId kontrolÃ¼ client side'da da yapÄ±labilir.
+    // Güvenlik kontrolü kaldırıldı veya hafifletildi.
+    // notifData.userId === userId kontrolü client side'da da yapılabilir.
     
-    if (action === 'accept') {
-      // TakÄ±ma ekle
+    if (action === 'accept' || action === 'accepted') {
+      // Takıma ekle
       const result = await addTeamMember(notifData.relatedId, userId);
-      if (!result.success && result.error !== 'KullanÄ±cÄ± zaten ekibe dahil') return result;
+      if (!result.success && result.error !== 'Kullanıcı zaten ekibe dahil') return result;
 
-      // Bildirimi gÃ¼ncelle
+      // Bildirimi güncelle
       await updateDoc(notifRef, {
         status: 'accepted',
         read: true,
         updatedAt: serverTimestamp()
       });
 
-      // GÃ¶nderene (Kaptana) bildirim gÃ¶nder
+      // Gönderene (Kaptana) bildirim gönder
       if (notifData.senderId) {
         await addDoc(collection(db, 'notifications'), {
             userId: notifData.senderId,
             type: 'team_join',
             title: 'Davet Kabul Edildi',
-            message: 'GÃ¶nderdiÄŸiniz takÄ±m daveti kabul edildi.',
+            message: 'Gönderdiğiniz takım daveti kabul edildi.',
             relatedId: notifData.relatedId,
             read: false,
             createdAt: serverTimestamp()
         });
       }
 
-    } else if (action === 'reject') {
-      // Bildirimi gÃ¼ncelle
+    } else if (action === 'reject' || action === 'rejected') {
+      // Bildirimi güncelle
       await updateDoc(notifRef, {
         status: 'rejected',
         read: true,
         updatedAt: serverTimestamp()
       });
 
-       // GÃ¶nderene bildirim
+       // Gönderene bildirim
        if (notifData.senderId) {
          await addDoc(collection(db, 'notifications'), {
             userId: notifData.senderId,
             type: 'team_reject',
             title: 'Davet Reddedildi',
-            message: 'GÃ¶nderdiÄŸiniz takÄ±m daveti reddedildi.',
+            message: 'Gönderdiğiniz takım daveti reddedildi.',
             relatedId: notifData.relatedId,
             read: false,
             createdAt: serverTimestamp()
@@ -4578,12 +4633,12 @@ export const respondToTeamInvitation = async (notificationId, action, userId) =>
 
     return { success: true };
   } catch (error) {
-    console.error('Davet yanÄ±tlama hatasÄ±:', error);
+    console.error('Davet yanıtlama hatası:', error);
     return { success: false, error: error.message };
   }
 };
 
-// KullanÄ±cÄ±yÄ± telefon numarasÄ± ile bul
+// Kullanıcıyı telefon numarası ile bul
 export const getUserByPhone = async (phone) => {
   try {
     const usersRef = collection(db, 'users');
@@ -4591,18 +4646,18 @@ export const getUserByPhone = async (phone) => {
     const querySnapshot = await getDocs(q);
 
     if (querySnapshot.empty) {
-      return { success: false, error: 'KullanÄ±cÄ± bulunamadÄ±' };
+      return { success: false, error: 'Kullanıcı bulunamadı' };
     }
 
     const userDoc = querySnapshot.docs[0];
     return { success: true, data: { id: userDoc.id, ...userDoc.data() } };
   } catch (error) {
-    console.error('KullanÄ±cÄ± arama hatasÄ±:', error);
+    console.error('Kullanıcı arama hatası:', error);
     return { success: false, error: error.message };
   }
 };
 
-// Ä°simden kullanÄ±cÄ± bul (Basit displayName aramasÄ±)
+// İsimden kullanıcı bul (Basit displayName araması)
 export const searchUserByName = async (name) => {
   try {
     const usersRef = collection(db, 'users');
@@ -4613,7 +4668,7 @@ export const searchUserByName = async (name) => {
          const q2 = query(usersRef, where('fullName', '==', name.trim()));
          const querySnapshot2 = await getDocs(q2);
          if (querySnapshot2.empty) {
-             return { success: false, error: 'KullanÄ±cÄ± bulunamadÄ±' };
+             return { success: false, error: 'Kullanıcı bulunamadı' };
          }
          const userDoc = querySnapshot2.docs[0];
          const userData = { id: userDoc.id, ...userDoc.data() };
@@ -4627,14 +4682,14 @@ export const searchUserByName = async (name) => {
     
     return { success: true, data: userData };
   } catch (error) {
-    console.error('KullanÄ±cÄ± bulma (isim) hatasÄ±:', error);
+    console.error('Kullanıcı bulma (isim) hatası:', error);
     return { success: false, error: error.message };
   }
 };
 
 
 
-// Ekipten Ã¼ye Ã§Ä±kar
+// Ekipten üye çıkar
 export const removeTeamMember = async (teamId, memberId) => {
   try {
     const teamDoc = doc(db, 'teams', teamId);
@@ -4643,18 +4698,18 @@ export const removeTeamMember = async (teamId, memberId) => {
     if (!teamData.exists()) {
       return {
         success: false,
-        error: 'Ekip bulunamadÄ±'
+        error: 'Ekip bulunamadı'
       };
     }
     
     const currentMembers = teamData.data().members || [];
     const updatedMembers = currentMembers.filter(id => id !== memberId);
     
-    // KaptanÄ± Ã§Ä±karamÄ±yoruz
+    // Kaptanı çıkaramıyoruz
     if (teamData.data().captainId === memberId) {
       return {
         success: false,
-        error: 'Kaptan ekipten Ã§Ä±karÄ±lamaz'
+        error: 'Kaptan ekipten çıkarılamaz'
       };
     }
     
@@ -4667,7 +4722,7 @@ export const removeTeamMember = async (teamId, memberId) => {
       success: true
     };
   } catch (error) {
-    console.error('Ãœye Ã§Ä±karma hatasÄ±:', error);
+    console.error('Üye çıkarma hatası:', error);
     return {
       success: false,
       error: error.message
@@ -4683,7 +4738,7 @@ export const deleteTeam = async (teamId) => {
       success: true
     };
   } catch (error) {
-    console.error('Ekip silme hatasÄ±:', error);
+    console.error('Ekip silme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -4691,7 +4746,7 @@ export const deleteTeam = async (teamId) => {
   }
 };
 
-// Ekip gÃ¼ncelle
+// Ekip güncelle
 export const updateTeam = async (teamId, teamData) => {
   try {
     await updateDoc(doc(db, 'teams', teamId), {
@@ -4702,7 +4757,7 @@ export const updateTeam = async (teamId, teamData) => {
       success: true
     };
   } catch (error) {
-    console.error('Ekip gÃ¼ncelleme hatasÄ±:', error);
+    console.error('Ekip güncelleme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -4710,7 +4765,7 @@ export const updateTeam = async (teamId, teamData) => {
   }
 };
 
-// Oyuncunun turnuvalarÄ±nÄ± getir
+// Oyuncunun turnuvalarını getir
 export const getPlayerTournaments = async (playerId) => {
   try {
     const tournamentsRef = collection(db, 'tournaments');
@@ -4726,7 +4781,7 @@ export const getPlayerTournaments = async (playerId) => {
       });
     });
     
-    // Oyuncunun Ã¼ye olduÄŸu turnuvalarÄ± filtrele
+    // Oyuncunun üye olduğu turnuvaları filtrele
     const playerTournaments = tournaments.filter(tournament => {
       const participants = tournament.participants || [];
       return participants.includes(playerId);
@@ -4737,7 +4792,7 @@ export const getPlayerTournaments = async (playerId) => {
       data: playerTournaments
     };
   } catch (error) {
-    console.error('Oyuncu turnuvalarÄ± getirme hatasÄ±:', error);
+    console.error('Oyuncu turnuvaları getirme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -4749,7 +4804,7 @@ export const getPlayerTournaments = async (playerId) => {
 export const getPlayerNotifications = async (playerId) => {
   try {
     const notificationsRef = collection(db, 'notifications');
-    // orderBy'Ä± kaldÄ±rÄ±p client-side sÄ±ralama yapacaÄŸÄ±z (index hatasÄ± Ã¶nlemek iÃ§in)
+    // orderBy'ı kaldırıp client-side sıralama yapacağız (index hatası önlemek için)
     const q = query(
       notificationsRef,
       where('userId', '==', playerId),
@@ -4766,7 +4821,7 @@ export const getPlayerNotifications = async (playerId) => {
       });
     });
     
-    // Client-side sÄ±ralama - en yeni Ã¶nce
+    // Client-side sıralama - en yeni önce
     notifications.sort((a, b) => {
       const dateA = a.createdAt?.toDate?.() || new Date(0);
       const dateB = b.createdAt?.toDate?.() || new Date(0);
@@ -4778,7 +4833,7 @@ export const getPlayerNotifications = async (playerId) => {
       data: notifications
     };
   } catch (error) {
-    console.error('Bildirimler getirme hatasÄ±:', error);
+    console.error('Bildirimler getirme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -4786,7 +4841,7 @@ export const getPlayerNotifications = async (playerId) => {
   }
 };
 
-// Bildirimi okundu olarak iÅŸaretle
+// Bildirimi okundu olarak işaretle
 export const markNotificationAsRead = async (notificationId) => {
   try {
     const docRef = doc(db, 'notifications', notificationId);
@@ -4796,12 +4851,12 @@ export const markNotificationAsRead = async (notificationId) => {
     });
     return { success: true };
   } catch (error) {
-    console.error('Bildirim okundu iÅŸaretleme hatasÄ±:', error);
+    console.error('Bildirim okundu işaretleme hatası:', error);
     return { success: false, error: error.message };
   }
 };
 
-// TÃ¼m bildirimleri okundu olarak iÅŸaretle
+// Tüm bildirimleri okundu olarak işaretle
 export const markAllNotificationsAsRead = async (userId) => {
   try {
     const q = query(
@@ -4822,12 +4877,12 @@ export const markAllNotificationsAsRead = async (userId) => {
     await batch.commit();
     return { success: true };
   } catch (error) {
-    console.error('Toplu okundu iÅŸaretleme hatasÄ±:', error);
+    console.error('Toplu okundu işaretleme hatası:', error);
     return { success: false, error: error.message };
   }
 };
 
-// ==================== ADMIN SERVÄ°SLERÄ° ====================
+// ==================== ADMIN SERVİSLERİ ====================
 
 // Platform istatistiklerini getir
 export const getPlatformStats = async () => {
@@ -4922,7 +4977,7 @@ export const getPlatformStats = async () => {
       }
     };
   } catch (error) {
-    console.error('Platform istatistikleri getirme hatasÄ±:', error);
+    console.error('Platform istatistikleri getirme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -4930,7 +4985,7 @@ export const getPlatformStats = async () => {
   }
 };
 
-// TÃ¼m tesisleri getir (admin)
+// Tüm tesisleri getir (admin)
 export const getAllTesislerAdmin = async (filters = {}) => {
   try {
     let q = query(collection(db, 'tesisler'));
@@ -4962,7 +5017,7 @@ export const getAllTesislerAdmin = async (filters = {}) => {
       data: tesisler
     };
   } catch (error) {
-    console.error('Tesisler getirme hatasÄ±:', error);
+    console.error('Tesisler getirme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -4981,7 +5036,7 @@ export const updateTesisStatus = async (tesisId, status, adminNotes = '') => {
     });
     return { success: true };
   } catch (error) {
-    console.error('Tesis durumu gÃ¼ncelleme hatasÄ±:', error);
+    console.error('Tesis durumu güncelleme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -5020,7 +5075,7 @@ export const getTesisStats = async () => {
 
     tesisler.forEach(tesis => {
       const city = tesis.city || 'Bilinmiyor';
-      const type = tesis.type || 'HalÄ± Saha';
+      const type = tesis.type || 'Halı Saha';
       
       stats.byCity[city] = (stats.byCity[city] || 0) + 1;
       stats.byType[type] = (stats.byType[type] || 0) + 1;
@@ -5028,7 +5083,7 @@ export const getTesisStats = async () => {
 
     return { success: true, data: stats };
   } catch (error) {
-    console.error('Tesis istatistikleri getirme hatasÄ±:', error);
+    console.error('Tesis istatistikleri getirme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -5036,7 +5091,7 @@ export const getTesisStats = async () => {
   }
 };
 
-// Tesis rezervasyonlarÄ±nÄ± getir
+// Tesis rezervasyonlarını getir
 export const getTesisReservations = async (tesisId, limitCount = 10) => {
   try {
     const q = query(
@@ -5076,7 +5131,7 @@ export const getTesisReservations = async (tesisId, limitCount = 10) => {
       stats
     };
   } catch (error) {
-    console.error('Tesis rezervasyonlarÄ± getirme hatasÄ±:', error);
+    console.error('Tesis rezervasyonları getirme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -5138,7 +5193,7 @@ export const getTesisRevenue = async (tesisId, period = 'month') => {
 
     return { success: true, data: revenue };
   } catch (error) {
-    console.error('Tesis gelir bilgileri getirme hatasÄ±:', error);
+    console.error('Tesis gelir bilgileri getirme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -5146,7 +5201,7 @@ export const getTesisRevenue = async (tesisId, period = 'month') => {
   }
 };
 
-// Tesis aktivite loglarÄ±nÄ± getir
+// Tesis aktivite loglarını getir
 export const getTesisActivityLogs = async (tesisId) => {
   try {
     const q = query(
@@ -5172,7 +5227,7 @@ export const getTesisActivityLogs = async (tesisId) => {
 
     return { success: true, data: logs };
   } catch (error) {
-    console.error('Tesis aktivite loglarÄ± getirme hatasÄ±:', error);
+    console.error('Tesis aktivite logları getirme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -5187,7 +5242,7 @@ export const bulkDeleteTesis = async (tesisIds) => {
     await Promise.all(promises);
     return { success: true };
   } catch (error) {
-    console.error('Toplu tesis silme hatasÄ±:', error);
+    console.error('Toplu tesis silme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -5195,7 +5250,7 @@ export const bulkDeleteTesis = async (tesisIds) => {
   }
 };
 
-// Toplu tesis gÃ¼ncelleme
+// Toplu tesis güncelleme
 export const bulkUpdateTesis = async (tesisIds, updates) => {
   try {
     const promises = tesisIds.map(id => 
@@ -5207,7 +5262,7 @@ export const bulkUpdateTesis = async (tesisIds, updates) => {
     await Promise.all(promises);
     return { success: true };
   } catch (error) {
-    console.error('Toplu tesis gÃ¼ncelleme hatasÄ±:', error);
+    console.error('Toplu tesis güncelleme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -5215,7 +5270,7 @@ export const bulkUpdateTesis = async (tesisIds, updates) => {
   }
 };
 
-// TÃ¼m kullanÄ±cÄ±larÄ± getir (admin)
+// Tüm kullanıcıları getir (admin)
 export const getAllUsers = async (filters = {}) => {
   try {
     let q = query(collection(db, 'users'));
@@ -5239,7 +5294,7 @@ export const getAllUsers = async (filters = {}) => {
       data: users
     };
   } catch (error) {
-    console.error('KullanÄ±cÄ±lar getirme hatasÄ±:', error);
+    console.error('Kullanıcılar getirme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -5247,7 +5302,7 @@ export const getAllUsers = async (filters = {}) => {
   }
 };
 
-// KullanÄ±cÄ± durumunu gÃ¼ncelle (ban/suspend)
+// Kullanıcı durumunu güncelle (ban/suspend)
 export const updateUserStatus = async (userId, status, reason = '') => {
   try {
     await updateDoc(doc(db, 'users', userId), {
@@ -5258,7 +5313,7 @@ export const updateUserStatus = async (userId, status, reason = '') => {
     });
     return { success: true };
   } catch (error) {
-    console.error('KullanÄ±cÄ± durumu gÃ¼ncelleme hatasÄ±:', error);
+    console.error('Kullanıcı durumu güncelleme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -5266,7 +5321,7 @@ export const updateUserStatus = async (userId, status, reason = '') => {
   }
 };
 
-// KullanÄ±cÄ± istatistiklerini getir
+// Kullanıcı istatistiklerini getir
 export const getUserStats = async () => {
   try {
     const querySnapshot = await getDocs(collection(db, 'users'));
@@ -5301,7 +5356,7 @@ export const getUserStats = async () => {
 
     return { success: true, data: stats };
   } catch (error) {
-    console.error('KullanÄ±cÄ± istatistikleri getirme hatasÄ±:', error);
+    console.error('Kullanıcı istatistikleri getirme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -5309,7 +5364,7 @@ export const getUserStats = async () => {
   }
 };
 
-// KullanÄ±cÄ± rezervasyonlarÄ±nÄ± getir
+// Kullanıcı rezervasyonlarını getir
 export const getUserReservations = async (userId, limitCount = 10) => {
   try {
     const q = query(
@@ -5349,7 +5404,7 @@ export const getUserReservations = async (userId, limitCount = 10) => {
       stats
     };
   } catch (error) {
-    console.error('KullanÄ±cÄ± rezervasyonlarÄ± getirme hatasÄ±:', error);
+    console.error('Kullanıcı rezervasyonları getirme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -5357,7 +5412,7 @@ export const getUserReservations = async (userId, limitCount = 10) => {
   }
 };
 
-// KullanÄ±cÄ± aktivite loglarÄ±nÄ± getir
+// Kullanıcı aktivite loglarını getir
 export const getUserActivityLogs = async (userId) => {
   try {
     const q = query(
@@ -5383,7 +5438,7 @@ export const getUserActivityLogs = async (userId) => {
 
     return { success: true, data: logs };
   } catch (error) {
-    console.error('KullanÄ±cÄ± aktivite loglarÄ± getirme hatasÄ±:', error);
+    console.error('Kullanıcı aktivite logları getirme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -5411,7 +5466,7 @@ export const getUserTesis = async (userId) => {
 
     return { success: true, data: tesisler };
   } catch (error) {
-    console.error('KullanÄ±cÄ± tesisleri getirme hatasÄ±:', error);
+    console.error('Kullanıcı tesisleri getirme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -5419,7 +5474,7 @@ export const getUserTesis = async (userId) => {
   }
 };
 
-// Toplu kullanÄ±cÄ± durum gÃ¼ncelleme
+// Toplu kullanıcı durum güncelleme
 export const bulkUpdateUserStatus = async (userIds, status, reason = '') => {
   try {
     const promises = userIds.map(id => 
@@ -5433,7 +5488,7 @@ export const bulkUpdateUserStatus = async (userIds, status, reason = '') => {
     await Promise.all(promises);
     return { success: true };
   } catch (error) {
-    console.error('Toplu kullanÄ±cÄ± durum gÃ¼ncelleme hatasÄ±:', error);
+    console.error('Toplu kullanıcı durum güncelleme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -5441,7 +5496,7 @@ export const bulkUpdateUserStatus = async (userIds, status, reason = '') => {
   }
 };
 
-// Admin tarafÄ±ndan kullanÄ±cÄ± dÃ¼zenleme
+// Admin tarafından kullanıcı düzenleme
 export const updateUserDataAdmin = async (userId, userData) => {
   try {
     await updateDoc(doc(db, 'users', userId), {
@@ -5450,7 +5505,7 @@ export const updateUserDataAdmin = async (userId, userData) => {
     });
     return { success: true };
   } catch (error) {
-    console.error('KullanÄ±cÄ± dÃ¼zenleme hatasÄ±:', error);
+    console.error('Kullanıcı düzenleme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -5458,14 +5513,14 @@ export const updateUserDataAdmin = async (userId, userData) => {
   }
 };
 
-// Admin tarafÄ±ndan kullanÄ±cÄ± silme
+// Admin tarafından kullanıcı silme
 export const deleteUserAdmin = async (userId) => {
   try {
-    // Firestore'dan kullanÄ±cÄ± verilerini sil
+    // Firestore'dan kullanıcı verilerini sil
     const userRef = doc(db, 'users', userId);
     await deleteDoc(userRef);
 
-    // Ä°liÅŸkili rezervasyonlardan kullanÄ±cÄ±yÄ± kaldÄ±r (userId alanÄ± varsa)
+    // İlişkili rezervasyonlardan kullanıcıyı kaldır (userId alanı varsa)
     const reservationsQuery = query(
       collection(db, 'rezervasyonlar'),
       where('userId', '==', userId)
@@ -5503,7 +5558,7 @@ export const deleteUserAdmin = async (userId) => {
 
     return { success: true };
   } catch (error) {
-    console.error('KullanÄ±cÄ± silme hatasÄ±:', error);
+    console.error('Kullanıcı silme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -5511,14 +5566,14 @@ export const deleteUserAdmin = async (userId) => {
   }
 };
 
-// Toplu kullanÄ±cÄ± silme
+// Toplu kullanıcı silme
 export const bulkDeleteUsers = async (userIds) => {
   try {
     const promises = userIds.map(id => deleteUserAdmin(id));
     await Promise.all(promises);
     return { success: true };
   } catch (error) {
-    console.error('Toplu kullanÄ±cÄ± silme hatasÄ±:', error);
+    console.error('Toplu kullanıcı silme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -5571,7 +5626,7 @@ export const getReservationStats = async () => {
 
     return { success: true, data: stats };
   } catch (error) {
-    console.error('Rezervasyon istatistikleri getirme hatasÄ±:', error);
+    console.error('Rezervasyon istatistikleri getirme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -5579,7 +5634,7 @@ export const getReservationStats = async () => {
   }
 };
 
-// Rezervasyon detaylarÄ±nÄ± getir
+// Rezervasyon detaylarını getir
 export const getReservationDetails = async (reservationId) => {
   try {
     const reservationDoc = await getDoc(doc(db, 'rezervasyonlar', reservationId));
@@ -5594,11 +5649,11 @@ export const getReservationDetails = async (reservationId) => {
     } else {
       return {
         success: false,
-        error: 'Rezervasyon bulunamadÄ±'
+        error: 'Rezervasyon bulunamadı'
       };
     }
   } catch (error) {
-    console.error('Rezervasyon detaylarÄ± getirme hatasÄ±:', error);
+    console.error('Rezervasyon detayları getirme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -5606,7 +5661,7 @@ export const getReservationDetails = async (reservationId) => {
   }
 };
 
-// Rezervasyon aktivite loglarÄ±nÄ± getir
+// Rezervasyon aktivite loglarını getir
 export const getReservationActivityLogs = async (reservationId) => {
   try {
     const q = query(
@@ -5632,7 +5687,7 @@ export const getReservationActivityLogs = async (reservationId) => {
 
     return { success: true, data: logs };
   } catch (error) {
-    console.error('Rezervasyon aktivite loglarÄ± getirme hatasÄ±:', error);
+    console.error('Rezervasyon aktivite logları getirme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -5640,7 +5695,7 @@ export const getReservationActivityLogs = async (reservationId) => {
   }
 };
 
-// Toplu rezervasyon durum gÃ¼ncelleme
+// Toplu rezervasyon durum güncelleme
 export const bulkUpdateReservationStatus = async (reservationIds, status) => {
   try {
     const promises = reservationIds.map(id => 
@@ -5649,7 +5704,7 @@ export const bulkUpdateReservationStatus = async (reservationIds, status) => {
     await Promise.all(promises);
     return { success: true };
   } catch (error) {
-    console.error('Toplu rezervasyon durum gÃ¼ncelleme hatasÄ±:', error);
+    console.error('Toplu rezervasyon durum güncelleme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -5664,7 +5719,7 @@ export const bulkDeleteReservations = async (reservationIds) => {
     await Promise.all(promises);
     return { success: true };
   } catch (error) {
-    console.error('Toplu rezervasyon silme hatasÄ±:', error);
+    console.error('Toplu rezervasyon silme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -5672,10 +5727,10 @@ export const bulkDeleteReservations = async (reservationIds) => {
   }
 };
 
-// Admin tarafÄ±ndan rezervasyon dÃ¼zenleme
+// Admin tarafından rezervasyon düzenleme
 export const updateReservationAdmin = async (reservationId, reservationData) => {
   try {
-    // Undefined deÄŸerleri filtrele
+    // Undefined değerleri filtrele
     const cleanData = {};
     Object.keys(reservationData).forEach(key => {
       if (reservationData[key] !== undefined && reservationData[key] !== null) {
@@ -5689,7 +5744,7 @@ export const updateReservationAdmin = async (reservationId, reservationData) => 
     });
     return { success: true };
   } catch (error) {
-    console.error('Rezervasyon dÃ¼zenleme hatasÄ±:', error);
+    console.error('Rezervasyon düzenleme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -5697,7 +5752,7 @@ export const updateReservationAdmin = async (reservationId, reservationData) => 
   }
 };
 
-// KullanÄ±cÄ± tipini gÃ¼ncelle (admin iÃ§in)
+// Kullanıcı tipini güncelle (admin için)
 export const updateUserType = async (userId, userType) => {
   try {
     await updateDoc(doc(db, 'users', userId), {
@@ -5707,7 +5762,7 @@ export const updateUserType = async (userId, userType) => {
     });
     return { success: true };
   } catch (error) {
-    console.error('KullanÄ±cÄ± tipi gÃ¼ncelleme hatasÄ±:', error);
+    console.error('Kullanıcı tipi güncelleme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -5715,7 +5770,7 @@ export const updateUserType = async (userId, userType) => {
   }
 };
 
-// TÃ¼m rezervasyonlarÄ± getir (admin)
+// Tüm rezervasyonları getir (admin)
 export const getAllReservations = async (filters = {}) => {
   try {
     let q = query(collection(db, 'rezervasyonlar'));
@@ -5745,7 +5800,7 @@ export const getAllReservations = async (filters = {}) => {
       data: reservations
     };
   } catch (error) {
-    console.error('Rezervasyonlar getirme hatasÄ±:', error);
+    console.error('Rezervasyonlar getirme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -5767,7 +5822,7 @@ export const createComplaint = async (complaintData) => {
       id: docRef.id
     };
   } catch (error) {
-    console.error('Åikayet oluÅŸturma hatasÄ±:', error);
+    console.error('Åikayet oluşturma hatası:', error);
     return {
       success: false,
       error: error.message
@@ -5775,7 +5830,7 @@ export const createComplaint = async (complaintData) => {
   }
 };
 
-// TÃ¼m ÅŸikayetleri getir
+// Tüm şikayetleri getir
 export const getAllComplaints = async (filters = {}) => {
   try {
     let q = query(collection(db, 'complaints'));
@@ -5805,7 +5860,7 @@ export const getAllComplaints = async (filters = {}) => {
       data: complaints
     };
   } catch (error) {
-    console.error('Åikayetler getirme hatasÄ±:', error);
+    console.error('Åikayetler getirme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -5813,7 +5868,7 @@ export const getAllComplaints = async (filters = {}) => {
   }
 };
 
-// Åikayet durumunu gÃ¼ncelle
+// Åikayet durumunu güncelle
 export const updateComplaintStatus = async (complaintId, status, adminNotes = '') => {
   try {
     await updateDoc(doc(db, 'complaints', complaintId), {
@@ -5823,7 +5878,7 @@ export const updateComplaintStatus = async (complaintId, status, adminNotes = ''
     });
     return { success: true };
   } catch (error) {
-    console.error('Åikayet durumu gÃ¼ncelleme hatasÄ±:', error);
+    console.error('Åikayet durumu güncelleme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -5831,7 +5886,7 @@ export const updateComplaintStatus = async (complaintId, status, adminNotes = ''
   }
 };
 
-// Platform ayarlarÄ±nÄ± getir
+// Platform ayarlarını getir
 export const getPlatformSettings = async () => {
   try {
     const settingsDoc = await getDoc(doc(db, 'platformSettings', 'main'));
@@ -5857,7 +5912,7 @@ export const getPlatformSettings = async () => {
       };
     }
   } catch (error) {
-    console.error('Platform ayarlarÄ± getirme hatasÄ±:', error);
+    console.error('Platform ayarları getirme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -5865,7 +5920,7 @@ export const getPlatformSettings = async () => {
   }
 };
 
-// Hero iÃ§eriÄŸini getir
+// Hero içeriğini getir
 export const getHeroContent = async () => {
   try {
     const heroDoc = await getDoc(doc(db, 'heroContent', 'main'));
@@ -5876,9 +5931,9 @@ export const getHeroContent = async () => {
       };
     } else {
       const defaultHeroContent = {
-        title: 'Adam Eksik Mi? Saha MÄ± ArÄ±yorsun?',
-        subtitle: 'TÃ¼rkiye\'nin en bÃ¼yÃ¼k spor platformunda 15.000+ tesisten seÃ§, anÄ±nda oyuncu bul, online rezervasyon yap!',
-        activeUsersText: 'kiÅŸi ÅŸu an online',
+        title: 'Adam Eksik Mi? Saha Mı Arıyorsun?',
+        subtitle: 'Türkiye\'nin en büyük spor platformunda 15.000+ tesisten seç, anında oyuncu bul, online rezervasyon yap!',
+        activeUsersText: 'kişi şu an online',
         backgroundColor: {
           from: '#00a651',
           to: '#04c956'
@@ -5886,15 +5941,15 @@ export const getHeroContent = async () => {
         tabs: [
           { key: 'saha', label: 'Saha Kirala' },
           { key: 'oyuncu', label: 'Oyuncu Bul' },
-          { key: 'takim', label: 'TakÄ±m Ara' }
+          { key: 'takim', label: 'Takım Ara' }
         ],
         searchFields: {
-          sportTypes: ['TÃ¼mÃ¼', 'Futbol', 'Basketbol', 'Tenis'],
+          sportTypes: ['Tümü', 'Futbol', 'Basketbol', 'Tenis'],
           timeSlots: [
-            'TÃ¼mÃ¼',
+            'Tümü',
             'Sabah (06:00-12:00)',
-            'Ã–ÄŸle (12:00-18:00)',
-            'AkÅŸam (18:00-00:00)',
+            'Öğle (12:00-18:00)',
+            'Akşam (18:00-00:00)',
             'Gece (00:00-06:00)'
           ]
         },
@@ -5908,14 +5963,14 @@ export const getHeroContent = async () => {
       };
     }
   } catch (error) {
-    console.error('Hero iÃ§eriÄŸi getirme hatasÄ±:', error);
+    console.error('Hero içeriği getirme hatası:', error);
     return {
       success: false,
       error: error.message,
       data: {
-        title: 'Adam Eksik Mi? Saha MÄ± ArÄ±yorsun?',
-        subtitle: 'TÃ¼rkiye\'nin en bÃ¼yÃ¼k spor platformunda 15.000+ tesisten seÃ§, anÄ±nda oyuncu bul, online rezervasyon yap!',
-        activeUsersText: 'kiÅŸi ÅŸu an online',
+        title: 'Adam Eksik Mi? Saha Mı Arıyorsun?',
+        subtitle: 'Türkiye\'nin en büyük spor platformunda 15.000+ tesisten seç, anında oyuncu bul, online rezervasyon yap!',
+        activeUsersText: 'kişi şu an online',
         backgroundColor: {
           from: '#00a651',
           to: '#04c956'
@@ -5923,15 +5978,15 @@ export const getHeroContent = async () => {
         tabs: [
           { key: 'saha', label: 'Saha Kirala' },
           { key: 'oyuncu', label: 'Oyuncu Bul' },
-          { key: 'takim', label: 'TakÄ±m Ara' }
+          { key: 'takim', label: 'Takım Ara' }
         ],
         searchFields: {
-          sportTypes: ['TÃ¼mÃ¼', 'Futbol', 'Basketbol', 'Tenis'],
+          sportTypes: ['Tümü', 'Futbol', 'Basketbol', 'Tenis'],
           timeSlots: [
-            'TÃ¼mÃ¼',
+            'Tümü',
             'Sabah (06:00-12:00)',
-            'Ã–ÄŸle (12:00-18:00)',
-            'AkÅŸam (18:00-00:00)',
+            'Öğle (12:00-18:00)',
+            'Akşam (18:00-00:00)',
             'Gece (00:00-06:00)'
           ]
         },
@@ -5942,7 +5997,7 @@ export const getHeroContent = async () => {
   }
 };
 
-// Hero iÃ§eriÄŸini gÃ¼ncelle
+// Hero içeriğini güncelle
 export const updateHeroContent = async (heroData) => {
   try {
     await setDoc(doc(db, 'heroContent', 'main'), {
@@ -5951,7 +6006,7 @@ export const updateHeroContent = async (heroData) => {
     }, { merge: true });
     return { success: true };
   } catch (error) {
-    console.error('Hero iÃ§eriÄŸi gÃ¼ncelleme hatasÄ±:', error);
+    console.error('Hero içeriği güncelleme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -5959,7 +6014,7 @@ export const updateHeroContent = async (heroData) => {
   }
 };
 
-// Platform ayarlarÄ±nÄ± gÃ¼ncelle
+// Platform ayarlarını güncelle
 export const updatePlatformSettings = async (settings) => {
   try {
     await setDoc(doc(db, 'platformSettings', 'main'), {
@@ -5968,7 +6023,7 @@ export const updatePlatformSettings = async (settings) => {
     }, { merge: true });
     return { success: true };
   } catch (error) {
-    console.error('Platform ayarlarÄ± gÃ¼ncelleme hatasÄ±:', error);
+    console.error('Platform ayarları güncelleme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -5976,9 +6031,9 @@ export const updatePlatformSettings = async (settings) => {
   }
 };
 
-// ==================== MARKETING SERVÄ°SLERÄ° ====================
+// ==================== MARKETING SERVİSLERİ ====================
 
-// Promosyon kodu oluÅŸtur
+// Promosyon kodu oluştur
 export const createPromotion = async (promotionData) => {
   try {
     const docRef = await addDoc(collection(db, 'promotions'), {
@@ -5993,7 +6048,7 @@ export const createPromotion = async (promotionData) => {
       id: docRef.id
     };
   } catch (error) {
-    console.error('Promosyon oluÅŸturma hatasÄ±:', error);
+    console.error('Promosyon oluşturma hatası:', error);
     return {
       success: false,
       error: error.message
@@ -6001,7 +6056,7 @@ export const createPromotion = async (promotionData) => {
   }
 };
 
-// TÃ¼m promosyon kodlarÄ±nÄ± getir
+// Tüm promosyon kodlarını getir
 export const getAllPromotions = async () => {
   try {
     const querySnapshot = await getDocs(collection(db, 'promotions'));
@@ -6025,7 +6080,7 @@ export const getAllPromotions = async () => {
       data: promotions
     };
   } catch (error) {
-    console.error('Promosyonlar getirme hatasÄ±:', error);
+    console.error('Promosyonlar getirme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -6033,7 +6088,7 @@ export const getAllPromotions = async () => {
   }
 };
 
-// Promosyon kodu gÃ¼ncelle
+// Promosyon kodu güncelle
 export const updatePromotion = async (promotionId, promotionData) => {
   try {
     await updateDoc(doc(db, 'promotions', promotionId), {
@@ -6042,7 +6097,7 @@ export const updatePromotion = async (promotionId, promotionData) => {
     });
     return { success: true };
   } catch (error) {
-    console.error('Promosyon gÃ¼ncelleme hatasÄ±:', error);
+    console.error('Promosyon güncelleme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -6056,7 +6111,7 @@ export const deletePromotion = async (promotionId) => {
     await deleteDoc(doc(db, 'promotions', promotionId));
     return { success: true };
   } catch (error) {
-    console.error('Promosyon silme hatasÄ±:', error);
+    console.error('Promosyon silme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -6064,9 +6119,9 @@ export const deletePromotion = async (promotionId) => {
   }
 };
 
-// ==================== DESTEK SERVÄ°SLERÄ° ====================
+// ==================== DESTEK SERVİSLERİ ====================
 
-// Ticket oluÅŸtur
+// Ticket oluştur
 export const createTicket = async (ticketData) => {
   try {
     const docRef = await addDoc(collection(db, 'tickets'), {
@@ -6081,7 +6136,7 @@ export const createTicket = async (ticketData) => {
       id: docRef.id
     };
   } catch (error) {
-    console.error('Ticket oluÅŸturma hatasÄ±:', error);
+    console.error('Ticket oluşturma hatası:', error);
     return {
       success: false,
       error: error.message
@@ -6089,7 +6144,7 @@ export const createTicket = async (ticketData) => {
   }
 };
 
-// TÃ¼m ticketlarÄ± getir
+// Tüm ticketları getir
 export const getAllTickets = async (filters = {}) => {
   try {
     let q = query(collection(db, 'tickets'));
@@ -6123,7 +6178,7 @@ export const getAllTickets = async (filters = {}) => {
       data: tickets
     };
   } catch (error) {
-    console.error('Ticketlar getirme hatasÄ±:', error);
+    console.error('Ticketlar getirme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -6131,7 +6186,7 @@ export const getAllTickets = async (filters = {}) => {
   }
 };
 
-// Ticket gÃ¼ncelle
+// Ticket güncelle
 export const updateTicket = async (ticketId, ticketData) => {
   try {
     await updateDoc(doc(db, 'tickets', ticketId), {
@@ -6140,7 +6195,7 @@ export const updateTicket = async (ticketId, ticketData) => {
     });
     return { success: true };
   } catch (error) {
-    console.error('Ticket gÃ¼ncelleme hatasÄ±:', error);
+    console.error('Ticket güncelleme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -6148,7 +6203,7 @@ export const updateTicket = async (ticketId, ticketData) => {
   }
 };
 
-// KullanÄ±cÄ±nÄ±n ticket'larÄ±nÄ± getir
+// Kullanıcının ticket'larını getir
 export const getUserTickets = async (userId, filters = {}) => {
   try {
     let q = query(
@@ -6174,7 +6229,7 @@ export const getUserTickets = async (userId, filters = {}) => {
       });
     });
     
-    // Client-side sorting: en yeni Ã¶nce
+    // Client-side sorting: en yeni önce
     tickets.sort((a, b) => {
       const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt || 0);
       const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt || 0);
@@ -6186,7 +6241,7 @@ export const getUserTickets = async (userId, filters = {}) => {
       data: tickets
     };
   } catch (error) {
-    console.error('KullanÄ±cÄ± ticketlarÄ± getirme hatasÄ±:', error);
+    console.error('Kullanıcı ticketları getirme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -6194,7 +6249,7 @@ export const getUserTickets = async (userId, filters = {}) => {
   }
 };
 
-// Ticket detaylarÄ±nÄ± getir
+// Ticket detaylarını getir
 export const getTicketDetails = async (ticketId) => {
   try {
     const ticketDoc = await getDoc(doc(db, 'tickets', ticketId));
@@ -6202,7 +6257,7 @@ export const getTicketDetails = async (ticketId) => {
     if (!ticketDoc.exists()) {
       return {
         success: false,
-        error: 'Ticket bulunamadÄ±'
+        error: 'Ticket bulunamadı'
       };
     }
     
@@ -6214,7 +6269,7 @@ export const getTicketDetails = async (ticketId) => {
       }
     };
   } catch (error) {
-    console.error('Ticket detay getirme hatasÄ±:', error);
+    console.error('Ticket detay getirme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -6222,7 +6277,7 @@ export const getTicketDetails = async (ticketId) => {
   }
 };
 
-// Ticket durumunu gÃ¼ncelle
+// Ticket durumunu güncelle
 export const updateTicketStatus = async (ticketId, status) => {
   try {
     await updateDoc(doc(db, 'tickets', ticketId), {
@@ -6234,7 +6289,7 @@ export const updateTicketStatus = async (ticketId, status) => {
       success: true
     };
   } catch (error) {
-    console.error('Ticket durum gÃ¼ncelleme hatasÄ±:', error);
+    console.error('Ticket durum güncelleme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -6242,7 +6297,7 @@ export const updateTicketStatus = async (ticketId, status) => {
   }
 };
 
-// Ticket'Ä± kapat
+// Ticket'ı kapat
 export const closeTicket = async (ticketId) => {
   try {
     await updateDoc(doc(db, 'tickets', ticketId), {
@@ -6255,7 +6310,7 @@ export const closeTicket = async (ticketId) => {
       success: true
     };
   } catch (error) {
-    console.error('Ticket kapatma hatasÄ±:', error);
+    console.error('Ticket kapatma hatası:', error);
     return {
       success: false,
       error: error.message
@@ -6263,7 +6318,7 @@ export const closeTicket = async (ticketId) => {
   }
 };
 
-// Ticket'Ä± yeniden aÃ§
+// Ticket'ı yeniden aç
 export const reopenTicket = async (ticketId) => {
   try {
     await updateDoc(doc(db, 'tickets', ticketId), {
@@ -6275,7 +6330,7 @@ export const reopenTicket = async (ticketId) => {
       success: true
     };
   } catch (error) {
-    console.error('Ticket yeniden aÃ§ma hatasÄ±:', error);
+    console.error('Ticket yeniden açma hatası:', error);
     return {
       success: false,
       error: error.message
@@ -6283,12 +6338,12 @@ export const reopenTicket = async (ticketId) => {
   }
 };
 
-// Ticket oluÅŸtur (createSupportTicket alias)
+// Ticket oluştur (createSupportTicket alias)
 export const createSupportTicket = async (ticketData) => {
   return await createTicket(ticketData);
 };
 
-// Ticket yanÄ±tÄ± ekle (replyToTicket alias)
+// Ticket yanıtı ekle (replyToTicket alias)
 export const replyToTicket = async (ticketId, replyData) => {
   return await addTicketReply(ticketId, replyData);
 };
@@ -6331,7 +6386,7 @@ export const getTicketStats = async () => {
       averageResolutionTime: 0
     };
 
-    // Ortalama Ã§Ã¶zÃ¼m sÃ¼resi hesapla (resolved/closed ticketlar iÃ§in)
+    // Ortalama çözüm süresi hesapla (resolved/closed ticketlar için)
     const resolvedTickets = tickets.filter(t => t.status === 'resolved' || t.status === 'closed');
     if (resolvedTickets.length > 0) {
       const totalTime = resolvedTickets.reduce((sum, ticket) => {
@@ -6354,7 +6409,7 @@ export const getTicketStats = async () => {
 
     return { success: true, data: stats };
   } catch (error) {
-    console.error('Ticket istatistikleri getirme hatasÄ±:', error);
+    console.error('Ticket istatistikleri getirme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -6362,7 +6417,7 @@ export const getTicketStats = async () => {
   }
 };
 
-// Ticket aktivite loglarÄ±nÄ± getir
+// Ticket aktivite loglarını getir
 export const getTicketActivityLogs = async (ticketId) => {
   try {
     const q = query(
@@ -6388,7 +6443,7 @@ export const getTicketActivityLogs = async (ticketId) => {
 
     return { success: true, data: logs };
   } catch (error) {
-    console.error('Ticket aktivite loglarÄ± getirme hatasÄ±:', error);
+    console.error('Ticket aktivite logları getirme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -6396,14 +6451,14 @@ export const getTicketActivityLogs = async (ticketId) => {
   }
 };
 
-// Toplu ticket durum gÃ¼ncelleme
+// Toplu ticket durum güncelleme
 export const bulkUpdateTicketStatus = async (ticketIds, status) => {
   try {
     const promises = ticketIds.map(id => updateTicketStatus(id, status));
     await Promise.all(promises);
     return { success: true };
   } catch (error) {
-    console.error('Toplu ticket durum gÃ¼ncelleme hatasÄ±:', error);
+    console.error('Toplu ticket durum güncelleme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -6418,7 +6473,7 @@ export const bulkDeleteTickets = async (ticketIds) => {
     await Promise.all(promises);
     return { success: true };
   } catch (error) {
-    console.error('Toplu ticket silme hatasÄ±:', error);
+    console.error('Toplu ticket silme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -6426,10 +6481,10 @@ export const bulkDeleteTickets = async (ticketIds) => {
   }
 };
 
-// Admin tarafÄ±ndan ticket dÃ¼zenleme
+// Admin tarafından ticket düzenleme
 export const updateTicketAdmin = async (ticketId, ticketData) => {
   try {
-    // Undefined deÄŸerleri filtrele
+    // Undefined değerleri filtrele
     const cleanData = {};
     Object.keys(ticketData).forEach(key => {
       if (ticketData[key] !== undefined && ticketData[key] !== null) {
@@ -6443,7 +6498,7 @@ export const updateTicketAdmin = async (ticketId, ticketData) => {
     });
     return { success: true };
   } catch (error) {
-    console.error('Ticket dÃ¼zenleme hatasÄ±:', error);
+    console.error('Ticket düzenleme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -6451,13 +6506,13 @@ export const updateTicketAdmin = async (ticketId, ticketData) => {
   }
 };
 
-// Admin tarafÄ±ndan ticket silme
+// Admin tarafından ticket silme
 export const deleteTicketAdmin = async (ticketId) => {
   try {
     await deleteDoc(doc(db, 'tickets', ticketId));
     return { success: true };
   } catch (error) {
-    console.error('Ticket silme hatasÄ±:', error);
+    console.error('Ticket silme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -6485,10 +6540,10 @@ export const addTicketReply = async (ticketId, replyData) => {
     }
     return {
       success: false,
-      error: 'Ticket bulunamadÄ±'
+      error: 'Ticket bulunamadı'
     };
   } catch (error) {
-    console.error('Ticket yanÄ±tÄ± ekleme hatasÄ±:', error);
+    console.error('Ticket yanıtı ekleme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -6496,9 +6551,9 @@ export const addTicketReply = async (ticketId, replyData) => {
   }
 };
 
-// ==================== Ã–DEME YÃ–NTEMLERÄ° SERVÄ°SLERÄ° ====================
+// ==================== ÖDEME YÖNTEMLERİ SERVİSLERİ ====================
 
-// KullanÄ±cÄ±nÄ±n Ã¶deme yÃ¶ntemlerini getir
+// Kullanıcının ödeme yöntemlerini getir
 export const getPlayerPaymentMethods = async (userId) => {
   try {
     const paymentMethodsRef = collection(db, 'users', userId, 'paymentMethods');
@@ -6512,7 +6567,7 @@ export const getPlayerPaymentMethods = async (userId) => {
       });
     });
     
-    // VarsayÄ±lan Ã¶deme yÃ¶ntemini Ã¶nce gÃ¶ster
+    // Varsayılan ödeme yöntemini önce göster
     paymentMethods.sort((a, b) => {
       if (a.isDefault && !b.isDefault) return -1;
       if (!a.isDefault && b.isDefault) return 1;
@@ -6524,7 +6579,7 @@ export const getPlayerPaymentMethods = async (userId) => {
       data: paymentMethods
     };
   } catch (error) {
-    console.error('Ã–deme yÃ¶ntemleri getirme hatasÄ±:', error);
+    console.error('Ödeme yöntemleri getirme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -6532,12 +6587,12 @@ export const getPlayerPaymentMethods = async (userId) => {
   }
 };
 
-// Yeni Ã¶deme yÃ¶ntemi ekle
+// Yeni ödeme yöntemi ekle
 export const addPaymentMethod = async (userId, paymentMethodData) => {
   try {
     const paymentMethodsRef = collection(db, 'users', userId, 'paymentMethods');
     
-    // EÄŸer varsayÄ±lan olarak iÅŸaretlenmiÅŸse, diÄŸerlerini varsayÄ±lan olmaktan Ã§Ä±kar
+    // Eğer varsayılan olarak işaretlenmişse, diğerlerini varsayılan olmaktan çıkar
     if (paymentMethodData.isDefault) {
       const existingMethods = await getPlayerPaymentMethods(userId);
       if (existingMethods.success) {
@@ -6563,7 +6618,7 @@ export const addPaymentMethod = async (userId, paymentMethodData) => {
       id: docRef.id
     };
   } catch (error) {
-    console.error('Ã–deme yÃ¶ntemi ekleme hatasÄ±:', error);
+    console.error('Ödeme yöntemi ekleme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -6571,12 +6626,12 @@ export const addPaymentMethod = async (userId, paymentMethodData) => {
   }
 };
 
-// Ã–deme yÃ¶ntemi gÃ¼ncelle
+// Ödeme yöntemi güncelle
 export const updatePaymentMethod = async (userId, paymentMethodId, paymentMethodData) => {
   try {
     const paymentMethodRef = doc(db, 'users', userId, 'paymentMethods', paymentMethodId);
     
-    // EÄŸer varsayÄ±lan olarak iÅŸaretlenmiÅŸse, diÄŸerlerini varsayÄ±lan olmaktan Ã§Ä±kar
+    // Eğer varsayılan olarak işaretlenmişse, diğerlerini varsayılan olmaktan çıkar
     if (paymentMethodData.isDefault) {
       const existingMethods = await getPlayerPaymentMethods(userId);
       if (existingMethods.success) {
@@ -6600,7 +6655,7 @@ export const updatePaymentMethod = async (userId, paymentMethodId, paymentMethod
       success: true
     };
   } catch (error) {
-    console.error('Ã–deme yÃ¶ntemi gÃ¼ncelleme hatasÄ±:', error);
+    console.error('Ödeme yöntemi güncelleme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -6608,7 +6663,7 @@ export const updatePaymentMethod = async (userId, paymentMethodId, paymentMethod
   }
 };
 
-// Ã–deme yÃ¶ntemi sil
+// Ödeme yöntemi sil
 export const deletePaymentMethod = async (userId, paymentMethodId) => {
   try {
     const paymentMethodRef = doc(db, 'users', userId, 'paymentMethods', paymentMethodId);
@@ -6618,7 +6673,7 @@ export const deletePaymentMethod = async (userId, paymentMethodId) => {
       success: true
     };
   } catch (error) {
-    console.error('Ã–deme yÃ¶ntemi silme hatasÄ±:', error);
+    console.error('Ödeme yöntemi silme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -6626,10 +6681,10 @@ export const deletePaymentMethod = async (userId, paymentMethodId) => {
   }
 };
 
-// VarsayÄ±lan Ã¶deme yÃ¶ntemi ayarla
+// Varsayılan ödeme yöntemi ayarla
 export const setDefaultPaymentMethod = async (userId, paymentMethodId) => {
   try {
-    // Ã–nce tÃ¼m Ã¶deme yÃ¶ntemlerini varsayÄ±lan olmaktan Ã§Ä±kar
+    // Önce tüm ödeme yöntemlerini varsayılan olmaktan çıkar
     const existingMethods = await getPlayerPaymentMethods(userId);
     if (existingMethods.success) {
       for (const method of existingMethods.data) {
@@ -6642,7 +6697,7 @@ export const setDefaultPaymentMethod = async (userId, paymentMethodId) => {
       }
     }
     
-    // SeÃ§ilen Ã¶deme yÃ¶ntemini varsayÄ±lan yap
+    // Seçilen ödeme yöntemini varsayılan yap
     const paymentMethodRef = doc(db, 'users', userId, 'paymentMethods', paymentMethodId);
     await updateDoc(paymentMethodRef, {
       isDefault: true,
@@ -6653,7 +6708,7 @@ export const setDefaultPaymentMethod = async (userId, paymentMethodId) => {
       success: true
     };
   } catch (error) {
-    console.error('VarsayÄ±lan Ã¶deme yÃ¶ntemi ayarlama hatasÄ±:', error);
+    console.error('Varsayılan ödeme yöntemi ayarlama hatası:', error);
     return {
       success: false,
       error: error.message
@@ -6661,7 +6716,7 @@ export const setDefaultPaymentMethod = async (userId, paymentMethodId) => {
   }
 };
 
-// FAQ oluÅŸtur
+// FAQ oluştur
 export const createFAQ = async (faqData) => {
   try {
     const docRef = await addDoc(collection(db, 'faqs'), {
@@ -6675,7 +6730,7 @@ export const createFAQ = async (faqData) => {
       id: docRef.id
     };
   } catch (error) {
-    console.error('FAQ oluÅŸturma hatasÄ±:', error);
+    console.error('FAQ oluşturma hatası:', error);
     return {
       success: false,
       error: error.message
@@ -6683,7 +6738,7 @@ export const createFAQ = async (faqData) => {
   }
 };
 
-// TÃ¼m FAQ'larÄ± getir
+// Tüm FAQ'ları getir
 export const getAllFAQs = async () => {
   try {
     const querySnapshot = await getDocs(collection(db, 'faqs'));
@@ -6707,7 +6762,7 @@ export const getAllFAQs = async () => {
       data: faqs
     };
   } catch (error) {
-    console.error('FAQ\'lar getirme hatasÄ±:', error);
+    console.error('FAQ\'lar getirme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -6715,7 +6770,7 @@ export const getAllFAQs = async () => {
   }
 };
 
-// FAQ gÃ¼ncelle
+// FAQ güncelle
 export const updateFAQ = async (faqId, faqData) => {
   try {
     await updateDoc(doc(db, 'faqs', faqId), {
@@ -6724,7 +6779,7 @@ export const updateFAQ = async (faqId, faqData) => {
     });
     return { success: true };
   } catch (error) {
-    console.error('FAQ gÃ¼ncelleme hatasÄ±:', error);
+    console.error('FAQ güncelleme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -6738,7 +6793,7 @@ export const deleteFAQ = async (faqId) => {
     await deleteDoc(doc(db, 'faqs', faqId));
     return { success: true };
   } catch (error) {
-    console.error('FAQ silme hatasÄ±:', error);
+    console.error('FAQ silme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -6746,9 +6801,9 @@ export const deleteFAQ = async (faqId) => {
   }
 };
 
-// ==================== PREMIUM ÃœYELÄ°K SERVÄ°SLERÄ° ====================
+// ==================== PREMIUM ÜYELİK SERVİSLERİ ====================
 
-// Premium Ã¼yelik oluÅŸtur veya gÃ¼ncelle
+// Premium üyelik oluştur veya güncelle
 export const createOrUpdateMembership = async (userId, membershipData) => {
   try {
     const membershipRef = doc(db, 'memberships', userId);
@@ -6766,7 +6821,7 @@ export const createOrUpdateMembership = async (userId, membershipData) => {
 
     return { success: true };
   } catch (error) {
-    console.error('Premium Ã¼yelik oluÅŸturma hatasÄ±:', error);
+    console.error('Premium üyelik oluşturma hatası:', error);
     return {
       success: false,
       error: error.message
@@ -6774,7 +6829,7 @@ export const createOrUpdateMembership = async (userId, membershipData) => {
   }
 };
 
-// Premium Ã¼yelik bilgisini getir
+// Premium üyelik bilgisini getir
 export const getMembership = async (userId) => {
   try {
     const membershipDoc = await getDoc(doc(db, 'memberships', userId));
@@ -6789,7 +6844,7 @@ export const getMembership = async (userId) => {
       data: null
     };
   } catch (error) {
-    console.error('Premium Ã¼yelik getirme hatasÄ±:', error);
+    console.error('Premium üyelik getirme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -6797,7 +6852,7 @@ export const getMembership = async (userId) => {
   }
 };
 
-// Premium Ã¼yelik iptal et
+// Premium üyelik iptal et
 export const cancelMembership = async (userId) => {
   try {
     await updateDoc(doc(db, 'memberships', userId), {
@@ -6813,7 +6868,7 @@ export const cancelMembership = async (userId) => {
 
     return { success: true };
   } catch (error) {
-    console.error('Premium Ã¼yelik iptal hatasÄ±:', error);
+    console.error('Premium üyelik iptal hatası:', error);
     return {
       success: false,
       error: error.message
@@ -6821,7 +6876,7 @@ export const cancelMembership = async (userId) => {
   }
 };
 
-// KullanÄ±cÄ±nÄ±n premium durumunu kontrol et
+// Kullanıcının premium durumunu kontrol et
 export const checkPremiumStatus = async (userId) => {
   try {
     const userDoc = await getDoc(doc(db, 'users', userId));
@@ -6856,7 +6911,7 @@ export const checkPremiumStatus = async (userId) => {
       isPremium: false
     };
   } catch (error) {
-    console.error('Premium durum kontrol hatasÄ±:', error);
+    console.error('Premium durum kontrol hatası:', error);
     return {
       success: false,
       error: error.message
@@ -6866,7 +6921,7 @@ export const checkPremiumStatus = async (userId) => {
 
 export const logAdminAction = async (adminId, action, details) => {
   try {
-    // Undefined deÄŸerleri filtrele
+    // Undefined değerleri filtrele
     const cleanDetails = {};
     if (details && typeof details === 'object') {
       Object.keys(details).forEach(key => {
@@ -6885,7 +6940,7 @@ export const logAdminAction = async (adminId, action, details) => {
     });
     return { success: true };
   } catch (error) {
-    console.error('Audit log kayÄ±t hatasÄ±:', error);
+    console.error('Audit log kayıt hatası:', error);
     return { success: false, error: error.message };
   }
 };
@@ -6912,14 +6967,14 @@ export const getAuditLogs = async (filters = {}) => {
 
     return { success: true, data: logs };
   } catch (error) {
-    console.error('Audit log yÃ¼kleme hatasÄ±:', error);
+    console.error('Audit log yükleme hatası:', error);
     return { success: false, error: error.message };
   }
 };
 
-// ==================== BAKÄ°YE VE CÃœZDAN SERVÄ°SLERÄ° ====================
+// ==================== BAKİYE VE CÜZDAN SERVİSLERİ ====================
 
-// Saha sahibi bakiyesini gÃ¼ncelle
+// Saha sahibi bakiyesini güncelle
 export const updateOwnerBalance = async (ownerId, amount, transactionData) => {
   try {
     await runTransaction(db, async (transaction) => {
@@ -6927,19 +6982,19 @@ export const updateOwnerBalance = async (ownerId, amount, transactionData) => {
       const userDoc = await transaction.get(userRef);
       
       if (!userDoc.exists()) {
-        throw new Error('KullanÄ±cÄ± bulunamadÄ±');
+        throw new Error('Kullanıcı bulunamadı');
       }
       
       const currentBalance = userDoc.data().balance || 0;
       const newBalance = currentBalance + amount;
       
-      // Bakiye gÃ¼ncelle
+      // Bakiye güncelle
       transaction.update(userRef, {
         balance: newBalance,
         updatedAt: serverTimestamp()
       });
       
-      // Wallet transaction kaydÄ± ekle
+      // Wallet transaction kaydı ekle
       const transactionRef = doc(collection(db, 'walletTransactions'));
       transaction.set(transactionRef, {
         ownerId,
@@ -6955,7 +7010,7 @@ export const updateOwnerBalance = async (ownerId, amount, transactionData) => {
     
     return { success: true };
   } catch (error) {
-    console.error('Bakiye gÃ¼ncelleme hatasÄ±:', error);
+    console.error('Bakiye güncelleme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -6977,11 +7032,11 @@ export const getOwnerBalance = async (ownerId) => {
     } else {
       return {
         success: false,
-        error: 'KullanÄ±cÄ± bulunamadÄ±'
+        error: 'Kullanıcı bulunamadı'
       };
     }
   } catch (error) {
-    console.error('Bakiye getirme hatasÄ±:', error);
+    console.error('Bakiye getirme hatası:', error);
     return {
       success: false,
       error: error.message
@@ -6989,7 +7044,7 @@ export const getOwnerBalance = async (ownerId) => {
   }
 };
 
-// Wallet transaction geÃ§miÅŸini getir
+// Wallet transaction geçmişini getir
 export const getWalletTransactions = async (ownerId, filters = {}) => {
   try {
     let q = query(
@@ -7033,33 +7088,33 @@ export const getWalletTransactions = async (ownerId, filters = {}) => {
 
     return { success: true, data: transactions };
   } catch (error) {
-    console.error('Wallet transaction geÃ§miÅŸi getirme hatasÄ±:', error);
+    console.error('Wallet transaction geçmişi getirme hatası:', error);
     return { success: false, error: error.message };
   }
 };
 
-// ==================== Ã‡EKÄ°M TALEPLERÄ° SERVÄ°SLERÄ° ====================
+// ==================== ÇEKİM TALEPLERİ SERVİSLERİ ====================
 
-// Ã‡ekim talebi oluÅŸtur
+// Çekim talebi oluştur
 export const createWithdrawalRequest = async (requestData) => {
   try {
     const { ownerId, amount, iban, fullName } = requestData;
     
-    // KullanÄ±cÄ± bilgilerini al
+    // Kullanıcı bilgilerini al
     const userDoc = await getDoc(doc(db, 'users', ownerId));
     if (!userDoc.exists()) {
-      return { success: false, error: 'KullanÄ±cÄ± bulunamadÄ±' };
+      return { success: false, error: 'Kullanıcı bulunamadı' };
     }
     
     const userData = userDoc.data();
     const currentBalance = userData.balance || 0;
     
-    // Bakiye kontrolÃ¼
+    // Bakiye kontrolü
     if (currentBalance < amount) {
       return { success: false, error: 'Yetersiz bakiye' };
     }
     
-    // Ã‡ekim talebi oluÅŸtur
+    // Çekim talebi oluştur
     const withdrawalRef = doc(collection(db, 'withdrawalRequests'));
     await setDoc(withdrawalRef, {
       ownerId,
@@ -7075,12 +7130,12 @@ export const createWithdrawalRequest = async (requestData) => {
     
     return { success: true, data: { id: withdrawalRef.id } };
   } catch (error) {
-    console.error('Ã‡ekim talebi oluÅŸturma hatasÄ±:', error);
+    console.error('Çekim talebi oluşturma hatası:', error);
     return { success: false, error: error.message };
   }
 };
 
-// TÃ¼m Ã§ekim taleplerini getir (Admin iÃ§in)
+// Tüm çekim taleplerini getir (Admin için)
 export const getAllWithdrawalRequests = async (filters = {}) => {
   try {
     let q = query(
@@ -7104,33 +7159,33 @@ export const getAllWithdrawalRequests = async (filters = {}) => {
     
     return { success: true, data: requests };
   } catch (error) {
-    console.error('Ã‡ekim talepleri getirme hatasÄ±:', error);
+    console.error('Çekim talepleri getirme hatası:', error);
     return { success: false, error: error.message };
   }
 };
 
-// Ã‡ekim talebi durumunu gÃ¼ncelle (Admin iÃ§in)
+// Çekim talebi durumunu güncelle (Admin için)
 export const updateWithdrawalRequestStatus = async (requestId, status, adminId, adminNote = '') => {
   try {
     const requestRef = doc(db, 'withdrawalRequests', requestId);
     const requestDoc = await getDoc(requestRef);
     
     if (!requestDoc.exists()) {
-      return { success: false, error: 'Ã‡ekim talebi bulunamadÄ±' };
+      return { success: false, error: 'Çekim talebi bulunamadı' };
     }
     
     const requestData = requestDoc.data();
     
-    // EÄŸer zaten iÅŸlenmiÅŸse tekrar iÅŸleme
+    // Eğer zaten işlenmişse tekrar işleme
     if (requestData.status !== 'pending') {
-      return { success: false, error: 'Bu talep zaten iÅŸlenmiÅŸ' };
+      return { success: false, error: 'Bu talep zaten işlenmiş' };
     }
     
-    // OnaylandÄ±ÄŸÄ±nda bakiyeden dÃ¼ÅŸ
+    // Onaylandığında bakiyeden düş
     if (status === 'approved') {
       const balanceResult = await getOwnerBalance(requestData.ownerId);
       if (!balanceResult.success) {
-        return { success: false, error: 'Bakiye bilgisi alÄ±namadÄ±' };
+        return { success: false, error: 'Bakiye bilgisi alınamadı' };
       }
       
       const currentBalance = balanceResult.data.balance || 0;
@@ -7138,24 +7193,24 @@ export const updateWithdrawalRequestStatus = async (requestId, status, adminId, 
         return { success: false, error: 'Yetersiz bakiye' };
       }
       
-      // Bakiye gÃ¼ncelle (negatif amount ile dÃ¼ÅŸ)
+      // Bakiye güncelle (negatif amount ile düş)
       const updateResult = await updateOwnerBalance(
         requestData.ownerId,
         -requestData.amount,
         {
           type: 'withdrawal',
-          description: `Ã‡ekim talebi - IBAN: ${requestData.iban}`,
+          description: `Çekim talebi - IBAN: ${requestData.iban}`,
           status: 'completed',
           withdrawalRequestId: requestId
         }
       );
       
       if (!updateResult.success) {
-        return { success: false, error: 'Bakiye gÃ¼ncellenemedi' };
+        return { success: false, error: 'Bakiye güncellenemedi' };
       }
     }
     
-    // Ã‡ekim talebi durumunu gÃ¼ncelle
+    // Çekim talebi durumunu güncelle
     const updateData = {
       status,
       updatedAt: serverTimestamp()
@@ -7173,12 +7228,12 @@ export const updateWithdrawalRequestStatus = async (requestId, status, adminId, 
     
     return { success: true };
   } catch (error) {
-    console.error('Ã‡ekim talebi durum gÃ¼ncelleme hatasÄ±:', error);
+    console.error('Çekim talebi durum güncelleme hatası:', error);
     return { success: false, error: error.message };
   }
 };
 
-// Saha sahibi iÃ§in Ã§ekim taleplerini getir
+// Saha sahibi için çekim taleplerini getir
 export const getWithdrawalRequestsByOwner = async (ownerId, filters = {}) => {
   try {
     let q = query(
@@ -7210,14 +7265,14 @@ export const getWithdrawalRequestsByOwner = async (ownerId, filters = {}) => {
     
     return { success: true, data: requests };
   } catch (error) {
-    console.error('Saha sahibi Ã§ekim talepleri getirme hatasÄ±:', error);
+    console.error('Saha sahibi çekim talepleri getirme hatası:', error);
     return { success: false, error: error.message };
   }
 };
 
-// ==================== PREMIUM YÃ–NETÄ°M SERVÄ°SLERÄ° (ADMIN) ====================
+// ==================== PREMIUM YÖNETİM SERVİSLERİ (ADMIN) ====================
 
-// TÃ¼m premium Ã¼yeleri getir
+// Tüm premium üyeleri getir
 export const getAllPremiumMembers = async (filters = {}) => {
   try {
     let q = query(collection(db, 'memberships'), orderBy('createdAt', 'desc'));
@@ -7239,7 +7294,7 @@ export const getAllPremiumMembers = async (filters = {}) => {
       const membershipData = docSnap.data();
       const userId = docSnap.id;
       
-      // KullanÄ±cÄ± bilgilerini getir
+      // Kullanıcı bilgilerini getir
       const userDoc = await getDoc(doc(db, 'users', userId));
       const userData = userDoc.exists() ? userDoc.data() : null;
 
@@ -7258,7 +7313,7 @@ export const getAllPremiumMembers = async (filters = {}) => {
 
     return { success: true, data: members };
   } catch (error) {
-    console.error('Premium Ã¼yeler getirme hatasÄ±:', error);
+    console.error('Premium üyeler getirme hatası:', error);
     return { success: false, error: error.message };
   }
 };
@@ -7284,7 +7339,7 @@ export const getPremiumStats = async () => {
       const data = docSnap.data();
       totalMembers++;
 
-      // Durum sayÄ±larÄ±
+      // Durum sayıları
       if (data.status === 'active') {
         activeMembers++;
         const endDate = data.endDate?.toDate?.() || new Date(data.endDate);
@@ -7295,14 +7350,14 @@ export const getPremiumStats = async () => {
         cancelledMembers++;
       }
 
-      // KullanÄ±cÄ± tipi
+      // Kullanıcı tipi
       if (data.userType === 'player') {
         playerMembers++;
       } else if (data.userType === 'owner') {
         ownerMembers++;
       }
 
-      // Gelir hesaplama (plan fiyatÄ±ndan)
+      // Gelir hesaplama (plan fiyatından)
       if (data.planPrice) {
         if (data.duration === 'monthly') {
           monthlyRevenue += data.planPrice;
@@ -7336,25 +7391,25 @@ export const getPremiumStats = async () => {
       }
     };
   } catch (error) {
-    console.error('Premium istatistikleri getirme hatasÄ±:', error);
+    console.error('Premium istatistikleri getirme hatası:', error);
     return { success: false, error: error.message };
   }
 };
 
-// Manuel premium Ã¼yelik oluÅŸtur (admin)
+// Manuel premium üyelik oluştur (admin)
 export const createPremiumMembership = async (userId, planId, adminId, customData = {}) => {
   try {
     // Plan bilgilerini getir
     const planDoc = await getDoc(doc(db, 'premiumPlans', planId));
     if (!planDoc.exists()) {
-      return { success: false, error: 'Plan bulunamadÄ±' };
+      return { success: false, error: 'Plan bulunamadı' };
     }
     const planData = planDoc.data();
 
-    // KullanÄ±cÄ± bilgilerini getir
+    // Kullanıcı bilgilerini getir
     const userDoc = await getDoc(doc(db, 'users', userId));
     if (!userDoc.exists()) {
-      return { success: false, error: 'KullanÄ±cÄ± bulunamadÄ±' };
+      return { success: false, error: 'Kullanıcı bulunamadı' };
     }
     const userData = userDoc.data();
 
@@ -7385,10 +7440,10 @@ export const createPremiumMembership = async (userId, planId, adminId, customDat
       ...customData
     };
 
-    // Membership oluÅŸtur
+    // Membership oluştur
     await setDoc(doc(db, 'memberships', userId), membershipData, { merge: true });
 
-    // User gÃ¼ncelle
+    // User güncelle
     await updateDoc(doc(db, 'users', userId), {
       membershipType: 'premium',
       membershipStartDate: Timestamp.fromDate(startDate),
@@ -7406,12 +7461,12 @@ export const createPremiumMembership = async (userId, planId, adminId, customDat
 
     return { success: true };
   } catch (error) {
-    console.error('Premium Ã¼yelik oluÅŸturma hatasÄ±:', error);
+    console.error('Premium üyelik oluşturma hatası:', error);
     return { success: false, error: error.message };
   }
 };
 
-// Premium Ã¼yelik gÃ¼ncelle
+// Premium üyelik güncelle
 export const updatePremiumMembership = async (membershipId, data, adminId) => {
   try {
     const membershipRef = doc(db, 'memberships', membershipId);
@@ -7421,7 +7476,7 @@ export const updatePremiumMembership = async (membershipId, data, adminId) => {
       updatedBy: adminId
     };
 
-    // EÄŸer endDate gÃ¼ncelleniyorsa, user'Ä± da gÃ¼ncelle
+    // Eğer endDate güncelleniyorsa, user'ı da güncelle
     if (data.endDate) {
       const endDate = data.endDate instanceof Date ? Timestamp.fromDate(data.endDate) : data.endDate;
       updateData.endDate = endDate;
@@ -7442,12 +7497,12 @@ export const updatePremiumMembership = async (membershipId, data, adminId) => {
 
     return { success: true };
   } catch (error) {
-    console.error('Premium Ã¼yelik gÃ¼ncelleme hatasÄ±:', error);
+    console.error('Premium üyelik güncelleme hatası:', error);
     return { success: false, error: error.message };
   }
 };
 
-// Premium Ã¼yelik iptal et (admin)
+// Premium üyelik iptal et (admin)
 export const cancelPremiumMembership = async (membershipId, adminId, reason = '') => {
   try {
     await updateDoc(doc(db, 'memberships', membershipId), {
@@ -7471,12 +7526,12 @@ export const cancelPremiumMembership = async (membershipId, adminId, reason = ''
 
     return { success: true };
   } catch (error) {
-    console.error('Premium Ã¼yelik iptal hatasÄ±:', error);
+    console.error('Premium üyelik iptal hatası:', error);
     return { success: false, error: error.message };
   }
 };
 
-// Premium planlarÄ± getir
+// Premium planları getir
 export const getPremiumPlans = async () => {
   try {
     const snapshot = await getDocs(query(collection(db, 'premiumPlans'), orderBy('createdAt', 'desc')));
@@ -7486,12 +7541,12 @@ export const getPremiumPlans = async () => {
     });
     return { success: true, data: plans };
   } catch (error) {
-    console.error('Premium planlar getirme hatasÄ±:', error);
+    console.error('Premium planlar getirme hatası:', error);
     return { success: false, error: error.message };
   }
 };
 
-// Premium plan oluÅŸtur
+// Premium plan oluştur
 export const createPremiumPlan = async (planData) => {
   try {
     const planRef = await addDoc(collection(db, 'premiumPlans'), {
@@ -7501,12 +7556,12 @@ export const createPremiumPlan = async (planData) => {
     });
     return { success: true, id: planRef.id };
   } catch (error) {
-    console.error('Premium plan oluÅŸturma hatasÄ±:', error);
+    console.error('Premium plan oluşturma hatası:', error);
     return { success: false, error: error.message };
   }
 };
 
-// Premium plan gÃ¼ncelle
+// Premium plan güncelle
 export const updatePremiumPlan = async (planId, planData) => {
   try {
     await updateDoc(doc(db, 'premiumPlans', planId), {
@@ -7515,7 +7570,7 @@ export const updatePremiumPlan = async (planId, planData) => {
     });
     return { success: true };
   } catch (error) {
-    console.error('Premium plan gÃ¼ncelleme hatasÄ±:', error);
+    console.error('Premium plan güncelleme hatası:', error);
     return { success: false, error: error.message };
   }
 };
@@ -7587,17 +7642,17 @@ export const cancelReservation = async (reservationId, playerId) => {
     
     const reservationData = reservationDoc.data();
     
-    // Yetki kontrolÃ¼
+    // Yetki kontrolü
     const isOrganizer = reservationData.userId === playerId;
     const isParticipant = (reservationData.playerIds && reservationData.playerIds.includes(playerId)) ||
-                          (reservationData.players && Array.isArray(reservationData.players) && reservationData.players.includes(playerId)); // Eski veri desteÄŸi
+                          (reservationData.players && Array.isArray(reservationData.players) && reservationData.players.includes(playerId)); // Eski veri desteği
 
-    // Sadece players iÃ§inde string id olarak varsa includes Ã§alÄ±ÅŸÄ±r, obje ise Ã§alÄ±ÅŸmaz.
-    // O yÃ¼zden isParticipant kontrolÃ¼nÃ¼ aÅŸaÄŸÄ±da daha detaylÄ± yapacaÄŸÄ±z veya playerIds'e gÃ¼veneceÄŸiz.
+    // Sadece players içinde string id olarak varsa includes çalışır, obje ise çalışmaz.
+    // O yüzden isParticipant kontrolünü aşağıda daha detaylı yapacağız veya playerIds'e güveneceğiz.
     // Yeni sistemde playerIds kesin var.
 
     if (!isOrganizer && !isParticipant) {
-        // Obje array kontrolÃ¼
+        // Obje array kontrolü
         const foundInObj = reservationData.players && Array.isArray(reservationData.players) && 
                            reservationData.players.some(p => (typeof p === 'object' && p.uid === playerId) || p === playerId);
         
@@ -7606,15 +7661,15 @@ export const cancelReservation = async (reservationId, playerId) => {
         }
     }
     
-    // Rezervasyon tarihini kontrol et (geÃ§miÅŸ rezervasyonlar iptal edilemez)
+    // Rezervasyon tarihini kontrol et (geçmiş rezervasyonlar iptal edilemez)
     const reservationDate = reservationData.date?.toDate ? reservationData.date.toDate() : new Date(reservationData.date);
     const now = new Date();
     
     if (reservationDate < now) {
-      return { success: false, error: 'GeÃ§miÅŸ rezervasyonlar iptal edilemez' };
+      return { success: false, error: 'Geçmiş rezervasyonlar iptal edilemez' };
     }
     
-    // EÄŸer OrganizatÃ¶r iptal ediyorsa tamamen iptal et
+    // Eğer Organizatör iptal ediyorsa tamamen iptal et
     if (isOrganizer) {
         await updateDoc(reservationRef, {
             status: 'cancelled',
@@ -7624,11 +7679,11 @@ export const cancelReservation = async (reservationId, playerId) => {
         return { success: true };
     }
 
-    // KatÄ±lÄ±mcÄ± ise sadece kendini Ã§Ä±kar
-    // 1. playerIds gÃ¼ncelle
+    // Katılımcı ise sadece kendini çıkar
+    // 1. playerIds güncelle
     const updatedPlayerIds = (reservationData.playerIds || []).filter(id => id !== playerId);
     
-    // 2. players gÃ¼ncelle (hem string hem obje olabilir)
+    // 2. players güncelle (hem string hem obje olabilir)
     let updatedPlayers = [];
     if (reservationData.players && Array.isArray(reservationData.players)) {
         updatedPlayers = reservationData.players.filter(p => {
@@ -7639,7 +7694,7 @@ export const cancelReservation = async (reservationId, playerId) => {
         });
     }
 
-    // EÄŸer oyuncu kalmadÄ±ysa (teorik olarak organizatÃ¶r yoksa) iptal et
+    // Eğer oyuncu kalmadıysa (teorik olarak organizatör yoksa) iptal et
     if (updatedPlayers.length === 0 && updatedPlayerIds.length === 0) {
       await updateDoc(reservationRef, {
         status: 'cancelled',
@@ -7647,7 +7702,7 @@ export const cancelReservation = async (reservationId, playerId) => {
         cancelledBy: playerId
       });
     } else {
-      // Sadece oyuncuyu listeden Ã§Ä±kar
+      // Sadece oyuncuyu listeden çıkar
       await updateDoc(reservationRef, {
         playerIds: updatedPlayerIds,
         players: updatedPlayers,
@@ -7675,7 +7730,7 @@ export const getInvoice = async (reservationId, playerId) => {
     
     const reservationData = reservationDoc.data();
     
-    // Oyuncunun bu rezervasyonda olup olmadÄ±ÄŸÄ±nÄ± kontrol et
+    // Oyuncunun bu rezervasyonda olup olmadığını kontrol et
     const isParticipant = (reservationData.playerIds && reservationData.playerIds.includes(playerId)) ||
                           (reservationData.players && Array.isArray(reservationData.players) && reservationData.players.includes(playerId)) || 
                           (reservationData.userId === playerId);
@@ -7769,7 +7824,7 @@ export const getUserByEmail = async (email) => {
     const userDoc = querySnapshot.docs[0];
     const userData = { id: userDoc.id, ...userDoc.data() };
     
-    // Hassas bilgileri Ã§Ä±kar
+    // Hassas bilgileri çıkar
     delete userData.password;
     
     return { success: true, data: userData };
@@ -7780,7 +7835,7 @@ export const getUserByEmail = async (email) => {
 };
 
 // Takımı turnuvaya kaydet
-export const registerTeamToTournament = async (tournamentId, teamId) => {
+export const registerTeamToTournament = async (tournamentId, teamId, userId) => {
   try {
     const tournamentRef = doc(db, 'tournaments', tournamentId);
     const tournamentDoc = await getDoc(tournamentRef);
@@ -7789,26 +7844,84 @@ export const registerTeamToTournament = async (tournamentId, teamId) => {
       return { success: false, error: 'Turnuva bulunamadı' };
     }
     
-    const tournamentData = tournamentDoc.data();
-    const registeredTeams = tournamentData.registeredTeams || [];
+    const tournament = tournamentDoc.data();
     
-    if (registeredTeams.includes(teamId)) {
+    // Kayıt durumunu kontrol et
+    if (tournament.status !== 'registration_open') {
+      return { success: false, error: 'Turnuva kayıtları açık değil' };
+    }
+    
+    // Kayıt son tarihi kontrolü
+    if (tournament.registrationDeadline) {
+      const deadlineDate = tournament.registrationDeadline.toDate ? 
+        tournament.registrationDeadline.toDate() : 
+        new Date(tournament.registrationDeadline);
+      
+      const deadline = new Date(deadlineDate);
+      deadline.setHours(23, 59, 59, 999);
+      
+      if (new Date() > deadline) {
+        return { success: false, error: 'Kayıt süresi dolmuş' };
+      }
+    }
+
+    // Ekip bilgilerini al
+    const teamDoc = await getDoc(doc(db, 'teams', teamId));
+    if (!teamDoc.exists()) {
+      return { success: false, error: 'Takım bulunamadı' };
+    }
+    const teamData = teamDoc.data();
+
+    // Mevcut katılımcıları getir
+    const participantsResult = await getTournamentParticipants(tournamentId);
+    const participants = participantsResult.success ? participantsResult.data : [];
+    
+    // Zaten kayıtlı mı kontrol et
+    if (participants.some(p => p.participantId === teamId)) {
       return { success: false, error: 'Takım zaten turnuvaya kayıtlı' };
     }
     
-    if (registeredTeams.length >= (tournamentData.maxTeams || 0)) {
+    if (participants.length >= (tournament.maxTeams || tournament.maxParticipants || 0)) {
       return { success: false, error: 'Turnuva dolu' };
     }
     
-    await updateDoc(tournamentRef, {
-      registeredTeams: [...registeredTeams, teamId],
+    // Katılımcıyı ekle
+    const participantDoc = {
+      tournamentId,
+      participantId: teamId,
+      participantName: teamData.name || 'Bilinmeyen Takım',
+      participantType: 'team',
+      captainId: userId || teamData.captainId || null,
+      status: tournament.registrationFee > 0 ? 'pending_payment' : 'confirmed',
+      paymentStatus: tournament.registrationFee > 0 ? 'pending' : 'free',
+      registrationFee: tournament.registrationFee || 0,
+      registeredAt: serverTimestamp(),
+      createdAt: serverTimestamp(),
       updatedAt: serverTimestamp()
-    });
+    };
     
-    return { success: true };
+    const docRef = await addDoc(collection(db, 'tournamentParticipants'), participantDoc);
+
+    // Geriye dönük uyumluluk için registeredTeams dizisini de güncelle
+    const registeredTeams = tournament.registeredTeams || [];
+    if (!registeredTeams.includes(teamId)) {
+      await updateDoc(tournamentRef, {
+        registeredTeams: [...registeredTeams, teamId],
+        updatedAt: serverTimestamp()
+      });
+    }
+    
+    return {
+      success: true,
+      id: docRef.id,
+      requiresPayment: tournament.registrationFee > 0
+    };
   } catch (error) {
-    console.error('Turnuva kayıt hatası:', error);
-    return { success: false, error: error.message };
+    console.error('Turnuva takım kayıt hatası:', error);
+    return {
+      success: false,
+      error: error.message
+    };
   }
 };
 
@@ -7845,7 +7958,7 @@ export const getPlayerPlayedWith = async (playerId) => {
       }
     });
     
-    // KullanÄ±cÄ± bilgilerini getir
+    // Kullanıcı bilgilerini getir
     const playersWithInfo = [];
     for (const [playerIdKey, playerData] of playerMap.entries()) {
       try {
@@ -7881,7 +7994,7 @@ export const addToFavorites = async (playerId, tesisId) => {
     const userDoc = await getDoc(userRef);
     
     if (!userDoc.exists()) {
-      return { success: false, error: 'KullanÄ±cÄ± bulunamadÄ±' };
+      return { success: false, error: 'Kullanıcı bulunamadı' };
     }
     
     const userData = userDoc.data();
@@ -7923,14 +8036,14 @@ export const removeFromFavorites = async (playerId, tesisId) => {
     
     return { success: true };
   } catch (error) {
-    console.error('Favori Ã§Ä±karma hatasÄ±:', error);
+    console.error('Favori çıkarma hatası:', error);
     return { success: false, error: error.message };
   }
 };
 
-// ==================== AÃ‡IK MAÃ‡ SÄ°STEMÄ° ====================
+// ==================== AÇIK MAÇ SİSTEMİ ====================
 
-// KullanÄ±cÄ± puanÄ±nÄ± hesapla
+// Kullanıcı puanını hesapla
 export const getUserRating = async (userId) => {
   try {
     const reservationsResult = await getPlayerReservations(userId);
@@ -7941,11 +8054,11 @@ export const getUserRating = async (userId) => {
     const reservations = reservationsResult.data;
     const completedMatches = reservations.filter(r => r.status === 'completed' || r.status === 'confirmed');
     
-    // Basit puanlama sistemi: tamamlanan maÃ§ sayÄ±sÄ±na gÃ¶re
-    // 0-10 maÃ§: 4.0-4.5
-    // 11-50 maÃ§: 4.5-4.7
-    // 51-100 maÃ§: 4.7-4.8
-    // 100+ maÃ§: 4.8-5.0
+    // Basit puanlama sistemi: tamamlanan maç sayısına göre
+    // 0-10 maç: 4.0-4.5
+    // 11-50 maç: 4.5-4.7
+    // 51-100 maç: 4.7-4.8
+    // 100+ maç: 4.8-5.0
     
     let rating = 4.0;
     const matchCount = completedMatches.length;
@@ -8003,7 +8116,7 @@ export const createOpenMatch = async (matchData) => {
       format: matchData.format,
       level: matchData.level,
       maxPlayers: matchData.maxPlayers,
-      currentPlayers: 1, // OrganizatÃ¶r dahil
+      currentPlayers: 1, // Organizatör dahil
       players: [matchData.organizerId],
       paidPlayers: [matchData.organizerId], // Organizatör otomatik ödendi sayılır
       pricePerPlayer: matchData.pricePerPlayer || 0,
@@ -8025,12 +8138,12 @@ export const createOpenMatch = async (matchData) => {
 };
 
 // Açık maçları getir
-// AÃ§Ä±k maÃ§larÄ± getir
+// Açık maçları getir
 export const getOpenMatches = async (filters = {}) => {
   try {
     const matchesRef = collection(db, 'openMatches');
-    // Sadece status filtresi yapÄ±yoruz (composite index gerektirmemesi iÃ§in)
-    // Tarih ve diÄŸer filtreleri client-side yapacaÄŸÄ±z
+    // Sadece status filtresi yapıyoruz (composite index gerektirmemesi için)
+    // Tarih ve diğer filtreleri client-side yapacağız
     const q = query(matchesRef, where('status', '==', 'open'));
     
     const querySnapshot = await getDocs(q);
@@ -8043,7 +8156,7 @@ export const getOpenMatches = async (filters = {}) => {
     // Client-side filtreleme
     let filteredMatches = matches;
     
-    // Tarih filtresi (gelecek maÃ§lar) - client-side
+    // Tarih filtresi (gelecek maçlar) - client-side
     const now = new Date();
     if (filters.date) {
       const dateStart = new Date(filters.date);
@@ -8056,7 +8169,7 @@ export const getOpenMatches = async (filters = {}) => {
         return matchDate >= dateStart && matchDate <= dateEnd;
       });
     } else {
-      // Gelecek maÃ§lar - client-side
+      // Gelecek maçlar - client-side
       const nowStartOfDay = new Date();
       nowStartOfDay.setHours(0, 0, 0, 0);
       
@@ -8093,7 +8206,7 @@ export const getOpenMatches = async (filters = {}) => {
       });
     }
     
-    // SÄ±ralama: en yakÄ±n tarih Ã¶nce
+    // Sıralama: en yakın tarih önce
     filteredMatches.sort((a, b) => {
       const dateA = a.date?.toDate ? a.date.toDate() : new Date(a.date);
       const dateB = b.date?.toDate ? b.date.toDate() : new Date(b.date);
@@ -8124,35 +8237,35 @@ export const getOpenMatch = async (matchId) => {
   }
 };
 
-// MaÃ§a katÄ±l
+// Maça katıl
 export const joinOpenMatch = async (matchId, playerId) => {
   try {
     const matchRef = doc(db, 'openMatches', matchId);
     const matchDoc = await getDoc(matchRef);
     
     if (!matchDoc.exists()) {
-      return { success: false, error: 'MaÃ§ bulunamadÄ±' };
+      return { success: false, error: 'Maç bulunamadı' };
     }
     
     const matchData = matchDoc.data();
     
     if (matchData.status !== 'open') {
-      return { success: false, error: 'MaÃ§ artÄ±k aÃ§Ä±k deÄŸil' };
+      return { success: false, error: 'Maç artık açık değil' };
     }
     
     if (matchData.players.includes(playerId)) {
-      return { success: false, error: 'Zaten bu maÃ§a katÄ±ldÄ±nÄ±z' };
+      return { success: false, error: 'Zaten bu maça katıldınız' };
     }
     
     if (matchData.currentPlayers >= matchData.maxPlayers) {
-      return { success: false, error: 'MaÃ§ dolu' };
+      return { success: false, error: 'Maç dolu' };
     }
     
     const newPlayers = [...matchData.players, playerId];
     const newCurrentPlayers = newPlayers.length;
     const newStatus = newCurrentPlayers >= matchData.maxPlayers ? 'full' : 'open';
     
-    // Tags gÃ¼ncelle
+    // Tags güncelle
     const tags = [...(matchData.tags || [])];
     if (matchData.maxPlayers - newCurrentPlayers <= 2 && !tags.includes('urgent')) {
       tags.push('urgent');
@@ -8169,12 +8282,12 @@ export const joinOpenMatch = async (matchId, playerId) => {
       updatedAt: serverTimestamp()
     });
 
-    // OrganizatÃ¶re bildirim gÃ¶nder
+    // Organizatöre bildirim gönder
     if (matchData.organizerId !== playerId) {
       try {
         const userRef = doc(db, 'users', playerId);
         const userDoc = await getDoc(userRef);
-        const playerName = userDoc.exists() ? (userDoc.data().displayName || userDoc.data().email) : 'Bir kullanÄ±cÄ±';
+        const playerName = userDoc.exists() ? (userDoc.data().displayName || userDoc.data().email) : 'Bir kullanıcı';
         
         await addDoc(collection(db, 'notifications'), {
           userId: matchData.organizerId,
@@ -8187,42 +8300,42 @@ export const joinOpenMatch = async (matchId, playerId) => {
           createdAt: serverTimestamp()
         });
       } catch (notifError) {
-        console.error('Bildirim gÃ¶nderme hatasÄ± (ihmal edilebilir):', notifError);
+        console.error('Bildirim gönderme hatası (ihmal edilebilir):', notifError);
       }
     }
     
     return { success: true };
   } catch (error) {
-    console.error('MaÃ§a katÄ±lma hatasÄ±:', error);
+    console.error('Maça katılma hatası:', error);
     return { success: false, error: error.message };
   }
 };
 
-// MaÃ§tan ayrÄ±l
+// Maçtan ayrıl
 export const leaveOpenMatch = async (matchId, playerId) => {
   try {
     const matchRef = doc(db, 'openMatches', matchId);
     const matchDoc = await getDoc(matchRef);
     
     if (!matchDoc.exists()) {
-      return { success: false, error: 'MaÃ§ bulunamadÄ±' };
+      return { success: false, error: 'Maç bulunamadı' };
     }
     
     const matchData = matchDoc.data();
     
     if (!matchData.players.includes(playerId)) {
-      return { success: false, error: 'Bu maÃ§a katÄ±lmamÄ±ÅŸsÄ±nÄ±z' };
+      return { success: false, error: 'Bu maça katılmamışsınız' };
     }
     
-    // OrganizatÃ¶r ayrÄ±lamaz
+    // Organizatör ayrılamaz
     if (matchData.organizerId === playerId) {
-      return { success: false, error: 'OrganizatÃ¶r maÃ§tan ayrÄ±lamaz' };
+      return { success: false, error: 'Organizatör maçtan ayrılamaz' };
     }
     
     const newPlayers = matchData.players.filter(id => id !== playerId);
     const newCurrentPlayers = newPlayers.length;
     
-    // Tags gÃ¼ncelle
+    // Tags güncelle
     const tags = [...(matchData.tags || [])];
     if (matchData.maxPlayers - newCurrentPlayers <= 2 && !tags.includes('urgent')) {
       tags.push('urgent');
@@ -8231,12 +8344,12 @@ export const leaveOpenMatch = async (matchId, playerId) => {
     await updateDoc(matchRef, {
       players: newPlayers,
       currentPlayers: newCurrentPlayers,
-      status: 'open', // Full ise open'e dÃ¶n
+      status: 'open', // Full ise open'e dön
       tags,
       updatedAt: serverTimestamp()
     });
 
-    // OrganizatÃ¶re bildirim gÃ¶nder
+    // Organizatöre bildirim gönder
     if (matchData.organizerId && matchData.organizerId !== playerId) {
         try {
             const userRef = doc(db, 'users', playerId);
@@ -8252,7 +8365,7 @@ export const leaveOpenMatch = async (matchId, playerId) => {
                 createdAt: serverTimestamp()
             });
         } catch (notifError) {
-            console.error('Bildirim gÃ¶nderme hatasÄ± (ihmal edilebilir):', notifError);
+            console.error('Bildirim gönderme hatası (ihmal edilebilir):', notifError);
         }
     }
     
@@ -8297,7 +8410,7 @@ export const updateOpenMatch = async (matchId, matchData) => {
       updatedAt: serverTimestamp()
     };
     
-    // Date'i Timestamp'e Ã§evir
+    // Date'i Timestamp'e çevir
     if (matchData.date) {
       updateData.date = Timestamp.fromDate(new Date(matchData.date));
     }
@@ -8306,28 +8419,28 @@ export const updateOpenMatch = async (matchId, matchData) => {
     
     return { success: true };
   } catch (error) {
-    console.error('AÃ§Ä±k maÃ§ gÃ¼ncelleme hatasÄ±:', error);
+    console.error('Açık maç güncelleme hatası:', error);
     return { success: false, error: error.message };
   }
 };
 
-// AÃ§Ä±k maÃ§ sil
+// Açık maç sil
 export const deleteOpenMatch = async (matchId, organizerId) => {
   try {
     const matchRef = doc(db, 'openMatches', matchId);
     const matchDoc = await getDoc(matchRef);
     
     if (!matchDoc.exists()) {
-      return { success: false, error: 'MaÃ§ bulunamadÄ±' };
+      return { success: false, error: 'Maç bulunamadı' };
     }
     
     const matchData = matchDoc.data();
     
     if (matchData.organizerId !== organizerId) {
-      return { success: false, error: 'Bu maÃ§Ä± silme yetkiniz yok' };
+      return { success: false, error: 'Bu maçı silme yetkiniz yok' };
     }
     
-    // KatÄ±lÄ±mcÄ±lara bildirim gÃ¶nder
+    // Katılımcılara bildirim gönder
     const playersToNotify = matchData.players.filter(pid => pid !== organizerId);
     if (playersToNotify.length > 0) {
         try {
@@ -8337,15 +8450,15 @@ export const deleteOpenMatch = async (matchId, organizerId) => {
                 batch.set(notifRef, {
                     userId: pid,
                     type: 'match_cancel',
-                    title: 'MaÃ§ Ä°ptali',
-                    message: `${matchData.tesisName || 'Bir maÃ§'} organizatÃ¶r tarafÄ±ndan iptal edildi.`,
+                    title: 'Maç İptali',
+                    message: `${matchData.tesisName || 'Bir maç'} organizatör tarafından iptal edildi.`,
                     read: false,
                     createdAt: serverTimestamp()
                 });
             });
             await batch.commit();
         } catch (notifError) {
-            console.error('Toplu bildirim gÃ¶nderme hatasÄ± (ihmal edilebilir):', notifError);
+            console.error('Toplu bildirim gönderme hatası (ihmal edilebilir):', notifError);
         }
     }
 
@@ -8353,12 +8466,12 @@ export const deleteOpenMatch = async (matchId, organizerId) => {
     
     return { success: true };
   } catch (error) {
-    console.error('AÃ§Ä±k maÃ§ silme hatasÄ±:', error);
+    console.error('Açık maç silme hatası:', error);
     return { success: false, error: error.message };
   }
 };
 
-// KullanÄ±cÄ±nÄ±n aÃ§Ä±k maÃ§larÄ±nÄ± getir
+// Kullanıcının açık maçlarını getir
 export const getUserOpenMatches = async (userId) => {
   try {
     const matchesRef = collection(db, 'openMatches');
@@ -8371,7 +8484,7 @@ export const getUserOpenMatches = async (userId) => {
       allMatches.push({ id: doc.id, ...doc.data() });
     });
     
-    // KullanÄ±cÄ±nÄ±n oluÅŸturduÄŸu veya katÄ±ldÄ±ÄŸÄ± maÃ§larÄ± filtrele
+    // Kullanıcının oluşturduğu veya katıldığı maçları filtrele
     const userMatches = {
       organized: allMatches.filter(m => m.organizerId === userId),
       joined: allMatches.filter(m => 
@@ -8379,7 +8492,7 @@ export const getUserOpenMatches = async (userId) => {
       )
     };
     
-    // SÄ±ralama: en yakÄ±n tarih Ã¶nce
+    // Sıralama: en yakın tarih önce
     userMatches.organized.sort((a, b) => {
       const dateA = a.date?.toDate ? a.date.toDate() : new Date(a.date);
       const dateB = b.date?.toDate ? b.date.toDate() : new Date(b.date);
@@ -8394,22 +8507,22 @@ export const getUserOpenMatches = async (userId) => {
     
     return { success: true, data: userMatches };
   } catch (error) {
-    console.error('KullanÄ±cÄ± aÃ§Ä±k maÃ§larÄ± getirme hatasÄ±:', error);
+    console.error('Kullanıcı açık maçları getirme hatası:', error);
     return { success: false, error: error.message };
   }
 };
 
-// KullanÄ±cÄ± verilerini JSON olarak export et (GDPR)
+// Kullanıcı verilerini JSON olarak export et (GDPR)
 export const exportUserData = async (userId) => {
   try {
     const userDoc = await getDoc(doc(db, 'users', userId));
     if (!userDoc.exists()) {
-      return { success: false, error: 'KullanÄ±cÄ± bulunamadÄ±' };
+      return { success: false, error: 'Kullanıcı bulunamadı' };
     }
 
     const userData = userDoc.data();
     
-    // KullanÄ±cÄ±nÄ±n tÃ¼m verilerini topla
+    // Kullanıcının tüm verilerini topla
     const exportData = {
       user: {
         uid: userId,
@@ -8447,7 +8560,7 @@ export const exportUserData = async (userId) => {
       });
     });
 
-    // TakÄ±mlar
+    // Takımlar
     const teamsQuery = query(
       collection(db, 'teams'),
       where('members', 'array-contains', userId)
@@ -8504,31 +8617,31 @@ export const exportUserData = async (userId) => {
       json: JSON.stringify(exportData, null, 2)
     };
   } catch (error) {
-    console.error('KullanÄ±cÄ± verisi export hatasÄ±:', error);
+    console.error('Kullanıcı verisi export hatası:', error);
     return { success: false, error: error.message };
   }
 };
 
-// KullanÄ±cÄ± hesabÄ±nÄ± sil
+// Kullanıcı hesabını sil
 export const deleteUserAccount = async (userId, password) => {
   try {
     const currentUser = auth.currentUser;
     if (!currentUser || currentUser.uid !== userId) {
-      return { success: false, error: 'Yetkisiz iÅŸlem' };
+      return { success: false, error: 'Yetkisiz işlem' };
     }
 
-    // Åifre ile yeniden doÄŸrula
+    // Åifre ile yeniden doğrula
     if (password) {
       const credential = EmailAuthProvider.credential(currentUser.email, password);
       await reauthenticateWithCredential(currentUser, credential);
     }
 
-    // Firestore'dan kullanÄ±cÄ± verilerini sil
+    // Firestore'dan kullanıcı verilerini sil
     const userRef = doc(db, 'users', userId);
     await deleteDoc(userRef);
 
-    // Ä°liÅŸkili verileri temizle (opsiyonel - cascade delete)
-    // Rezervasyonlardan kullanÄ±cÄ±yÄ± kaldÄ±r
+    // İlişkili verileri temizle (opsiyonel - cascade delete)
+    // Rezervasyonlardan kullanıcıyı kaldır
     const reservationsQuery = query(
       collection(db, 'rezervasyonlar'),
       where('players', 'array-contains', userId)
@@ -8546,12 +8659,12 @@ export const deleteUserAccount = async (userId, password) => {
       await Promise.all(batch);
     }
 
-    // Auth'dan kullanÄ±cÄ±yÄ± sil
+    // Auth'dan kullanıcıyı sil
     await deleteUser(currentUser);
 
     return { success: true };
   } catch (error) {
-    console.error('Hesap silme hatasÄ±:', error);
+    console.error('Hesap silme hatası:', error);
     return { success: false, error: error.message };
   }
 };
@@ -8565,7 +8678,7 @@ export const exportPerformanceData = async (playerId, format = 'excel') => {
     ]);
 
     if (!statsResult.success || !reservationsResult.success) {
-      return { success: false, error: 'Veriler alÄ±namadÄ±' };
+      return { success: false, error: 'Veriler alınamadı' };
     }
 
     const stats = statsResult.data;
@@ -8602,18 +8715,18 @@ export const exportPerformanceData = async (playerId, format = 'excel') => {
       };
     }
 
-    // Excel format iÃ§in CSV
+    // Excel format için CSV
     if (format === 'excel' || format === 'csv') {
       const csvRows = [];
       csvRows.push(['Performans Raporu']);
       csvRows.push([]);
-      csvRows.push(['Ä°statistik', 'DeÄŸer']);
-      csvRows.push(['Toplam MaÃ§', stats.totalMatches || 0]);
-      csvRows.push(['Tamamlanan MaÃ§', stats.completedMatches || 0]);
+      csvRows.push(['İstatistik', 'Değer']);
+      csvRows.push(['Toplam Maç', stats.totalMatches || 0]);
+      csvRows.push(['Tamamlanan Maç', stats.completedMatches || 0]);
       csvRows.push(['Toplam Harcama', `â‚º${totalSpent.toLocaleString('tr-TR')}`]);
-      csvRows.push(['MaÃ§ BaÅŸÄ± Ortalama', `â‚º${exportData.summary.averagePerMatch.toFixed(2)}`]);
+      csvRows.push(['Maç Başı Ortalama', `â‚º${exportData.summary.averagePerMatch.toFixed(2)}`]);
       csvRows.push([]);
-      csvRows.push(['Rezervasyon DetaylarÄ±']);
+      csvRows.push(['Rezervasyon Detayları']);
       csvRows.push(['Saha', 'Tarih', 'Saat', 'Tutar', 'Durum']);
       reservations.forEach(r => {
         const date = r.date?.toDate ? r.date.toDate().toLocaleDateString('tr-TR') : r.date;
@@ -8636,16 +8749,15 @@ export const exportPerformanceData = async (playerId, format = 'excel') => {
 
     return { success: false, error: 'Desteklenmeyen format' };
   } catch (error) {
-    console.error('Performans verisi export hatasÄ±:', error);
+    console.error('Performans verisi export hatası:', error);
     return { success: false, error: error.message };
   }
 };
 
-// ==================== BLOG/HABER FONKSÄ°YONLARI ====================
+// ==================== BLOG/HABER FONKSİYONLARI ====================
 
 export const getBlogPosts = async (filters = {}) => {
   try {
-    const { collection, query, where, orderBy, getDocs, limit: limitFn } = await import('firebase/firestore');
     const blogsRef = collection(db, 'blogPosts');
     
     let q = query(blogsRef);
@@ -8690,7 +8802,7 @@ export const getBlogPosts = async (filters = {}) => {
     
     return { success: true, data: posts };
   } catch (error) {
-    console.error('Blog yazÄ±larÄ± getirme hatasÄ±:', error);
+    console.error('Blog yazıları getirme hatası:', error);
     return { success: false, error: error.message };
   }
 };
@@ -8702,19 +8814,19 @@ export const getBlogPost = async (postId) => {
     const postSnap = await getDoc(postRef);
     
     if (!postSnap.exists()) {
-      return { success: false, error: 'Blog yazÄ±sÄ± bulunamadÄ±' };
+      return { success: false, error: 'Blog yazısı bulunamadı' };
     }
     
     const postData = { id: postSnap.id, ...postSnap.data() };
     
-    // GÃ¶rÃ¼ntÃ¼lenme sayÄ±sÄ±nÄ± artÄ±r
+    // Görüntülenme sayısını artır
     await updateDoc(postRef, {
       views: increment(1)
     });
     
     return { success: true, data: postData };
   } catch (error) {
-    console.error('Blog yazÄ±sÄ± getirme hatasÄ±:', error);
+    console.error('Blog yazısı getirme hatası:', error);
     return { success: false, error: error.message };
   }
 };
@@ -8736,7 +8848,7 @@ export const getBlogCategories = async () => {
     
     return { success: true, data: categories };
   } catch (error) {
-    console.error('Blog kategorileri getirme hatasÄ±:', error);
+    console.error('Blog kategorileri getirme hatası:', error);
     return { success: false, error: error.message };
   }
 };
@@ -8751,7 +8863,7 @@ export const deleteBlogPost = async (postId) => {
     
     return { success: true };
   } catch (error) {
-    console.error('Blog yazÄ±sÄ± silme hatasÄ±:', error);
+    console.error('Blog yazısı silme hatası:', error);
     return { success: false, error: error.message };
   }
 };
@@ -8763,12 +8875,12 @@ export const getBlogPostById = async (postId) => {
     const postSnap = await getDoc(postRef);
     
     if (!postSnap.exists()) {
-      return { success: false, error: 'Blog yazÄ±sÄ± bulunamadÄ±' };
+      return { success: false, error: 'Blog yazısı bulunamadı' };
     }
     
     return { success: true, data: { id: postSnap.id, ...postSnap.data() } };
   } catch (error) {
-    console.error('Blog yazÄ±sÄ± getirme hatasÄ±:', error);
+    console.error('Blog yazısı getirme hatası:', error);
     return { success: false, error: error.message };
   }
 };
@@ -8781,13 +8893,13 @@ export const getBlogPostBySlug = async (slug) => {
     const querySnapshot = await getDocs(q);
     
     if (querySnapshot.empty) {
-      return { success: false, error: 'Blog yazÄ±sÄ± bulunamadÄ±' };
+      return { success: false, error: 'Blog yazısı bulunamadı' };
     }
     
     const postDoc = querySnapshot.docs[0];
     const postData = { id: postDoc.id, ...postDoc.data() };
     
-    // GÃ¶rÃ¼ntÃ¼lenme sayÄ±sÄ±nÄ± artÄ±r
+    // Görüntülenme sayısını artır
     const postRef = doc(db, 'blogPosts', postDoc.id);
     await updateDoc(postRef, {
       views: increment(1)
@@ -8795,7 +8907,7 @@ export const getBlogPostBySlug = async (slug) => {
     
     return { success: true, data: postData };
   } catch (error) {
-    console.error('Blog yazÄ±sÄ± getirme hatasÄ±:', error);
+    console.error('Blog yazısı getirme hatası:', error);
     return { success: false, error: error.message };
   }
 };
@@ -8810,7 +8922,7 @@ export const createBlogCategory = async (categoryData) => {
       name: categoryData.name,
       slug: categoryData.slug,
       color: categoryData.color || 'bg-gray-500',
-      icon: categoryData.icon || 'BookOpen', // VarsayÄ±lan ikon
+      icon: categoryData.icon || 'BookOpen', // Varsayılan ikon
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp()
     };
@@ -8818,12 +8930,12 @@ export const createBlogCategory = async (categoryData) => {
     const docRef = await addDoc(categoriesRef, newCategory);
     return { success: true, id: docRef.id };
   } catch (error) {
-    console.error('Kategori oluÅŸturma hatasÄ±:', error);
+    console.error('Kategori oluşturma hatası:', error);
     return { success: false, error: error.message };
   }
 };
 
-// Blog kategorisi gÃ¼ncelle
+// Blog kategorisi güncelle
 export const updateBlogCategory = async (categoryId, categoryData) => {
   try {
     const { doc, updateDoc, serverTimestamp } = await import('firebase/firestore');
@@ -8836,7 +8948,7 @@ export const updateBlogCategory = async (categoryId, categoryData) => {
     
     return { success: true };
   } catch (error) {
-    console.error('Kategori gÃ¼ncelleme hatasÄ±:', error);
+    console.error('Kategori güncelleme hatası:', error);
     return { success: false, error: error.message };
   }
 };
@@ -8849,7 +8961,7 @@ export const deleteBlogCategory = async (categoryId) => {
     await deleteDoc(categoryRef);
     return { success: true };
   } catch (error) {
-    console.error('Kategori silme hatasÄ±:', error);
+    console.error('Kategori silme hatası:', error);
     return { success: false, error: error.message };
   }
 };
@@ -8859,7 +8971,7 @@ export const getFeaturedPosts = async (limit = 3) => {
     const result = await getBlogPosts({ featured: true, limit, sortBy: 'date', sortOrder: 'desc' });
     return result;
   } catch (error) {
-    console.error('Ã–ne Ã§Ä±kan blog yazÄ±larÄ± getirme hatasÄ±:', error);
+    console.error('Öne çıkan blog yazıları getirme hatası:', error);
     return { success: false, error: error.message };
   }
 };
@@ -8869,7 +8981,7 @@ export const createBlogPost = async (postData) => {
     const { collection, addDoc, serverTimestamp, Timestamp } = await import('firebase/firestore');
     const blogsRef = collection(db, 'blogPosts');
     
-    // Okuma sÃ¼resini hesapla
+    // Okuma süresini hesapla
     const wordsPerMinute = 200;
     const wordCount = postData.content ? postData.content.split(/\s+/).length : 0;
     const readTime = Math.ceil(wordCount / wordsPerMinute);
@@ -8907,7 +9019,7 @@ export const createBlogPost = async (postData) => {
     
     return { success: true, id: docRef.id };
   } catch (error) {
-    console.error('Blog yazÄ±sÄ± oluÅŸturma hatasÄ±:', error);
+    console.error('Blog yazısı oluşturma hatası:', error);
     return { success: false, error: error.message };
   }
 };
@@ -8917,7 +9029,7 @@ export const updateBlogPost = async (postId, postData) => {
     const { doc, updateDoc, serverTimestamp, Timestamp } = await import('firebase/firestore');
     const postRef = doc(db, 'blogPosts', postId);
     
-    // Okuma sÃ¼resini hesapla
+    // Okuma süresini hesapla
     const wordsPerMinute = 200;
     const wordCount = postData.content ? postData.content.split(/\s+/).length : 0;
     const readTime = Math.ceil(wordCount / wordsPerMinute);
@@ -8941,13 +9053,13 @@ export const updateBlogPost = async (postId, postData) => {
       updatedAt: serverTimestamp()
     };
     
-    // YayÄ±nlanma tarihi mantÄ±ÄŸÄ±
+    // Yayınlanma tarihi mantığı
     if (postData.publishDate) {
       updateData.publishedAt = Timestamp.fromDate(new Date(postData.publishDate));
     } else if (postData.status === 'published') {
       const { getDoc } = await import('firebase/firestore');
       const postSnap = await getDoc(postRef);
-      // EÄŸer daha Ã¶nce yayÄ±nlanma tarihi yoksa ÅŸu anÄ± ata
+      // Eğer daha önce yayınlanma tarihi yoksa şu anı ata
       if (postSnap.exists() && !postSnap.data().publishedAt) {
         updateData.publishedAt = serverTimestamp();
       }
@@ -8957,20 +9069,20 @@ export const updateBlogPost = async (postId, postData) => {
     
     return { success: true };
   } catch (error) {
-    console.error('Blog yazÄ±sÄ± gÃ¼ncelleme hatasÄ±:', error);
+    console.error('Blog yazısı güncelleme hatası:', error);
     return { success: false, error: error.message };
   }
 };
 
-// Ä°ki kullanÄ±cÄ± arasÄ±nda konuÅŸma oluÅŸtur veya mevcut konuÅŸmayÄ± getir
-// Ä°ki kullanÄ±cÄ± arasÄ±nda konuÅŸma oluÅŸtur veya mevcut konuÅŸmayÄ± getir
+// İki kullanıcı arasında konuşma oluştur veya mevcut konuşmayı getir
+// İki kullanıcı arasında konuşma oluştur veya mevcut konuşmayı getir
 export const createOrGetConversation = async (userId1, userId2, initialStatus = 'accepted') => {
   try {
     if (userId1 === userId2) {
-      return { success: false, error: 'Kendi kendinize mesaj gÃ¶nderemezsiniz' };
+      return { success: false, error: 'Kendi kendinize mesaj gönderemezsiniz' };
     }
 
-    // Conversation ID: alfabetik sÄ±ralÄ± kullanÄ±cÄ± ID'leri birleÅŸtir
+    // Conversation ID: alfabetik sıralı kullanıcı ID'leri birleştir
     const participants = [userId1, userId2].sort();
     const conversationId = `${participants[0]}_${participants[1]}`;
 
@@ -8979,7 +9091,7 @@ export const createOrGetConversation = async (userId1, userId2, initialStatus = 
 
     if (conversationSnap.exists()) {
       
-      // EÄŸer konuÅŸma silinmiÅŸse (hidden), tekrar gÃ¶rÃ¼nÃ¼r yap
+      // Eğer konuşma silinmişse (hidden), tekrar görünür yap
       const currentData = conversationSnap.data();
       if (currentData.deletedFor && currentData.deletedFor[userId1]) {
            await updateDoc(conversationRef, {
@@ -8994,7 +9106,7 @@ export const createOrGetConversation = async (userId1, userId2, initialStatus = 
       };
     }
 
-    // Yeni konuÅŸma oluÅŸtur
+    // Yeni konuşma oluştur
     const conversationData = {
       participants: participants,
       lastMessage: null,
@@ -9017,15 +9129,15 @@ export const createOrGetConversation = async (userId1, userId2, initialStatus = 
       isNew: true
     };
   } catch (error) {
-    console.error('KonuÅŸma oluÅŸturma/getirme hatasÄ±:', error);
+    console.error('Konuşma oluşturma/getirme hatası:', error);
     return { success: false, error: error.message };
   }
 };
 
-// Sohbet daveti gÃ¶nder
+// Sohbet daveti gönder
 export const sendChatInvitation = async (inviterId, invitedId, conversationId) => {
     try {
-        // KullanÄ±cÄ± bilgilerini al
+        // Kullanıcı bilgilerini al
         const inviterDoc = await getDoc(doc(db, 'users', inviterId));
         const inviterName = inviterDoc.exists() ? (inviterDoc.data().displayName || 'Bir kullanıcı') : 'Bir kullanıcı';
 
@@ -9057,7 +9169,7 @@ export const respondToChatInvitation = async (notificationId, response, userId) 
         if (!notifDoc.exists()) return { success: false, error: 'Bildirim bulunamadı' };
         const notifData = notifDoc.data();
         
-        // KonuÅŸmayÄ± bul ve gÃ¼ncelle
+        // Konuşmayı bul ve güncelle
         const participants = [userId, notifData.senderId].sort();
         const conversationId = `${participants[0]}_${participants[1]}`;
         const conversationRef = doc(db, 'conversations', conversationId);
@@ -9074,7 +9186,7 @@ export const respondToChatInvitation = async (notificationId, response, userId) 
                 message: 'Mesajlaşma isteğini kabul ettiniz.'
             });
             
-            // GÃ¶nderene bildirim
+            // Gönderene bildirim
             await addDoc(collection(db, 'notifications'), {
                 userId: notifData.senderId,
                 type: 'system',
@@ -9085,9 +9197,9 @@ export const respondToChatInvitation = async (notificationId, response, userId) 
                 createdAt: serverTimestamp()
             });
         } else {
-             // ReddedildiÄŸinde konuÅŸma durumunu deÄŸiÅŸtirme veya sil?
-             // Åimdilik blocked veya rejected yapabiliriz veya status'u deÄŸiÅŸtirmeyebiliriz.
-             // Belki de rejected yapalÄ±m.
+             // Reddedildiğinde konuşma durumunu değiştirme veya sil?
+             // Åimdilik blocked veya rejected yapabiliriz veya status'u değiştirmeyebiliriz.
+             // Belki de rejected yapalım.
              await updateDoc(conversationRef, {
                 status: 'rejected',
                 updatedAt: serverTimestamp()
@@ -9175,7 +9287,7 @@ export const getConversationMessages = async (conversationId, limitCount = 50) =
   }
 };
 
-// Mesaj gÃ¶nder
+// Mesaj gönder
 export const sendMessage = async (conversationId, senderId, receiverId, text, attachments = []) => {
   try {
     if (!text && (!attachments || attachments.length === 0)) {
@@ -9197,19 +9309,19 @@ export const sendMessage = async (conversationId, senderId, receiverId, text, at
       updatedAt: serverTimestamp()
     };
 
-    // MesajÄ± ekle
+    // Mesajı ekle
     const messagesRef = collection(db, 'messages');
     const messageDocRef = await addDoc(messagesRef, messageData);
 
-    // KonuÅŸmayÄ± gÃ¼ncelle - unreadCount'u transaction ile artÄ±r
+    // Konuşmayı güncelle - unreadCount'u transaction ile artır
     const conversationRef = doc(db, 'conversations', conversationId);
     const lastMessage = {
-      text: text || (attachments.length > 0 ? 'Dosya gÃ¶nderildi' : ''),
+      text: text || (attachments.length > 0 ? 'Dosya gönderildi' : ''),
       senderId,
       createdAt: serverTimestamp()
     };
 
-    // unreadCount'u artÄ±rmak iÃ§in transaction kullan
+    // unreadCount'u artırmak için transaction kullan
     try {
       await runTransaction(db, async (transaction) => {
         const convSnap = await transaction.get(conversationRef);
@@ -9225,7 +9337,7 @@ export const sendMessage = async (conversationId, senderId, receiverId, text, at
             updatedAt: serverTimestamp()
           });
         } else {
-          // KonuÅŸma yoksa oluÅŸtur (bu durumda olmamalÄ± ama gÃ¼venlik iÃ§in)
+          // Konuşma yoksa oluştur (bu durumda olmamalı ama güvenlik için)
           transaction.set(conversationRef, {
             participants: [senderId, receiverId].sort(),
             lastMessage,
@@ -9234,7 +9346,7 @@ export const sendMessage = async (conversationId, senderId, receiverId, text, at
               [senderId]: 0,
               [receiverId]: 1
             },
-            // Yeni konuÅŸma, deletedFor zaten yok ama temiz baÅŸlamak iÃ§in
+            // Yeni konuşma, deletedFor zaten yok ama temiz başlamak için
             deletedFor: {},
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp()
@@ -9242,8 +9354,8 @@ export const sendMessage = async (conversationId, senderId, receiverId, text, at
         }
       });
     } catch (transactionError) {
-      console.error('KonuÅŸma gÃ¼ncelleme hatasÄ± (transaction):', transactionError);
-      // Transaction baÅŸarÄ±sÄ±z olursa manuel gÃ¼ncelleme dene
+      console.error('Konuşma güncelleme hatası (transaction):', transactionError);
+      // Transaction başarısız olursa manuel güncelleme dene
       try {
         await updateDoc(conversationRef, {
           lastMessage,
@@ -9251,7 +9363,7 @@ export const sendMessage = async (conversationId, senderId, receiverId, text, at
           updatedAt: serverTimestamp()
         });
       } catch (updateError) {
-        console.error('KonuÅŸma gÃ¼ncelleme hatasÄ± (fallback):', updateError);
+        console.error('Konuşma güncelleme hatası (fallback):', updateError);
       }
     }
 
@@ -9318,7 +9430,7 @@ export const deleteMessage = async (messageId, userId) => {
 
     const messageData = messageSnap.data();
     if (messageData.senderId !== userId) {
-      return { success: false, error: 'Sadece kendi mesajlarÄ±nÄ±zÄ± silebilirsiniz' };
+      return { success: false, error: 'Sadece kendi mesajlarınızı silebilirsiniz' };
     }
 
     await updateDoc(messageRef, {
@@ -9329,7 +9441,7 @@ export const deleteMessage = async (messageId, userId) => {
 
     return { success: true };
   } catch (error) {
-    console.error('Mesaj silme hatasÄ±:', error);
+    console.error('Mesaj silme hatası:', error);
     return { success: false, error: error.message };
   }
 };
@@ -9341,7 +9453,7 @@ export const addMessageReaction = async (messageId, emoji, userId) => {
     const messageSnap = await getDoc(messageRef);
 
     if (!messageSnap.exists()) {
-      return { success: false, error: 'Mesaj bulunamadÄ±' };
+      return { success: false, error: 'Mesaj bulunamadı' };
     }
 
     const messageData = messageSnap.data();
@@ -9362,19 +9474,19 @@ export const addMessageReaction = async (messageId, emoji, userId) => {
 
     return { success: true };
   } catch (error) {
-    console.error('Emoji reaksiyonu ekleme hatasÄ±:', error);
+    console.error('Emoji reaksiyonu ekleme hatası:', error);
     return { success: false, error: error.message };
   }
 };
 
-// Emoji reaksiyonunu kaldÄ±r
+// Emoji reaksiyonunu kaldır
 export const removeMessageReaction = async (messageId, emoji, userId) => {
   try {
     const messageRef = doc(db, 'messages', messageId);
     const messageSnap = await getDoc(messageRef);
 
     if (!messageSnap.exists()) {
-      return { success: false, error: 'Mesaj bulunamadÄ±' };
+      return { success: false, error: 'Mesaj bulunamadı' };
     }
 
     const messageData = messageSnap.data();
@@ -9394,12 +9506,12 @@ export const removeMessageReaction = async (messageId, emoji, userId) => {
 
     return { success: true };
   } catch (error) {
-    console.error('Emoji reaksiyonu kaldÄ±rma hatasÄ±:', error);
+    console.error('Emoji reaksiyonu kaldırma hatası:', error);
     return { success: false, error: error.message };
   }
 };
 
-// KullanÄ±cÄ±nÄ±n toplam okunmamÄ±ÅŸ mesaj sayÄ±sÄ±
+// Kullanıcının toplam okunmamış mesaj sayısı
 export const getUnreadCount = async (userId) => {
   try {
     const conversationsRef = collection(db, 'conversations');
@@ -9419,15 +9531,15 @@ export const getUnreadCount = async (userId) => {
 
     return { success: true, data: totalUnread };
   } catch (error) {
-    console.error('OkunmamÄ±ÅŸ mesaj sayÄ±sÄ± getirme hatasÄ±:', error);
+    console.error('Okunmamış mesaj sayısı getirme hatası:', error);
     return { success: false, error: error.message };
   }
 };
 
-// --- YENÄ° EKLENEN FONKSÄ°YONLAR ---
+// --- YENİ EKLENEN FONKSİYONLAR ---
 
-// MaÃ§a katÄ±l
-// MaÃ§a katÄ±lma isteÄŸi gÃ¶nder
+// Maça katıl
+// Maça katılma isteği gönder
 export const requestJoinMatch = async (matchId, userId, userData) => {
   try {
     const matchRef = doc(db, 'openMatches', matchId);
@@ -9435,30 +9547,30 @@ export const requestJoinMatch = async (matchId, userId, userData) => {
     await runTransaction(db, async (transaction) => {
       const matchDoc = await transaction.get(matchRef);
       if (!matchDoc.exists()) {
-        throw new Error('MaÃ§ bulunamadÄ±');
+        throw new Error('Maç bulunamadı');
       }
 
       const matchData = matchDoc.data();
       
       if (matchData.status !== 'open') {
-        throw new Error('Bu maÃ§ artÄ±k katÄ±lÄ±ma aÃ§Ä±k deÄŸil');
+        throw new Error('Bu maç artık katılıma açık değil');
       }
 
       const players = matchData.players || [];
       if (players.includes(userId)) {
-        throw new Error('Zaten bu maÃ§tasÄ±nÄ±z');
+        throw new Error('Zaten bu maçtasınız');
       }
 
       const joinRequests = matchData.joinRequests || [];
       if (joinRequests.includes(userId)) {
-        throw new Error('Zaten katÄ±lma isteÄŸi gÃ¶nderdiniz');
+        throw new Error('Zaten katılma isteği gönderdiniz');
       }
 
       const currentPlayers = matchData.currentPlayers || 0;
       const maxPlayers = matchData.maxPlayers || 14; 
 
       if (currentPlayers >= maxPlayers) {
-        throw new Error('MaÃ§ kadrosu dolu');
+        throw new Error('Maç kadrosu dolu');
       }
 
       // Add to join requests
@@ -9469,7 +9581,7 @@ export const requestJoinMatch = async (matchId, userId, userData) => {
       // Send notification to organizer
       if (matchData.organizerId && matchData.organizerId !== userId) {
         const notificationRef = doc(collection(db, 'notifications'));
-        const requesterName = userData?.name || userData?.displayName || 'Bir kullanÄ±cÄ±';
+        const requesterName = userData?.name || userData?.displayName || 'Bir kullanıcı';
         
         transaction.set(notificationRef, {
           userId: matchData.organizerId,
@@ -9658,12 +9770,12 @@ export const respondToMessageRequest = async (notificationId, action) => {
     
     return { success: true };
   } catch (error) {
-    console.error('Mesaj isteÄŸi yanÄ±t hatasÄ±:', error);
+    console.error('Mesaj isteği yanıt hatası:', error);
     return { success: false, error: error.message };
   }
 };
 
-// MaÃ§tan oyuncu at (OrganizatÃ¶r iÃ§in)
+// Maçtan oyuncu at (Organizatör için)
 export const kickPlayerFromMatch = async (matchId, playerId) => {
   try {
     const matchRef = doc(db, 'openMatches', matchId);
@@ -9671,14 +9783,14 @@ export const kickPlayerFromMatch = async (matchId, playerId) => {
     await runTransaction(db, async (transaction) => {
       const matchDoc = await transaction.get(matchRef);
       if (!matchDoc.exists()) {
-        throw new Error('MaÃ§ bulunamadÄ±');
+        throw new Error('Maç bulunamadı');
       }
 
       const matchData = matchDoc.data();
       const players = matchData.players || [];
 
       if (!players.includes(playerId)) {
-        throw new Error('Oyuncu bu maÃ§ta deÄŸil');
+        throw new Error('Oyuncu bu maçta değil');
       }
 
       const newPlayers = players.filter(id => id !== playerId);
@@ -9690,13 +9802,13 @@ export const kickPlayerFromMatch = async (matchId, playerId) => {
         currentPlayers: newCurrentPlayers
       });
       
-      // Bildirim gÃ¶nder
+      // Bildirim gönder
       const notificationRef = doc(collection(db, 'notifications'));
       transaction.set(notificationRef, {
         userId: playerId,
         type: 'match_kick',
-        title: 'MaÃ§tan Ã‡Ä±karÄ±ldÄ±nÄ±z',
-        message: `${matchData.tesisName || 'Bir maÃ§tan'} yÃ¶netici tarafÄ±ndan Ã§Ä±karÄ±ldÄ±nÄ±z.`,
+        title: 'Maçtan Çıkarıldınız',
+        message: `${matchData.tesisName || 'Bir maçtan'} yönetici tarafından çıkarıldınız.`,
         read: false,
         createdAt: serverTimestamp()
       });
@@ -9704,17 +9816,17 @@ export const kickPlayerFromMatch = async (matchId, playerId) => {
 
     return { success: true };
   } catch (error) {
-    console.error('Oyuncu atma hatasÄ±:', error);
+    console.error('Oyuncu atma hatası:', error);
     return { success: false, error: error.message };
   }
 };
 
-// Birden Ã§ok kullanÄ±cÄ±yÄ± ID'lerine gÃ¶re getir
+// Birden çok kullanıcıyı ID'lerine göre getir
 export const getUsersByIds = async (userIds) => {
   try {
     if (!userIds || userIds.length === 0) return { success: true, data: [] };
     
-    // BasitÃ§e her ID iÃ§in getDoc yapalÄ±m
+    // Basitçe her ID için getDoc yapalım
     const promises = userIds.map(id => getDoc(doc(db, 'users', id)));
     const docs = await Promise.all(promises);
     
@@ -9727,15 +9839,15 @@ export const getUsersByIds = async (userIds) => {
 
     return { success: true, data: users };
   } catch (error) {
-    console.error('KullanÄ±cÄ±larÄ± getirme hatasÄ±:', error);
+    console.error('Kullanıcıları getirme hatası:', error);
     return { success: false, error: error.message };
   }
 };
 
-// MaÃ§ mesajÄ± gÃ¶nder
+// Maç mesajı gönder
 export const sendMatchMessage = async (matchId, senderId, senderName, text) => {
   try {
-    // 1. MesajÄ± kaydet
+    // 1. Mesajı kaydet
     await addDoc(collection(db, 'openMatches', matchId, 'messages'), {
       senderId,
       senderName,
@@ -9743,15 +9855,15 @@ export const sendMatchMessage = async (matchId, senderId, senderName, text) => {
       createdAt: serverTimestamp()
     });
 
-    // 2. MaÃ§ katÄ±lÄ±mcÄ±larÄ±nÄ± bul ve bildirim gÃ¶nder
+    // 2. Maç katılımcılarını bul ve bildirim gönder
     const matchRef = doc(db, 'openMatches', matchId);
     const matchDoc = await getDoc(matchRef);
     
     if (matchDoc.exists()) {
        const matchData = matchDoc.data();
        const participants = new Set(matchData.players || []);
-       // OrganizatÃ¶r players iÃ§inde olabilir veya olmayabilir. Genelde players iÃ§indedir.
-       // EÄŸer players iÃ§inde yoksa ekleyelim.
+       // Organizatör players içinde olabilir veya olmayabilir. Genelde players içindedir.
+       // Eğer players içinde yoksa ekleyelim.
        if (matchData.organizerId) participants.add(matchData.organizerId); 
        
        const batch = writeBatch(db);
@@ -9780,13 +9892,13 @@ export const sendMatchMessage = async (matchId, senderId, senderName, text) => {
 
     return { success: true };
   } catch (error) {
-    console.error('Mesaj gÃ¶nderme hatasÄ±:', error);
+    console.error('Mesaj gönderme hatası:', error);
     return { success: false, error: error.message };
   }
 };
 
 
-// KullanÄ±cÄ±nÄ±n katÄ±ldÄ±ÄŸÄ± veya oluÅŸturduÄŸu aÃ§Ä±k maÃ§larÄ± getir
+// Kullanıcının katıldığı veya oluşturduğu açık maçları getir
 export const getUserOpenMatchesList = async (userId) => {
   try {
     const q = query(
@@ -9801,7 +9913,7 @@ export const getUserOpenMatchesList = async (userId) => {
       matches.push({ id: doc.id, ...doc.data() });
     });
     
-    // Tarihe gÃ¶re sÄ±rala (yakÄ±n tarih Ã¶nce)
+    // Tarihe göre sırala (yakın tarih önce)
     matches.sort((a, b) => {
       const dateA = a.date?.toDate ? a.date.toDate() : new Date(a.date);
       const dateB = b.date?.toDate ? b.date.toDate() : new Date(b.date);
@@ -9810,12 +9922,12 @@ export const getUserOpenMatchesList = async (userId) => {
 
     return { success: true, data: matches };
   } catch (error) {
-    console.error('KullanÄ±cÄ± maÃ§larÄ±nÄ± getirme hatasÄ±:', error);
+    console.error('Kullanıcı maçlarını getirme hatası:', error);
     return { success: false, error: error.message };
   }
 };
 
-// Oyuncu Puanlama Ä°ÅŸlemleri
+// Oyuncu Puanlama İşlemleri
 
 export const submitMatchRatings = async (matchId, ratingsToSubmit, raterId) => {
   try {
@@ -9879,8 +9991,8 @@ export const submitMatchRatings = async (matchId, ratingsToSubmit, raterId) => {
         batch.set(notificationRef, {
             userId: userId,
             type: 'rating',
-            title: 'Yeni DeÄŸerlendirme AlÄ±ndÄ± â­',
-            message: 'Son maÃ§Ä±nÄ±zdan sonra performansÄ±nÄ±z deÄŸerlendirildi. Profilinizden detaylarÄ± inceleyebilirsiniz.',
+            title: 'Yeni Değerlendirme Alındı â­',
+            message: 'Son maçınızdan sonra performansınız değerlendirildi. Profilinizden detayları inceleyebilirsiniz.',
             relatedId: matchId,
             read: false,
             createdAt: serverTimestamp()

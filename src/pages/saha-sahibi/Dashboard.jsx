@@ -733,16 +733,7 @@ const Dashboard = () => {
       <div className="flex-1 flex flex-col">
         {/* Header */}
         {/* Header */}
-        <DashboardHeader title="Dashboard">
-
-              <button 
-                onClick={() => navigate('/saha-sahibi/rezervasyonlar')}
-                className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-xl hover:bg-green-700 font-semibold shadow-sm transition-all duration-150"
-              >
-                <Plus className="w-4 h-4" />
-                <span className="hidden sm:inline">Yeni Rezervasyon</span>
-              </button>
-        </DashboardHeader>
+        <DashboardHeader title="Dashboard" />
 
         {/* Main Content Area */}
         <div className="flex-1 p-6 overflow-y-auto bg-gray-50">

@@ -77,7 +77,7 @@ const Footer = () => {
   const activeSocialIcons = getSocialIcons();
 
   return (
-    <footer className='bg-[#1a1a1a] text-white py-12 lg:py-16'>
+    <footer className='bg-gray-50 text-gray-800 py-12 lg:py-16 border-t border-gray-100'>
       <div className='container mx-auto max-w-screen-xl px-4'>
         <div className='grid grid-cols-1 lg:grid-cols-4 gap-8 lg:gap-12'>
           {/* Left Column - Logo & Description */}
@@ -97,7 +97,7 @@ const Footer = () => {
             </div>
 
             {/* Description */}
-            <p className='text-gray-300 leading-relaxed mb-6'>
+            <p className='text-gray-600 leading-relaxed mb-6'>
               Türkiye'nin en büyük spor tesisi rezervasyon ve oyuncu bulma platformu. 
               81 ilde, 15.000+ tesisle hizmetimizdeyiz.
             </p>
@@ -116,7 +116,7 @@ const Footer = () => {
                       viewport={{ once: true }}
                       transition={{ duration: 0.4, delay: index * 0.1 }}
                       whileHover={{ scale: 1.1, y: -2 }}
-                      className='w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center hover:bg-green-500 transition-all duration-200'
+                      className='w-10 h-10 bg-white shadow-sm border border-gray-100 rounded-full flex items-center justify-center hover:bg-green-500 hover:text-white transition-all duration-200'
                       aria-label={social.label}
                     >
                       <social.icon size={18} />
@@ -147,7 +147,7 @@ const Footer = () => {
                 >
                   <Link
                     to={link.href}
-                    className='text-gray-300 hover:text-white transition-colors duration-200 block'
+                    className='text-gray-600 hover:text-green-600 transition-colors duration-200 block'
                   >
                     {link.label}
                   </Link>
@@ -175,7 +175,7 @@ const Footer = () => {
                 >
                   <Link
                     to={link.href}
-                    className='text-gray-300 hover:text-white transition-colors duration-200 block'
+                    className='text-gray-600 hover:text-green-600 transition-colors duration-200 block'
                   >
                     {link.label}
                   </Link>
@@ -203,7 +203,7 @@ const Footer = () => {
                 >
                   <Link
                     to={link.href}
-                    className='text-gray-300 hover:text-white transition-colors duration-200 block'
+                    className='text-gray-600 hover:text-green-600 transition-colors duration-200 block'
                   >
                     {link.label}
                   </Link>
@@ -219,7 +219,7 @@ const Footer = () => {
           whileInView={{ opacity: 1, scaleX: 1 }}
           viewport={{ once: true }}
           transition={{ duration: 0.8, delay: 0.5 }}
-          className='border-t border-gray-800 mt-12 pt-8'
+          className='border-t border-gray-100 mt-12 pt-8'
         >
           <div className='flex flex-col md:flex-row md:items-center md:justify-between text-center md:text-left'>
             <motion.p
@@ -227,7 +227,7 @@ const Footer = () => {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.6, delay: 0.6 }}
-              className='text-gray-400 text-sm mb-4 md:mb-0'
+              className='text-gray-500 text-sm mb-4 md:mb-0'
             >
               © 2025 Sahada. Tüm hakları saklıdır.
             </motion.p>
@@ -238,10 +238,10 @@ const Footer = () => {
               transition={{ duration: 0.6, delay: 0.7 }}
               className='flex justify-center md:justify-end gap-6 text-sm'
             >
-              <Link to="/gizlilik-politikasi" className='text-gray-400 hover:text-white transition-colors duration-200'>
+              <Link to="/gizlilik-politikasi" className='text-gray-500 hover:text-green-600 transition-colors duration-200'>
                 Gizlilik Politikası
               </Link>
-              <Link to="/kullanim-kosullari" className='text-gray-400 hover:text-white transition-colors duration-200'>
+              <Link to="/kullanim-kosullari" className='text-gray-500 hover:text-green-600 transition-colors duration-200'>
                 Kullanım Şartları
               </Link>
             </motion.div>

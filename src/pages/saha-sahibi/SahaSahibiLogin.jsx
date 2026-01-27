@@ -43,6 +43,12 @@ const SahaSahibiLogin = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [showResetPassword, setShowResetPassword] = useState(false);
   
+  // SMS Verification States
+  const [showOTPModal, setShowOTPModal] = useState(false);
+  const [otpCode, setOtpCode] = useState('');
+  const [generatedOTP, setGeneratedOTP] = useState('');
+  const [otpLoading, setOtpLoading] = useState(false);
+  
   const [pageContent, setPageContent] = useState({
     prefixTitle: 'Saha Sahibi Paneli',
     title: 'İşletmenizi',
@@ -109,6 +115,56 @@ const SahaSahibiLogin = () => {
     return Object.keys(newErrors).length === 0;
   };
 
+  // Send OTP via NetGSM
+  const sendOTP = async (phone, code) => {
+    try {
+      const username = '8503059015';
+      const password = '4A33D@1';
+      const header = 'Bigabe';
+
+      let formattedPhone = String(phone)
+        .replace(/\D/g, '')
+        .replace(/^90/, '')
+        .replace(/^\+90/, '')
+        .replace(/^0/, '');
+
+      if (formattedPhone.length === 10) formattedPhone = '0' + formattedPhone;
+
+      const message = `Sahada Doğrulama Kodunuz: ${code}\nKayıt işleminizi tamamlamak için bu kodu giriniz.`;
+
+      const apiUrl = 'https://api.netgsm.com.tr/sms/send/get';
+      const requestData = new URLSearchParams({
+        usercode: username,
+        password: password,
+        gsmno: formattedPhone,
+        message: message,
+        msgheader: header,
+        dil: 'TR'
+      });
+
+      try {
+        const response = await fetch(apiUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: requestData
+        });
+        const text = await response.text();
+        console.log('NetGSM Response:', text);
+        return text.startsWith('00') || text.startsWith('01') || text.startsWith('02');
+      } catch (fetchError) {
+        console.warn("CORS/Network Error (Dev Mode):", fetchError);
+        return true; // Allow in dev
+      }
+    } catch (error) {
+      console.error("SMS Error:", error);
+      throw error;
+    }
+  };
+
+  const verifyOTP = async (inputCode, generatedCode) => {
+    return inputCode === generatedCode;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!validateForm()) return;
@@ -134,11 +190,21 @@ const SahaSahibiLogin = () => {
           return;
         }
 
-        result = await registerUser({
-          ...formData,
-          userType: 'owner', // Explicitly set as owner
-          onboardingCompleted: false
-        });
+        // SMS Doğrulama Adımı
+        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+        setGeneratedOTP(otp);
+        
+        const smsSent = await sendOTP(formData.phone, otp);
+        if (!smsSent) {
+          setErrors({ submit: 'SMS gönderilemedi. Lütfen tekrar deneyin.' });
+          setIsLoading(false);
+          return;
+        }
+
+        // SMS gönderildi, modal aç
+        setShowOTPModal(true);
+        setIsLoading(false);
+        return; // Kayıt işlemi OTP doğrulandıktan sonra yapılacak
       }
       
       if (result.success) {
@@ -154,12 +220,8 @@ const SahaSahibiLogin = () => {
           if (setNeedsOnboarding) setNeedsOnboarding(true);
         }
         
-        // Context'i güncelle
         const nextPath = userType === 'owner' ? '/saha-sahibi/dashboard' : '/oyuncu/dashboard';
         
-        // Timeout olmadan direkt yönlendirme yapma, PublicRoute bunu halletmeli
-        // Ama eğer PublicRoute hemen devreye girmezse diye manuel yönlendirme ekle
-        // Fakat userData'nın oturduğundan emin ol
         setTimeout(() => {
              navigate(nextPath, { replace: true });
         }, 500);
@@ -171,6 +233,56 @@ const SahaSahibiLogin = () => {
       setErrors({ submit: 'Bir hata oluştu.' });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // OTP Doğrulama ve Kayıt Tamamlama (Sadece normal kayıt için)
+  const handleVerifyOTP = async () => {
+    if (!otpCode || otpCode.length !== 6) {
+      setErrors({ otp: 'Lütfen 6 haneli kodu girin' });
+      return;
+    }
+
+    setOtpLoading(true);
+    setErrors({});
+
+    try {
+      const isValid = await verifyOTP(otpCode, generatedOTP);
+      
+      if (!isValid) {
+        setErrors({ otp: 'Doğrulama kodu hatalı' });
+        setOtpLoading(false);
+        return;
+      }
+
+      // OTP doğru, şimdi kayıt işlemini tamamla
+      const result = await registerUser({
+        ...formData,
+        userType: 'owner',
+        onboardingCompleted: false
+      });
+
+      if (result.success) {
+        setUserData({
+          uid: result.user.uid,
+          email: result.user.email,
+          userType: 'owner',
+          onboardingCompleted: false
+        });
+        if (setNeedsOnboarding) setNeedsOnboarding(true);
+        
+        setShowOTPModal(false);
+        setTimeout(() => {
+          navigate('/saha-sahibi/dashboard', { replace: true });
+        }, 500);
+      } else {
+        setErrors({ otp: result.error });
+      }
+    } catch (error) {
+      console.error('OTP verification error:', error);
+      setErrors({ otp: 'Doğrulama hatası oluştu' });
+    } finally {
+      setOtpLoading(false);
     }
   };
 
@@ -203,19 +315,19 @@ const SahaSahibiLogin = () => {
       let result;
       
       if (provider === 'google') {
-        result = await loginWithGoogle('owner'); // Force 'owner' type
+        result = await loginWithGoogle('owner');
       } else if (provider === 'facebook') {
         result = await loginWithFacebook('owner');
       }
       
       if (result.success) {
-        // Double check user type, though we forced it for new users
         const userType = result.user?.userType || 'owner';
         
+        // Yeni kullanıcı ise onboarding'e yönlendir (orada telefon doğrulaması yapılacak)
+        // Mevcut kullanıcı ise zaten kayıtlı, direkt yönlendir
         if (userType === 'owner') {
            navigate('/saha-sahibi/onboarding', { replace: true });
         } else {
-           // If an existing player logs in, redirect them away
            navigate('/oyuncu/onboarding', { replace: true });
         }
       } else {
@@ -496,6 +608,71 @@ const SahaSahibiLogin = () => {
           </div>
         </div>
       </div>
+
+      {/* OTP Verification Modal */}
+      <AnimatePresence>
+        {showOTPModal && (
+          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl"
+            >
+              <h3 className="text-xl font-bold text-gray-900 mb-2">Telefon Doğrulama</h3>
+              <p className="text-gray-500 text-sm mb-6">
+                {formData.phone} numarasına gönderilen 6 haneli kodu girin
+              </p>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Doğrulama Kodu</label>
+                  <input
+                    type="text"
+                    maxLength={6}
+                    value={otpCode}
+                    onChange={(e) => {
+                      setOtpCode(e.target.value.replace(/\D/g, ''));
+                      setErrors({});
+                    }}
+                    className="w-full px-4 py-3 text-center text-2xl font-bold tracking-widest bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-green-500"
+                    placeholder="000000"
+                  />
+                  {errors.otp && <p className="mt-1 text-xs text-red-500">{errors.otp}</p>}
+                </div>
+                
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => {
+                      setShowOTPModal(false);
+                      setOtpCode('');
+                      setGeneratedOTP('');
+                      setErrors({});
+                    }}
+                    className="flex-1 py-3 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xl font-medium transition-colors"
+                  >
+                    İptal
+                  </button>
+                  <button
+                    onClick={handleVerifyOTP}
+                    disabled={otpLoading || otpCode.length !== 6}
+                    className="flex-1 py-3 text-white bg-green-600 hover:bg-green-700 rounded-xl font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {otpLoading ? (
+                      <div className="flex items-center justify-center gap-2">
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        Doğrulanıyor...
+                      </div>
+                    ) : (
+                      'Doğrula'
+                    )}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Password Reset Modal */}
       <AnimatePresence>

@@ -34,16 +34,16 @@ const Rakamlar = () => {
   }, []);
 
   return (
-    <div className='bg-green-600 py-12 lg:py-20'>
+    <div className='bg-green-50 py-12 lg:py-20'>
       <div className='container mx-auto max-w-screen-xl px-4'>
         <div className='grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-16 items-center'>
           {/* Left Content */}
-          <div className='text-white'>
+          <div className='text-gray-900'>
             <h2 className='text-3xl sm:text-4xl lg:text-5xl font-bold mb-6 leading-tight'>
               {content.title}
             </h2>
 
-            <p className='text-lg lg:text-xl text-white/90 mb-8'>
+            <p className='text-lg lg:text-xl text-gray-600 mb-8'>
               {content.subtitle}
             </p>
 
@@ -54,10 +54,10 @@ const Rakamlar = () => {
                   key={index}
                   className='flex items-center gap-3'
                 >
-                  <div className='flex-shrink-0 w-6 h-6 bg-white/20 rounded-full flex items-center justify-center'>
-                    <Check size={14} className='text-white' />
+                  <div className='flex-shrink-0 w-6 h-6 bg-green-100 rounded-full flex items-center justify-center'>
+                    <Check size={14} className='text-green-600' />
                   </div>
-                  <span className='text-white/90 font-medium'>{feature}</span>
+                  <span className='text-gray-700 font-medium'>{feature}</span>
                 </div>
               ))}
             </div>

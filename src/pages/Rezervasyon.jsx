@@ -1377,6 +1377,19 @@ const Rezervasyon = ({ inPanel = false }) => {
 
   
   const handlePaymentSubmit = async () => {
+    // Frontend validasyonu
+    if (!invoiceData.name || !invoiceData.taxNumber || !invoiceData.address || !invoiceData.city || !invoiceData.district) {
+      alert('Lütfen tüm fatura bilgilerini doldurun.');
+      return;
+    }
+
+    // Vergi No / TC Kontrolü
+    const taxRegex = /^(\d{10}|\d{11})$/;
+    if (!taxRegex.test(invoiceData.taxNumber)) {
+      alert('Vergi No 10 haneli veya T.C. Kimlik No 11 haneli olmalıdır.');
+      return;
+    }
+
     if (selectedPaymentMethod === 'sahada-odeme') {
         // Sahada ödeme için direkt rezervasyon oluştur
         const currentData = {
@@ -1436,6 +1449,12 @@ const Rezervasyon = ({ inPanel = false }) => {
       month: 'long',
       day: 'numeric'
     }) : '';
+    
+    // Logo ve Başlık bilgisini al
+    // Ayarlardan gelen güncel veriyi kullan, yoksa cache'den al
+    const logoUrl = platformSettings?.logoUrl || localStorage.getItem('platform_logo') || '/images/logo.png';
+    const siteTitle = platformSettings?.siteTitle || localStorage.getItem('platform_title') || 'Sahada';
+    const contactEmail = platformSettings?.contactEmail || 'destek@sahada.com';
 
     // Görünmez bir div oluştur
     const invoiceDiv = document.createElement('div');
@@ -1449,9 +1468,14 @@ const Rezervasyon = ({ inPanel = false }) => {
     invoiceDiv.style.margin = '0';
 
     invoiceDiv.innerHTML = `
-      <div style="width: 100%; background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%); color: #fff; padding: 40px 50px; border-radius: 12px 12px 0 0; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-        <div style="font-size: 36px; font-weight: 700; letter-spacing: 2px; margin-bottom: 8px;">SAHADA</div>
-        <div style="font-size: 16px; opacity: 0.95; font-weight: 400;">Spor Tesisleri Rezervasyon Faturası</div>
+      <div style="width: 100%; background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%); color: #fff; padding: 40px 50px; border-radius: 12px 12px 0 0; box-shadow: 0 4px 6px rgba(0,0,0,0.1); display: flex; align-items: center; justify-content: space-between;">
+        <div>
+          <div style="font-size: 36px; font-weight: 700; letter-spacing: 2px; margin-bottom: 8px;">${siteTitle.toUpperCase()}</div>
+          <div style="font-size: 16px; opacity: 0.95; font-weight: 400;">Spor Tesisleri Rezervasyon Faturası</div>
+        </div>
+        <div>
+           ${logoUrl ? `<img src="${logoUrl}" style="height: 60px; width: auto; background: white; padding: 5px; border-radius: 8px;" />` : ''}
+        </div>
       </div>
       
       <div style="padding: 40px 50px; background: #ffffff;">
@@ -2261,7 +2285,7 @@ const Rezervasyon = ({ inPanel = false }) => {
                       <CreditCard className="w-6 h-6 text-blue-600" />
                       <div>
                         <h4 className="font-medium text-blue-900">Güvenli Ödeme</h4>
-                        <p className="text-sm text-blue-700">Kart bilgileriniz iframe ödeme sayfasında güvenle işlenecektir.</p>
+                        <p className="text-sm text-blue-700">Kart bilgileriniz ödeme sayfasında güvenle işlenecektir.</p>
                       </div>
                       </div>
                         </div>
@@ -2281,29 +2305,100 @@ const Rezervasyon = ({ inPanel = false }) => {
                     </div>
                   </div>
                   
+                  {/* Fatura Tipi Seçimi */}
+                  <div className="flex gap-4 mb-6">
+                     <label className={`flex-1 p-3 border rounded-xl cursor-pointer transition-all ${invoiceData.type === 'bireysel' ? 'border-green-500 bg-green-50 text-green-700 font-bold' : 'border-gray-200 text-gray-500 hover:border-green-200'}`}>
+                        <div className="flex items-center gap-2 justify-center">
+                            <input 
+                                type="radio" 
+                                name="invoiceType" 
+                                value="bireysel" 
+                                checked={invoiceData.type === 'bireysel' || !invoiceData.type} 
+                                onChange={() => setInvoiceData({...invoiceData, type: 'bireysel'})}
+                                className="accent-green-600"
+                            />
+                            <span>Bireysel</span>
+                        </div>
+                     </label>
+                     <label className={`flex-1 p-3 border rounded-xl cursor-pointer transition-all ${invoiceData.type === 'kurumsal' ? 'border-green-500 bg-green-50 text-green-700 font-bold' : 'border-gray-200 text-gray-500 hover:border-green-200'}`}>
+                        <div className="flex items-center gap-2 justify-center">
+                            <input 
+                                type="radio" 
+                                name="invoiceType" 
+                                value="kurumsal" 
+                                checked={invoiceData.type === 'kurumsal'} 
+                                onChange={() => setInvoiceData({...invoiceData, type: 'kurumsal'})}
+                                className="accent-green-600"
+                            />
+                            <span>Kurumsal</span>
+                        </div>
+                     </label>
+                  </div>
+
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-1">
-                      <label className="text-[11px] font-black text-gray-400 uppercase tracking-widest px-1">Ad Soyad / Firma Adı *</label>
+                      <label className="text-[11px] font-black text-gray-400 uppercase tracking-widest px-1">
+                          {invoiceData.type === 'kurumsal' ? 'Firma Ünvanı *' : 'Ad Soyad *'}
+                      </label>
                       <input
                         type="text"
                         value={invoiceData.name}
                         onChange={(e) => setInvoiceData({...invoiceData, name: e.target.value})}
-                        placeholder="Örn: Ahmet Yılmaz"
+                        placeholder={invoiceData.type === 'kurumsal' ? "Örn: Kürkaya Yazılım Ltd. Şti." : "Örn: Ahmet Yılmaz"}
                         className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:bg-white focus:border-transparent outline-none transition-all font-medium text-gray-900"
                         required
                       />
                     </div>
-                    <div className="space-y-1">
-                      <label className="text-[11px] font-black text-gray-400 uppercase tracking-widest px-1">TC / Vergi No *</label>
-                      <input
-                        type="text"
-                        value={invoiceData.taxNumber}
-                        onChange={(e) => setInvoiceData({...invoiceData, taxNumber: e.target.value})}
-                        placeholder="11 haneli TC veya Vergi No"
-                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:bg-white focus:border-transparent outline-none transition-all font-medium text-gray-900"
-                        required
-                      />
-                    </div>
+                    
+                    {invoiceData.type === 'kurumsal' ? (
+                        <>
+                            <div className="space-y-1">
+                              <label className="text-[11px] font-black text-gray-400 uppercase tracking-widest px-1">Vergi Dairesi *</label>
+                              <input
+                                type="text"
+                                value={invoiceData.taxOffice}
+                                onChange={(e) => setInvoiceData({...invoiceData, taxOffice: e.target.value})}
+                                placeholder="Vergi Dairesi Adı"
+                                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:bg-white focus:border-transparent outline-none transition-all font-medium text-gray-900"
+                                required
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-[11px] font-black text-gray-400 uppercase tracking-widest px-1">Vergi No (10 Haneli) *</label>
+                              <input
+                                type="text"
+                                value={invoiceData.taxNumber}
+                                onChange={(e) => {
+                                  const val = e.target.value.replace(/[^0-9]/g, '');
+                                  if (val.length <= 10) {
+                                    setInvoiceData({...invoiceData, taxNumber: val});
+                                  }
+                                }}
+                                placeholder="10 Haneli Vergi No"
+                                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:bg-white focus:border-transparent outline-none transition-all font-medium text-gray-900"
+                                required
+                              />
+                            </div>
+                        </>
+                    ) : (
+                        <div className="space-y-1">
+                          <label className="text-[11px] font-black text-gray-400 uppercase tracking-widest px-1">TC Kimlik No (11 Haneli) *</label>
+                          <input
+                            type="text"
+                            value={invoiceData.taxNumber} // Using taxNumber field for TC as well to keep struct simple
+                            onChange={(e) => {
+                              const val = e.target.value.replace(/[^0-9]/g, '');
+                              if (val.length <= 11) {
+                                setInvoiceData({...invoiceData, taxNumber: val});
+                              }
+                            }}
+                            placeholder="11 haneli TC Kimlik No"
+                            className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:bg-white focus:border-transparent outline-none transition-all font-medium text-gray-900"
+                            required
+                          />
+                        </div>
+                    )}
+                    
                     <div className="md:col-span-2 space-y-1">
                       <label className="text-[11px] font-black text-gray-400 uppercase tracking-widest px-1">Adres *</label>
                       <input
@@ -2349,7 +2444,38 @@ const Rezervasyon = ({ inPanel = false }) => {
                     Geri
                   </button>
                   <button
-                    onClick={handlePaymentSubmit}
+                    onClick={() => {
+                        // Invoice Validation Check
+                        if (acceptTerms) {
+                             const isCorporate = invoiceData.type === 'kurumsal';
+                             const isIndividual = !invoiceData.type || invoiceData.type === 'bireysel';
+                             
+                             if (!invoiceData.name || !invoiceData.address || !invoiceData.city || !invoiceData.district) {
+                                 toast.error('Lütfen fatura bilgilerini eksiksiz doldurunuz.');
+                                 // Highlight invoice section
+                                 document.querySelector('.bg-green-100')?.scrollIntoView({ behavior: 'smooth' });
+                                 return;
+                             }
+                             
+                             if (isIndividual && (invoiceData.taxNumber?.length !== 11)) {
+                                 toast.error('Bireysel fatura için 11 haneli TC Kimlik Numarası gereklidir.');
+                                 return;
+                             }
+                             
+                             if (isCorporate) {
+                                 if (!invoiceData.taxOffice) {
+                                     toast.error('Kurumsal fatura için Vergi Dairesi boş bırakılamaz.');
+                                     return;
+                                 }
+                                 if (invoiceData.taxNumber?.length !== 10) {
+                                     toast.error('Kurumsal fatura için 10 haneli Vergi Numarası gereklidir.');
+                                     return;
+                                 }
+                             }
+                        }
+                        
+                        handlePaymentSubmit();
+                    }}
                     disabled={!acceptTerms || isPaymentProcessing}
                     className={`flex-1 md:flex-none px-12 py-3 rounded-xl font-bold transition-all shadow-lg active:scale-95 flex items-center justify-center gap-2 ${
                       acceptTerms && !isPaymentProcessing

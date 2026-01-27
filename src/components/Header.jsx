@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Menu, X, User, LogOut, Settings, ChevronDown, MapPin,
-
-  LayoutDashboard,
+  Menu, X, User, LogOut, Settings, ChevronDown, MapPin, LayoutDashboard, Bell, Info, Check 
 } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
@@ -10,7 +8,6 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { getPlatformSettings, markNotificationAsRead, markAllNotificationsAsRead } from '../services/firestoreService';
 import { collection, query, where, onSnapshot, limit, orderBy, updateDoc, doc, writeBatch } from 'firebase/firestore';
 import { db } from '../config/firebase';
-import { Bell, Info, Check } from 'lucide-react';
 
 const Header = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -254,114 +251,126 @@ const Header = () => {
           {/* Right: Auth & Mobile Toggle */}
           <div className="flex-1 flex items-center justify-end gap-2 sm:gap-3">
             {user ? (
-              <div className="relative user-dropdown flex items-center gap-2" ref={notificationRef}>
-                <button
-                  onClick={() => {
-                    if (unreadCount > 0) {
+              <div className="flex items-center gap-2 sm:gap-4">
+                {/* Notification Bell */}
+                <div className="relative" ref={notificationRef}>
+                  <button
+                    onClick={() => {
                       setIsNotificationsOpen(!isNotificationsOpen);
                       setIsUserDropdownOpen(false);
-                    } else {
+                    }}
+                    className="relative p-2 rounded-full hover:bg-gray-100 transition-colors text-gray-600 hover:text-green-600 focus:outline-none"
+                  >
+                    <Bell size={20} />
+                    {unreadCount > 0 && (
+                      <span className="absolute top-1 right-1 min-w-[16px] h-[16px] flex items-center justify-center bg-red-500 text-white text-[9px] font-bold rounded-full border-2 border-white animate-pulse">
+                        {unreadCount}
+                      </span>
+                    )}
+                  </button>
+
+                  {/* Notifications Dropdown */}
+                  {isNotificationsOpen && (
+                    <div className="absolute right-0 top-full mt-2 w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-gray-100 py-2 z-50 transform origin-top-right animate-scaleIn">
+                      <div className="px-4 py-3 border-b border-gray-50 flex justify-between items-center">
+                        <h3 className="font-bold text-gray-900 text-sm">Bildirimler</h3>
+                        {unreadCount > 0 && (
+                          <button onClick={markAllAsRead} className="text-[10px] text-green-600 hover:text-green-700 font-bold uppercase tracking-wider">
+                            Tümünü Oku
+                          </button>
+                        )}
+                      </div>
+                      <div className="max-h-80 overflow-y-auto custom-scrollbar">
+                        {notifications.length > 0 ? (
+                          notifications.map((n) => (
+                            <div
+                              key={n.id}
+                              onClick={() => {
+                                markAsRead(n.id);
+                                if (n.link) navigate(n.link);
+                                setIsNotificationsOpen(false);
+                              }}
+                              className={`px-4 py-3 hover:bg-gray-50 cursor-pointer border-b border-gray-50 last:border-0 transition-colors ${!n.read ? 'bg-green-50/20' : ''}`}
+                            >
+                              <div className="flex items-center gap-3">
+                                <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${!n.read ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'}`}>
+                                  <Info size={20} />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className={`text-xs ${!n.read ? 'font-bold text-gray-900' : 'text-gray-600'}`}>
+                                    {cleanMessage(n.title)}
+                                  </p>
+                                  <p className="text-[11px] text-gray-500 mt-0.5 line-clamp-2">
+                                    {cleanMessage(n.message)}
+                                  </p>
+                                  <p className="text-[9px] text-gray-400 mt-1 uppercase font-medium">
+                                    {formatNotificationDate(n.createdAt)}
+                                  </p>
+                                </div>
+                                {!n.read && (
+                                  <div className="flex flex-col items-center gap-2 self-center">
+                                      <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            markAsRead(n.id);
+                                        }}
+                                        className="p-1.5 hover:bg-green-100 text-green-600 rounded-full transition-colors"
+                                      >
+                                          <Check size={14} strokeWidth={3} />
+                                      </button>
+                                      <div className="w-1.5 h-1.5 bg-green-500 rounded-full flex-shrink-0 animate-pulse" />
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="px-4 py-10 text-center text-gray-400">
+                            <Bell size={24} className="mx-auto mb-2 opacity-20" />
+                            <p className="text-xs">Bildirim bulunmuyor</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* User Dropdown */}
+                <div className="relative user-dropdown">
+                  <button
+                    onClick={() => {
                       setIsUserDropdownOpen(!isUserDropdownOpen);
                       setIsNotificationsOpen(false);
-                    }
-                  }}
-                  className="flex items-center gap-2 pl-3 pr-2 py-1.5 rounded-full border border-gray-100 hover:border-green-200 bg-gray-50/50 hover:bg-white transition-all shadow-sm"
-                >
-                  <span className="hidden lg:inline-block text-xs font-bold text-gray-700">
-                    {userData?.fullName || userData?.displayName || 'Kullanıcı'}
-                  </span>
-                  <div className="relative">
-                    <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center overflow-hidden border-2 border-white shadow-sm">
-                      {userData?.photoURL || user?.photoURL || userData?.profilePhoto?.url ? (
-                        <img 
-                          src={userData?.photoURL || user?.photoURL || userData?.profilePhoto?.url} 
-                          alt="Profil" 
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <User size={18} className="text-green-600" />
-                      )}
-                    </div>
-                    {unreadCount > 0 && (
-                      <div className="absolute -top-1 -right-1 min-w-[17px] h-[17px] bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center px-1 border-2 border-white animate-pulse shadow-sm z-10">
-                        {unreadCount}
+                    }}
+                    className="flex items-center gap-2 pl-2 pr-1 py-1 rounded-full border border-gray-100 hover:border-green-200 bg-gray-50/50 hover:bg-white transition-all shadow-sm"
+                  >
+                    <span className="hidden lg:inline-block text-xs font-bold text-gray-700 ml-2">
+                      {userData?.fullName || userData?.displayName || 'Kullanıcı'}
+                    </span>
+                    <div className="relative">
+                      <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center overflow-hidden border-2 border-white shadow-sm">
+                        {userData?.photoURL || user?.photoURL || userData?.profilePhoto?.url ? (
+                          <img 
+                            src={userData?.photoURL || user?.photoURL || userData?.profilePhoto?.url} 
+                            alt="Profil" 
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <User size={18} className="text-green-600" />
+                        )}
                       </div>
-                    )}
-                  </div>
-                  <ChevronDown 
-                    size={14} 
-                    className={`text-gray-400 transition-transform duration-200 hidden sm:block ${isUserDropdownOpen ? 'rotate-180' : ''}`} 
-                  />
-                </button>
+                    </div>
+                    <ChevronDown 
+                      size={14} 
+                      className={`text-gray-400 mr-1 transition-transform duration-200 hidden sm:block ${isUserDropdownOpen ? 'rotate-180' : ''}`} 
+                    />
+                  </button>
 
-                {/* Notifications Dropdown */}
-                {isNotificationsOpen && (
-                  <div className="absolute right-0 mt-3 w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-gray-100 py-2 z-50 transform origin-top-right transition-all animate-in fade-in zoom-in-95">
-                    <div className="px-4 py-3 border-b border-gray-50 flex justify-between items-center">
-                      <h3 className="font-bold text-gray-900 text-sm">Bildirimler</h3>
-                      {unreadCount > 0 && (
-                        <button onClick={markAllAsRead} className="text-[10px] text-green-600 hover:text-green-700 font-bold uppercase tracking-wider">
-                          Tümünü Oku
-                        </button>
-                      )}
-                    </div>
-                    <div className="max-h-80 overflow-y-auto custom-scrollbar">
-                      {notifications.length > 0 ? (
-                        notifications.map((n) => (
-                          <div
-                            key={n.id}
-                            onClick={() => {
-                              markAsRead(n.id);
-                              if (n.link) navigate(n.link);
-                              setIsNotificationsOpen(false);
-                            }}
-                            className={`px-4 py-3 hover:bg-gray-50 cursor-pointer border-b border-gray-50 last:border-0 transition-colors ${!n.read ? 'bg-green-50/20' : ''}`}
-                          >
-                            <div className="flex gap-3">
-                              <div className={`mt-0.5 p-1.5 rounded-full flex-shrink-0 ${!n.read ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'}`}>
-                                <Info size={14} />
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className={`text-xs ${!n.read ? 'font-bold text-gray-900' : 'text-gray-600'}`}>
-                                  {cleanMessage(n.title)}
-                                </p>
-                                <p className="text-[11px] text-gray-500 mt-0.5 line-clamp-2">
-                                  {cleanMessage(n.message)}
-                                </p>
-                                <p className="text-[9px] text-gray-400 mt-1 uppercase font-medium">
-                                  {formatNotificationDate(n.createdAt)}
-                                </p>
-                              </div>
-                              {!n.read && (
-                                <div className="flex flex-col items-center gap-2 self-center">
-                                    <button
-                                      onClick={(e) => {
-                                          e.stopPropagation();
-                                          markAsRead(n.id);
-                                      }}
-                                      className="p-1.5 hover:bg-green-100 text-green-600 rounded-full transition-colors"
-                                    >
-                                        <Check size={14} strokeWidth={3} />
-                                    </button>
-                                    <div className="w-1.5 h-1.5 bg-green-500 rounded-full flex-shrink-0 animate-pulse" />
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        ))
-                      ) : (
-                        <div className="px-4 py-10 text-center text-gray-400">
-                          <Bell size={24} className="mx-auto mb-2 opacity-20" />
-                          <p className="text-xs">Bildirim bulunmuyor</p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
+
 
                 {/* Dropdown Menu */}
                 {isUserDropdownOpen && (
-                  <div className="absolute right-0 mt-3 w-60 bg-white rounded-2xl shadow-2xl border border-gray-100 py-2 z-50 animate-in fade-in zoom-in-95 duration-200">
+                  <div className="absolute right-0 top-full mt-3 w-60 bg-white rounded-2xl shadow-2xl border border-gray-100 py-2 z-50 transform origin-top-right animate-scaleIn">
                     <div className="px-5 py-4 border-b border-gray-50">
                       <p className="text-sm font-black text-gray-900 truncate">
                         {userData?.fullName || userData?.displayName || 'Kullanıcı'}
@@ -400,6 +409,7 @@ const Header = () => {
                   </div>
                 )}
               </div>
+            </div>
             ) : (
               <button
                 onClick={() => navigate('/login', { state: { from: location.pathname } })}

@@ -103,6 +103,21 @@ const userLocationIcon = new DivIcon({
   iconAnchor: [12, 12],
 });
 
+const normalizeSearchText = (text) => {
+    if (!text) return '';
+    return text
+        .toString()
+        .replace(/İ/g, 'i')
+        .replace(/I/g, 'i')
+        .toLowerCase()
+        .replace(/ı/g, 'i')
+        .replace(/ğ/g, 'g')
+        .replace(/ü/g, 'u')
+        .replace(/ş/g, 's')
+        .replace(/ö/g, 'o')
+        .replace(/ç/g, 'c');
+};
+
 const OyuncuBul = () => {
   const { user } = useAuth();
   const [searchParams] = useSearchParams();
@@ -244,10 +259,10 @@ const OyuncuBul = () => {
      }
   }, [user, searchType, allPlayers.length]);
 
-  // Effect 3: Map & Tesisler
+  // Effect 3: Map & Tesisler & Location
   useEffect(() => {
+    getUserLocation();
     if (mapView) {
-      getUserLocation();
       loadTesisler();
     }
   }, [mapView]);
@@ -442,13 +457,16 @@ const OyuncuBul = () => {
       setLoading(true);
       const result = await getPlayers();
       if (result.success) {
-        let playersData = result.data.filter(p => p.uid !== user?.uid && p.displayName && p.displayName.trim() !== ''); // Kendisi hariç ve ismi olanlar
+        // En azından fullName veya displayName olan herkesi alalım
+        let playersData = result.data.filter(p => 
+          p.uid !== user?.uid && 
+          (p.displayName?.trim() || p.fullName?.trim() || p.email)
+        );
         
-        // Mock coordinates for demo (if missing) - In real app, rely on p.latitude/p.longitude
-        // Sadece demo amacıyla, İstanbul etrafında rastgele dağıtıyoruz eğer konumu yoksa
+        // Mock coordinates for demo (if missing)
         playersData = playersData.map(p => {
           if (!p.latitude || !p.longitude) {
-            // İstanbul merkez etrafında +/- 0.1 derece (yaklaşık 10km) rastgele
+            // İstanbul merkez etrafında rastgele
             const lat = 41.0082 + (Math.random() - 0.5) * 0.1;
             const lng = 28.9784 + (Math.random() - 0.5) * 0.1;
             return { ...p, latitude: lat, longitude: lng, isLocationMock: true };
@@ -456,20 +474,16 @@ const OyuncuBul = () => {
           return p;
         });
 
-        // Harita açıksa ve oyuncu bul modundaysak, mesafeye göre filtrele (opsiyonel)
-        if (mapView) {
-            playersData = playersData.map(p => ({
-                ...p,
-                distance: calculateDistance(userLocation.lat, userLocation.lng, p.latitude, p.longitude)
-            }));
-            // Yakındakiler (örneğin 50km altı)
-            // playersData = playersData.filter(p => p.distance < 50); 
-        }
+        // Mesafe hesapla ve sırala
+        playersData = playersData.map(p => ({
+            ...p,
+            distance: calculateDistance(userLocation.lat, userLocation.lng, p.latitude, p.longitude)
+        }));
 
-        // Initial filter application
-        const filtered = applyPlayerFilters(playersData);
-        setAllPlayers(playersData); // Store all
-        // setPlayers(filtered); // This will handled by the useEffect above
+        // Varsayılan olarak mesafeye göre sırala
+        playersData.sort((a, b) => a.distance - b.distance);
+
+        setAllPlayers(playersData);
       }
     } catch (error) {
       console.error('Oyuncular yükleme hatası:', error);
@@ -483,16 +497,23 @@ const OyuncuBul = () => {
     let filtered = [...playersData];
 
     if (filters.searchTerm) {
-      const searchLower = filters.searchTerm.toLowerCase();
+      const term = normalizeSearchText(filters.searchTerm);
       filtered = filtered.filter(p => 
-        p.displayName?.toLowerCase().includes(searchLower) ||
-        p.fullName?.toLowerCase().includes(searchLower) ||
-        p.bio?.toLowerCase().includes(searchLower)
+        normalizeSearchText(p.displayName || '').includes(term) ||
+        normalizeSearchText(p.fullName || '').includes(term) ||
+        normalizeSearchText(p.bio || '').includes(term) ||
+        normalizeSearchText(p.city || '').includes(term) ||
+        normalizeSearchText(p.district || '').includes(term)
       );
     }
 
     if (filters.position && filters.position !== 'all') {
-      filtered = filtered.filter(p => p.position === filters.position || (p.sportPreferences && p.sportPreferences.some(sp => sp.position === filters.position)));
+      const filterPos = filters.position.toLowerCase().trim();
+      filtered = filtered.filter(p => {
+        const playerPos = (p.position || '').toLowerCase().trim();
+        const hasPreference = p.sportPreferences?.some(sp => (sp.position || '').toLowerCase().trim() === filterPos);
+        return playerPos === filterPos || hasPreference;
+      });
     }
 
     if (filters.level && filters.level !== 'all') {
@@ -504,12 +525,25 @@ const OyuncuBul = () => {
     }
 
     if (filters.location) {
-        const locLower = filters.location.toLowerCase();
+        const locTerm = normalizeSearchText(filters.location);
         filtered = filtered.filter(p => 
-            p.city?.toLowerCase().includes(locLower) ||
-            p.district?.toLowerCase().includes(locLower)
+            normalizeSearchText(p.city || '').includes(locTerm) ||
+            normalizeSearchText(p.district || '').includes(locTerm)
         );
     }
+
+    // Mesafe hesapla ve sırala (her zaman mesafeye göre gelsin demiştik)
+    filtered = filtered.map(p => {
+        const lat = p.latitude;
+        const lng = p.longitude;
+        const dist = (lat && lng) ? calculateDistance(userLocation.lat, userLocation.lng, lat, lng) : Infinity;
+        return {
+            ...p,
+            distance: dist
+        };
+    });
+    
+    filtered.sort((a, b) => a.distance - b.distance);
 
     return filtered;
   };
@@ -1021,7 +1055,7 @@ const OyuncuBul = () => {
 
         {/* Harita Görünümü */}
         {mapView && (activeTab === 'all' || searchType === 'player') ? (
-          <div className="bg-white rounded-xl shadow-sm overflow-hidden mb-6" style={{ height: '600px' }}>
+          <div className="bg-white rounded-xl shadow-sm overflow-hidden mb-6 h-[50vh] min-h-[400px] lg:h-[600px]">
             <div className="flex items-center justify-between p-4 border-b border-gray-200">
               <h2 className="text-lg font-semibold text-gray-900">
                 {searchType === 'match' ? 'Yakındaki Maçlar' : 'Yakındaki Oyuncular'}
@@ -1164,7 +1198,14 @@ const OyuncuBul = () => {
                                     <div>
                                         <h3 className="font-bold text-gray-900 text-lg">{player.displayName}</h3>
                                         <div className="flex items-center justify-center gap-2 text-xs text-gray-600 mt-1">
-                                            <span className="bg-green-100 text-green-800 px-2 py-0.5 rounded-full font-medium">{player.position || 'Mevki Yok'}</span>
+                                            <span className="bg-green-100 text-green-800 px-2 py-0.5 rounded-full font-medium">
+                                                {filters.position !== 'all' && (
+                                                    (player.position || '').toLowerCase().trim() === filters.position.toLowerCase().trim() || 
+                                                    player.sportPreferences?.some(sp => (sp.position || '').toLowerCase().trim() === filters.position.toLowerCase().trim())
+                                                ) 
+                                                    ? filters.position 
+                                                    : (player.position || 'Belirtilmemiş')}
+                                            </span>
                                             <div className="flex items-center gap-1">
                                                 <Star size={10} className="text-yellow-500 fill-yellow-500" />
                                                 <span>{player.skillLevel || '-'}</span>
@@ -1554,7 +1595,14 @@ const OyuncuBul = () => {
                                     >
                                         {player.displayName}
                                     </h3>
-                                    <p className="text-green-600 text-xs md:text-sm font-semibold">{player.position || 'Forvet'}</p>
+                                    <p className="text-green-600 text-xs md:text-sm font-semibold">
+                                        {filters.position !== 'all' && (
+                                            (player.position || '').toLowerCase().trim() === filters.position.toLowerCase().trim() || 
+                                            player.sportPreferences?.some(sp => (sp.position || '').toLowerCase().trim() === filters.position.toLowerCase().trim())
+                                        ) 
+                                            ? filters.position 
+                                            : (player.position || 'Belirtilmemiş')}
+                                    </p>
                                     
                                     <div className={`flex items-center gap-1.5 mt-1 text-[10px] md:text-xs text-gray-500 font-medium ${viewMode === 'grid' ? 'justify-center' : ''}`}>
                                         <Star size={12} className="text-yellow-500 fill-yellow-500" />

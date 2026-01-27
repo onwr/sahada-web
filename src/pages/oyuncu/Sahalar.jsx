@@ -92,16 +92,23 @@ const Sahalar = () => {
     return true;
   });
 
-  if (loading) {
-    return (
-      <div className="flex h-screen bg-gray-50 items-center justify-center">
-        <div className="text-center">
-          <div className="w-8 h-8 border-4 border-green-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600">Sahalar yükleniyor...</p>
+  const SahaSkeleton = () => (
+    <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden animate-pulse">
+      <div className="w-full h-48 bg-gray-200" />
+      <div className="p-6">
+        <div className="flex items-start justify-between mb-3">
+          <div className="h-6 bg-gray-200 rounded w-2/3" />
+          <div className="h-6 bg-gray-200 rounded w-12" />
         </div>
+        <div className="space-y-3 mb-6">
+          <div className="h-4 bg-gray-200 rounded w-3/4" />
+          <div className="h-4 bg-gray-200 rounded w-1/2" />
+          <div className="h-4 bg-gray-200 rounded w-2/3" />
+        </div>
+        <div className="h-10 bg-gray-200 rounded w-full" />
       </div>
-    );
-  }
+    </div>
+  );
 
   if (error) {
     return (
@@ -134,7 +141,7 @@ const Sahalar = () => {
             <div>
               <h1 className="text-2xl font-bold text-gray-900">Sahalar</h1>
               <p className="text-gray-600 mt-1">
-                {filteredSahalar.length} saha bulundu
+                {loading ? 'Sahalar yükleniyor...' : `${filteredSahalar.length} saha bulundu`}
               </p>
             </div>
           </div>
@@ -170,20 +177,26 @@ const Sahalar = () => {
         {/* Content */}
         <div className="flex-1 p-6 overflow-y-auto">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredSahalar.length > 0 ? (
+            {loading ? (
+              // Skeleton Grid
+              Array(6).fill(0).map((_, i) => <SahaSkeleton key={i} />)
+            ) : filteredSahalar.length > 0 ? (
               filteredSahalar.map((saha) => (
                 <div key={saha.id} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow">
-                  {saha.images && saha.images.length > 0 ? (
-                    <img
-                      src={saha.images[0].optimized_url || saha.images[0].url}
-                      alt={saha.name}
-                      className="w-full h-48 object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-48 bg-gradient-to-br from-green-500 to-green-600 flex items-center justify-center">
-                      <MapPin className="w-16 h-16 text-white opacity-50" />
-                    </div>
-                  )}
+                  {/* Image with overlay while loading if necessary, but here we just show image */}
+                  <div className="relative">
+                    {saha.images && saha.images.length > 0 ? (
+                      <img
+                        src={saha.images[0].optimized_url || saha.images[0].url}
+                        alt={saha.name}
+                        className="w-full h-48 object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-48 bg-gradient-to-br from-green-500 to-green-600 flex items-center justify-center">
+                        <MapPin className="w-16 h-16 text-white opacity-50" />
+                      </div>
+                    )}
+                  </div>
                   
                   <div className="p-6">
                     <div className="flex items-start justify-between mb-3">

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Search, MapPin, ArrowRight, CheckCircle, Sparkles } from 'lucide-react';
+import { Search, MapPin, ArrowRight, CheckCircle, Sparkles, Check } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../contexts/AuthContext';
 import { getHeroContent } from '../services/firestoreService';
@@ -106,27 +106,6 @@ const Hero = () => {
 
     return (
         <section className="relative bg-white pb-12 overflow-hidden min-h-[700px] flex items-center">
-            {/* Background Graphic */}
-            <div className="absolute inset-0 z-0">
-                <AnimatePresence mode='wait'>
-                    {activeSlide?.imageUrl && (
-                        <motion.div
-                            key={activeSlide.id}
-                            initial={{ opacity: 0, scale: 1.05 }}
-                            animate={{ opacity: 0.15, scale: 1 }}
-                            exit={{ opacity: 0 }}
-                            transition={{ duration: 1.5 }}
-                            className="absolute inset-0"
-                        >
-                            <img src={activeSlide.imageUrl} alt="background" className="w-full h-full object-cover" />
-                        </motion.div>
-                    )}
-                </AnimatePresence>
-                {/* Gradient Overlays */}
-                <div className="absolute inset-0 bg-gradient-to-r from-white via-white/80 to-transparent"></div>
-                <div className="absolute top-0 right-0 w-3/4 h-full bg-gradient-to-l from-green-50/50 to-transparent skew-x-12 opacity-50"></div>
-                <div className="absolute bottom-0 left-0 w-96 h-96 bg-blue-50/50 rounded-full blur-3xl opacity-60 translate-y-1/2 -translate-x-1/2"></div>
-            </div>
 
             <div className="container mx-auto px-4 relative z-10 pt-20 md:pt-28">
                 <div className="flex flex-col lg:flex-row items-center gap-12 lg:gap-20">
@@ -290,20 +269,20 @@ const Hero = () => {
                                     animate="visible"
                                     whileHover="hover"
                                     custom={2}
-                                    className="bg-gray-900 text-white p-6 rounded-3xl shadow-2xl shadow-gray-900/20 relative overflow-hidden"
+                                    className="bg-white text-gray-900 p-6 rounded-3xl shadow-2xl shadow-gray-200 relative overflow-hidden border border-gray-100"
                                 >
                                     <div className="absolute top-0 right-0 w-24 h-24 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl"></div>
                                     
                                     <div className="flex items-center gap-4 mb-4 relative z-10">
-                                        <div className="w-10 h-10 rounded-full bg-white/20 p-[2px]">
-                                            <div className="w-full h-full rounded-full bg-gray-900 flex items-center justify-center text-xs font-bold">BY</div>
+                                        <div className="w-10 h-10 rounded-full bg-gray-100 p-[2px]">
+                                            <div className="w-full h-full rounded-full bg-white flex items-center justify-center text-xs font-bold text-gray-900">BY</div>
                                         </div>
                                         <div>
-                                            <div className="font-bold text-sm">Burak Yılmaz</div>
-                                            <div className="text-[10px] text-gray-400">Profesyonel Forvet</div>
+                                            <div className="font-bold text-sm text-gray-900">Burak Yılmaz</div>
+                                            <div className="text-[10px] text-gray-500">Profesyonel Forvet</div>
                                         </div>
                                     </div>
-                                    <div className="text-xs text-gray-300 bg-white/5 p-3 rounded-xl mb-4 italic leading-relaxed border border-white/5 relative z-10">
+                                    <div className="text-xs text-gray-600 bg-gray-50 p-3 rounded-xl mb-4 italic leading-relaxed border border-gray-100 relative z-10">
                                         "Hafta içi akşam maçlarına çağırabilirsiniz. Kondisyonum yerinde."
                                     </div>
                                     <button

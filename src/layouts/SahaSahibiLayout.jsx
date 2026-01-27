@@ -27,6 +27,8 @@ const SahaSahibiLayout = () => {
   const navigate = useNavigate();
   const [settings, setSettings] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [plans, setPlans] = useState([]);
+  const [features, setFeatures] = useState([]);
 
   useEffect(() => {
     const fetchSettings = async () => {
@@ -44,13 +46,48 @@ const SahaSahibiLayout = () => {
     fetchSettings();
   }, []);
 
+  // Real-time Plans and Features
+  useEffect(() => {
+    const plansQuery = query(
+      collection(db, 'premiumPlans'),
+      where('userType', '==', 'owner'),
+      where('isActive', '==', true),
+      orderBy('createdAt', 'desc')
+    );
+    const unsubPlans = onSnapshot(plansQuery, (snap) => {
+      const d = [];
+      snap.forEach(doc => d.push({id: doc.id, ...doc.data()}));
+      setPlans(d);
+    });
+
+    const featuresQuery = query(collection(db, 'premiumFeatures'), orderBy('order', 'asc'));
+    const unsubFeatures = onSnapshot(featuresQuery, (snap) => {
+      const d = [];
+      snap.forEach(doc => d.push({id: doc.id, ...doc.data()}));
+      setFeatures(d);
+    });
+
+    return () => {
+      unsubPlans();
+      unsubFeatures();
+    };
+  }, []);
+
   // Blocking Logic
   const isPaymentRequired = settings?.membership?.mandatoryPayment;
   
-  // Check if user is active (Assuming 'active' status or checking if trial/sub exists)
-  // If subscriptionStatus is undefined, we assume they are NOT active if payment is mandatory.
-  // We can also add a logic for 'specialRules' exemption here if needed, but for now strict.
-  const isUserActive = userData?.subscriptionStatus === 'active'; 
+  // Check if user is active (Subscription or non-expired trial)
+  const isUserActive = (() => {
+    if (userData?.subscriptionStatus === 'active') return true;
+    
+    // Check trial
+    if (userData?.subscriptionType === 'trial' && userData?.trialEndDate) {
+      const endDate = userData.trialEndDate.toDate ? userData.trialEndDate.toDate() : new Date(userData.trialEndDate);
+      return endDate > new Date();
+    }
+    
+    return false;
+  })();
 
   // Allow crucial pages even if blocked
   const allowedPaths = ['/saha-sahibi/ayarlar', '/saha-sahibi/destek', '/saha-sahibi/onboarding', '/saha-sahibi/bildirimler'];
@@ -239,56 +276,64 @@ const SahaSahibiLayout = () => {
                             </button>
                         </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 flex-1">
-                            {/* Pro Plan */}
-                            <div className="relative group">
-                                <div className="absolute -inset-0.5 bg-gradient-to-r from-green-500 to-emerald-600 rounded-3xl blur opacity-20 group-hover:opacity-40 transition duration-1000 group-hover:duration-200"></div>
-                                <div className="relative bg-white border border-gray-100 p-6 rounded-3xl h-full flex flex-col shadow-sm hover:shadow-md transition-all">
-                                    <div className="w-10 h-10 bg-green-50 rounded-xl flex items-center justify-center mb-4">
-                                        <Zap className="w-5 h-5 text-green-600" />
-                                    </div>
-                                    <h5 className="font-black text-gray-900 text-lg mb-1">Profesyonel</h5>
-                                    <div className="flex items-baseline gap-1 mb-6">
-                                        <span className="text-2xl font-black text-gray-900">₺299</span>
-                                        <span className="text-gray-400 text-sm font-medium">/ Ay</span>
-                                    </div>
-                                    <div className="space-y-3 mb-8 text-sm text-gray-600">
-                                        <p className="flex items-center gap-2"><Check size={14} className="text-green-500" /> 5 Sahaya Kadar</p>
-                                        <p className="flex items-center gap-2"><Check size={14} className="text-green-500" /> Finansal Detaylar</p>
-                                        <p className="flex items-center gap-2"><Check size={14} className="text-green-500" /> Müşteri CRM</p>
-                                    </div>
-                                    <button 
-                                        onClick={() => window.location.href = '/saha-sahibi/ayarlar?tab=membership&plan=pro'}
-                                        className="mt-auto w-full py-3 bg-green-600 text-white rounded-xl font-bold hover:bg-green-700 transition-all shadow-lg shadow-green-100"
-                                    >
-                                        Seç & Öde
-                                    </button>
-                                </div>
-                            </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 flex-1">
+                                {plans.length > 0 ? (
+                                    plans.map((plan, idx) => (
+                                        <div key={plan.id} className={`relative group ${idx === 1 ? 'sm:scale-105 z-10' : ''}`}>
+                                            {idx === 1 && (
+                                                <div className="absolute -inset-0.5 bg-gradient-to-r from-orange-400 to-rose-500 rounded-[2rem] blur opacity-30 animate-pulse"></div>
+                                            )}
+                                            <div className={`relative bg-white border ${idx === 1 ? 'border-orange-100 shadow-xl' : 'border-gray-100 shadow-sm'} p-8 rounded-[2rem] h-full flex flex-col hover:shadow-2xl transition-all duration-300`}>
+                                                <div className={`w-12 h-12 ${idx === 1 ? 'bg-orange-100' : 'bg-green-50'} rounded-2xl flex items-center justify-center mb-6`}>
+                                                    {plan.duration === 'yearly' ? <Rocket className={`w-6 h-6 ${idx === 1 ? 'text-orange-600' : 'text-green-600'}`} /> : <Zap className={`w-6 h-6 ${idx === 1 ? 'text-orange-600' : 'text-green-600'}`} />}
+                                                </div>
+                                                <h5 className="font-black text-gray-900 text-xl mb-1">{plan.name}</h5>
+                                                <div className="flex items-baseline gap-1 mb-6">
+                                                    <span className="text-3xl font-black text-gray-900">₺{plan.price}</span>
+                                                    <span className="text-gray-400 text-sm font-medium">/ {plan.duration === 'yearly' ? 'Yıl' : 'Ay'}</span>
+                                                </div>
+                                                
+                                                <div className="space-y-4 mb-10 flex-1">
+                                                    {features.length > 0 ? features.slice(0, 4).map((feat, fIdx) => (
+                                                        <p key={fIdx} className="flex items-center gap-3 text-sm text-gray-600">
+                                                            <div className={`w-5 h-5 rounded-full ${idx === 1 ? 'bg-orange-100/50' : 'bg-green-50'} flex items-center justify-center flex-shrink-0`}>
+                                                                <Check size={12} className={idx === 1 ? 'text-orange-600' : 'text-green-600'} />
+                                                            </div>
+                                                            {feat.name}
+                                                        </p>
+                                                    )) : (
+                                                        <>
+                                                            <p className="flex items-center gap-3 text-sm text-gray-600"><Check size={14} className="text-green-500" /> Sınırsız Saha Tanımı</p>
+                                                            <p className="flex items-center gap-3 text-sm text-gray-600"><Check size={14} className="text-green-500" /> Finansal Detaylar</p>
+                                                            <p className="flex items-center gap-3 text-sm text-gray-600"><Check size={14} className="text-green-500" /> Müşteri CRM</p>
+                                                        </>
+                                                    )}
+                                                </div>
 
-                            {/* Enterprise Plan */}
-                            <div className="relative border border-orange-100 bg-orange-50/30 p-6 rounded-3xl flex flex-col group hover:border-orange-200 transition-all">
-                                <div className="w-10 h-10 bg-orange-100 rounded-xl flex items-center justify-center mb-4">
-                                    <Rocket className="w-5 h-5 text-orange-600" />
-                                </div>
-                                <h5 className="font-black text-gray-900 text-lg mb-1 leading-tight">Sınırsız <br /> Kurumsal</h5>
-                                <div className="flex items-baseline gap-1 mb-6">
-                                    <span className="text-2xl font-black text-gray-900">₺599</span>
-                                    <span className="text-gray-400 text-sm font-medium">/ Ay</span>
-                                </div>
-                                <div className="space-y-3 mb-8 text-sm text-gray-600">
-                                    <p className="flex items-center gap-2"><Check size={14} className="text-orange-500" /> Sınırsız Saha</p>
-                                    <p className="flex items-center gap-2"><Check size={14} className="text-orange-500" /> Özel Destek</p>
-                                    <p className="flex items-center gap-2"><Check size={14} className="text-orange-500" /> Gelişmiş API</p>
-                                </div>
-                                <button 
-                                    onClick={() => window.location.href = '/saha-sahibi/ayarlar?tab=membership&plan=enterprise'}
-                                    className="mt-auto w-full py-3 bg-gray-900 text-white rounded-xl font-bold hover:bg-gray-800 transition-all"
-                                >
-                                    Kurumsal Teklif
-                                </button>
-                                <span className="absolute top-4 right-4 bg-orange-200 text-orange-800 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-tighter">Popüler</span>
-                            </div>
+                                                <button 
+                                                    onClick={() => navigate(`/saha-sahibi/ayarlar?tab=membership&plan=${plan.id}`)}
+                                                    className={`w-full py-4 rounded-2xl font-black transition-all transform hover:scale-[1.02] shadow-lg ${
+                                                        idx === 1 
+                                                            ? 'bg-gray-900 text-white shadow-gray-200' 
+                                                            : 'bg-green-600 text-white shadow-green-100 hover:bg-green-700'
+                                                    }`}
+                                                >
+                                                    {idx === 1 ? 'Kurumsal Teklif' : 'Seç & Öde'}
+                                                </button>
+                                                
+                                                {idx === 1 && (
+                                                    <span className="absolute top-6 right-6 bg-orange-500 text-white text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-wider">Popüler</span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))
+                                ) : (
+                                    /* Fallback static cards if plans haven't loaded yet */
+                                    <>
+                                        <div className="bg-gray-50 animate-pulse rounded-[2rem] h-80"></div>
+                                        <div className="bg-gray-50 animate-pulse rounded-[2rem] h-80"></div>
+                                    </>
+                                )}
                         </div>
 
                         <div className="mt-8 flex items-center gap-4 p-4 bg-gray-50 rounded-2xl border border-dashed border-gray-200">

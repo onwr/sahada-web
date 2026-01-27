@@ -168,6 +168,12 @@ const SahaSahibiOnboard = () => {
   const [mapCenter, setMapCenter] = useState({ lat: 41.0082, lng: 28.9784 });
   const [isDragging, setIsDragging] = useState(false);
   const [pinPosition, setPinPosition] = useState({ x: 50, y: 50 });
+  
+  const [showOTPModal, setShowOTPModal] = useState(false);
+  const [otpCode, setOtpCode] = useState('');
+  const [generatedOTP, setGeneratedOTP] = useState('');
+  const [otpLoading, setOtpLoading] = useState(false);
+  const [phoneVerified, setPhoneVerified] = useState(false);
 
 
   // Optimize district filtering
@@ -716,6 +722,96 @@ const SahaSahibiOnboard = () => {
     handleInputChange('companyType', type);
     handleInputChange('taxNumber', '');
     setErrors(prev => ({ ...prev, taxNumber: '' }));
+  };
+  
+  const sendOTP = async (phone, code) => {
+    console.log('=== OWNER SMS GÖNDERME BAŞLADI ===');
+    console.log('1. Gelen telefon:', phone);
+    console.log('2. Gelen kod:', code);
+    
+    try {
+      const username = '8503059015';
+      const password = '4A33D@1';
+      const header = 'Bigabe';
+      
+      console.log('3. NetGSM Bilgileri:', { username, header });
+      
+      let formattedPhone = String(phone).replace(/\D/g, '').replace(/^90/, '').replace(/^\+90/, '').replace(/^0/, '');
+      console.log('4. Temizlenmiş telefon:', formattedPhone);
+      
+      if (formattedPhone.length === 10) formattedPhone = '0' + formattedPhone;
+      console.log('5. Formatlanmış telefon:', formattedPhone);
+      
+      const message = `Sahada Doğrulama Kodunuz: ${code}\nTelefon numaranızı doğrulamak için bu kodu girin.`;
+      console.log('6. Mesaj:', message);
+      
+      const apiUrl = 'https://api.netgsm.com.tr/sms/send/get';
+      const requestData = new URLSearchParams({ 
+        usercode: username, 
+        password: password, 
+        gsmno: formattedPhone, 
+        message: message, 
+        msgheader: header, 
+        dil: 'TR' 
+      });
+      
+      console.log('7. API URL:', apiUrl);
+      console.log('8. Request Data:', Object.fromEntries(requestData));
+      
+      try {
+        console.log('9. Fetch başlatılıyor...');
+        const response = await fetch(apiUrl, { 
+          method: 'POST', 
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, 
+          body: requestData 
+        });
+        
+        console.log('10. Response status:', response.status);
+        console.log('11. Response ok:', response.ok);
+        
+        const text = await response.text();
+        console.log('12. NetGSM Yanıt:', text);
+        
+        const success = text.startsWith('00') || text.startsWith('01') || text.startsWith('02');
+        console.log('13. Başarılı mı?:', success);
+        console.log('=== OWNER SMS GÖNDERME BİTTİ ===');
+        
+        return success;
+      } catch (fetchError) { 
+        console.error('14. FETCH HATASI:', fetchError);
+        console.error('Hata detayı:', fetchError.message);
+        console.log('=== OWNER SMS GÖNDERME HATA İLE BİTTİ (FETCH) ===');
+        return true; 
+      }
+    } catch (error) { 
+      console.error('15. GENEL HATA:', error);
+      console.error('Hata detayı:', error.message);
+      console.log('=== OWNER SMS GÖNDERME HATA İLE BİTTİ (GENEL) ===');
+      return false; 
+    }
+  };
+  
+  const handleSendOTP = async () => {
+    if (!formData.businessPhone || formData.businessPhone.replace(/\D/g, '').length < 10) return;
+    setOtpLoading(true);
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    setGeneratedOTP(otp);
+    const sent = await sendOTP(formData.businessPhone, otp);
+    setOtpLoading(false);
+    if (sent) setShowOTPModal(true);
+  };
+  
+  const handleVerifyOTP = async () => {
+    if (!otpCode || otpCode.length !== 6) return;
+    setOtpLoading(true);
+    const isValid = otpCode === generatedOTP;
+    setOtpLoading(false);
+    if (isValid) {
+      setPhoneVerified(true);
+      setShowOTPModal(false);
+      setOtpCode('');
+      await updateUserData(user.uid, { phoneVerified: true, businessPhone: formData.businessPhone });
+    }
   };
 
   const handleSubmit = async () => {

@@ -117,6 +117,13 @@ const OyuncuDetay = () => {
     }
   }, [playerData]);
 
+  // Handle URL cleanup - if accessed by ID, redirect to slug
+  useEffect(() => {
+    if (playerData?.slug && idOrSlug === playerData.id) {
+      navigate(`/oyuncu-detay/${playerData.slug}`, { replace: true });
+    }
+  }, [playerData, idOrSlug, navigate]);
+
   useEffect(() => {
     if (idOrSlug) {
       loadPlayerData();

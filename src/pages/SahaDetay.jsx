@@ -111,6 +111,13 @@ const SahaDetay = () => {
     }
   }, [sahaData]);
 
+  // Handle URL cleanup - if accessed by ID, redirect to slug
+  useEffect(() => {
+    if (sahaData?.slug && idOrSlug === sahaData.id) {
+      navigate(`/saha/${sahaData.slug}`, { replace: true });
+    }
+  }, [sahaData, idOrSlug, navigate]);
+
   // Saha verilerini yükle
   useEffect(() => {
     loadSahaData();

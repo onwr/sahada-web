@@ -120,7 +120,17 @@ const YakinTesisler = () => {
         const usersResult = await getAllUsers();
         if (usersResult.success) {
             const ads = usersResult.data
-                .filter(u => u.role === 'player' || u.userType === 'player' || !u.role) // Sadece oyuncular
+                .filter(u => {
+                    // Saha sahiplerini ve adminleri filtrele
+                    if (u.userType === 'owner' || u.role === 'owner' || u.userType === 'saha_sahibi' || u.role === 'admin') return false;
+                    
+                    // İsminde 'Spor Kompleksi', 'Tesis' vb. geçenleri filtrele (tipi olmayan eski kayıtlar için)
+                    const name = (u.fullName || u.displayName || '').toLowerCase();
+                    if (name.includes('spor kompleksi') || name.includes('tesisleri') || name.includes('halı saha')) return false;
+
+                    // Sadece oyuncuları veya tipi belirtilmemişleri (varsayılan oyuncu) göster
+                    return u.userType === 'player' || u.role === 'player' || (!u.userType && !u.role);
+                })
                 .slice(0, 5) // Son 5 oyuncu
                 .map(u => ({
                     id: u.id,
@@ -150,7 +160,7 @@ const YakinTesisler = () => {
   };
 
   const handleCreateAdClick = () => {
-      if(currentUser) navigate('/oyuncu/dashboard'); else navigate('/login');
+      if(currentUser) navigate('/oyuncu/mac-olustur'); else navigate('/login');
   };
 
   const handlePlayerClick = (ad) => {
@@ -278,7 +288,7 @@ const YakinTesisler = () => {
                   </div>
                   <div className="hidden md:flex gap-2">
                       <button className="px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-bold text-gray-900 hover:bg-gray-50 flex items-center gap-2"><Filter size={14} /> Filtrele</button>
-                      <button onClick={() => navigate('/yakin-sahalar')} className="px-4 py-2 bg-gray-900 text-white rounded-lg text-sm font-bold hover:bg-black flex items-center gap-2">Tümü <ArrowRight size={14} /></button>
+                      <button onClick={() => navigate('/yakin-sahalar')} className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-bold hover:bg-green-700 flex items-center gap-2">Tümü <ArrowRight size={14} /></button>
                   </div>
               </div>
 
@@ -364,7 +374,7 @@ const YakinTesisler = () => {
                                       <span className="text-xs text-gray-400 ml-1">/ saat</span>
                                   </div>
                                   <button
-                                      className="bg-gray-900 hover:bg-green-600 text-white w-9 h-9 rounded-lg flex items-center justify-center transition-all shadow-sm hover:shadow-green-200"
+                                      className="bg-green-600 hover:bg-green-700 text-white w-9 h-9 rounded-lg flex items-center justify-center transition-all shadow-md shadow-green-100"
                                   >
                                       <ArrowRight size={16} />
                                   </button>
@@ -457,20 +467,20 @@ const YakinTesisler = () => {
                   </div>
 
                   {/* Community (Col 2) */}
-                  <div className="bg-gray-900 rounded-[2rem] p-8 text-white relative overflow-hidden">
+                  <div className="bg-green-50 rounded-[2rem] p-8 text-gray-900 relative overflow-hidden border border-green-100">
                       <div className="absolute top-0 right-0 w-64 h-64 bg-green-500 rounded-full blur-[80px] opacity-20 -mr-10 -mt-10"></div>
 
                       <div className="relative z-10">
                           <div className="inline-block bg-yellow-500 text-white text-[10px] font-bold px-2 py-1 rounded mb-4">GÜNDEM</div>
-                          <h3 className="text-3xl font-black mb-6 leading-tight">Meydan'da Neler<br />Konuşuluyor?</h3>
+                          <h3 className="text-3xl font-black mb-6 leading-tight text-gray-900">Meydan'da Neler<br />Konuşuluyor?</h3>
 
                           <div className="space-y-4 mb-8">
                               {MOCK_FORUM_POSTS.length > 0 ? (
                                   MOCK_FORUM_POSTS.map(post => (
-                                      <div key={post.id} className="bg-white/10 backdrop-blur-md p-4 rounded-xl border border-white/10 hover:bg-white/20 transition-colors cursor-pointer">
+                                      <div key={post.id} className="bg-white p-4 rounded-xl border border-green-100 hover:border-green-300 shadow-sm transition-all cursor-pointer">
                                           <div className="flex items-center gap-3 mb-2">
                                               <img src={post.authorAvatar || `https://ui-avatars.com/api/?name=${post.authorName || 'U'}`} className="w-6 h-6 rounded-full" alt="u" />
-                                              <span className="text-xs font-bold text-gray-300">{post.authorName} • {post.category || 'Genel'}</span>
+                                              <span className="text-xs font-bold text-gray-400">{post.authorName} • {post.category || 'Genel'}</span>
                                           </div>
                                           <p className="font-bold text-sm mb-3 line-clamp-2">{post.title}</p>
                                       </div>
@@ -479,7 +489,7 @@ const YakinTesisler = () => {
                                   <div className="text-center text-gray-400 text-xs">Henüz konu yok.</div>
                               )}
                           </div>
-                          <Link to="/meydan" className="inline-flex items-center gap-2 bg-white text-gray-900 px-6 py-3 rounded-xl font-bold text-sm hover:bg-gray-100 transition-colors">
+                          <Link to="/meydan" className="inline-flex items-center gap-2 bg-green-600 text-white px-6 py-3 rounded-xl font-bold text-sm hover:bg-green-700 transition-colors shadow-lg shadow-green-200">
                               Tartışmaya Katıl <ArrowRight size={16} />
                           </Link>
                       </div>

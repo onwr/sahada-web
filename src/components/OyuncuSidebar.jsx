@@ -54,6 +54,7 @@ const OyuncuSidebar = () => {
   const [unreadMessageCount, setUnreadMessageCount] = useState(0);
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
   const [hasNewMessage, setHasNewMessage] = useState(false);
+  const [hasPlayedInitialMessageSound, setHasPlayedInitialMessageSound] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -73,12 +74,16 @@ const OyuncuSidebar = () => {
         totalUnread += unread;
       });
       
-      // Yeni mesaj geldiğinde bildirim göster (mesajlar sayfasında değilken)
+      // Yeni mesaj geldiğinde bildirim göster
       if (previousCount !== -1 && totalUnread > previousCount && location.pathname !== '/oyuncu/mesajlar') {
         setHasNewMessage(true);
         toast.success('Yeni mesajınız var', { icon: '📩' });
+        playNotificationSound();
         // 5 saniye sonra animasyonu kaldır
         setTimeout(() => setHasNewMessage(false), 5000);
+      } else if (previousCount === -1 && totalUnread > 0 && !hasPlayedInitialMessageSound) {
+        playNotificationSound();
+        setHasPlayedInitialMessageSound(true);
       }
       
       // Mesajlar sayfasındayken animasyonu kaldır
@@ -105,6 +110,7 @@ const OyuncuSidebar = () => {
         
         if (previousNotifCount !== -1 && count > previousNotifCount && location.pathname !== '/oyuncu/bildirimler') {
             toast.success('Yeni bildiriminiz var', { icon: '🔔' });
+            playNotificationSound();
         }
         
         previousNotifCount = count;
@@ -112,6 +118,16 @@ const OyuncuSidebar = () => {
     }, (error) => { console.error('Bildirim listener hatası:', error); });
     return () => unsubscribe();
   }, [user, location.pathname]);
+
+  const playNotificationSound = () => {
+    try {
+      const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+      audio.volume = 0.5;
+      audio.play().catch(e => console.log('Ses çalma engellendi:', e));
+    } catch (error) {
+      console.error('Ses çalma hatası:', error);
+    }
+  };
 
   const navigationItems = [
     {

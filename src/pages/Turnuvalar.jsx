@@ -63,13 +63,13 @@ const Turnuvalar = () => {
   return (
     <>
       {/* Hero Header */}
-      <div className="bg-[#1A1A1A] text-white pt-24 pb-20 relative overflow-hidden">
+      <div className="bg-white text-gray-900 pt-24 pb-20 relative overflow-hidden border-b border-gray-100">
         <div className="absolute top-0 right-0 w-96 h-96 bg-green-600/20 rounded-full blur-3xl -mr-20 -mt-20"></div>
         <div className="absolute bottom-0 left-0 w-72 h-72 bg-orange-500/20 rounded-full blur-3xl -ml-10 -mb-10"></div>
 
         <div className="container mx-auto px-4 relative z-10 text-center">
           <h1 className="text-4xl md:text-5xl font-bold mb-4 tracking-tight">Spor Etkinlikleri & Turnuvalar 🎉</h1>
-          <p className="text-gray-400 text-lg max-w-2xl mx-auto mb-8">
+          <p className="text-gray-600 text-lg max-w-2xl mx-auto mb-8">
             İster profesyonel turnuvalara katıl, ister sosyal etkinliklerde yer al.
           </p>
           <div className="flex justify-center gap-4">
@@ -78,7 +78,7 @@ const Turnuvalar = () => {
             </button>
             <button 
               onClick={() => currentUser ? navigate('/panel/saha-sahibi') : navigate('/saha-sahibi-login')} 
-              className="bg-white/10 hover:bg-white/20 text-white px-6 py-3 rounded-xl font-bold transition-all backdrop-blur-sm"
+              className="bg-gray-100 hover:bg-gray-200 text-gray-900 px-6 py-3 rounded-xl font-bold transition-all border border-gray-200"
             >
               Etkinlik Oluştur
             </button>
@@ -111,7 +111,7 @@ const Turnuvalar = () => {
             </button>
             <button
               onClick={() => setFilter('completed')}
-              className={`px-5 py-2.5 rounded-full text-sm font-bold transition-all ${filter === 'completed' ? 'bg-gray-500 text-white shadow-lg' : 'bg-white text-gray-600 hover:bg-gray-100'}`}
+              className={`px-5 py-2.5 rounded-full text-sm font-bold transition-all ${filter === 'completed' ? 'bg-gray-800 text-white shadow-lg' : 'bg-white text-gray-600 hover:bg-gray-100'}`}
             >
               Tamamlananlar
             </button>
@@ -140,7 +140,7 @@ const Turnuvalar = () => {
                     <div className="absolute top-4 left-4 z-20">
                       {getStatusBadge(event.status)}
                     </div>
-                    <div className="absolute top-4 right-4 z-20 bg-white/90 backdrop-blur px-2 py-1 rounded text-xs font-bold text-[#1A1A1A] flex items-center gap-1">
+                    <div className="absolute top-4 right-4 z-20 bg-white/90 backdrop-blur px-2 py-1 rounded text-xs font-bold text-gray-900 flex items-center gap-1 shadow-sm">
                       {event.sportType || 'Spor'}
                     </div>
                     <div className="absolute bottom-4 left-4 z-20 text-white">
@@ -201,15 +201,15 @@ const Turnuvalar = () => {
                       </div>
                       {event.status === 'registration_open' ? (
                         <button 
-                            onClick={() => navigate(currentUser ? '/panel/oyuncu' : '/login')}
-                            className="bg-[#1A1A1A] hover:bg-black text-white px-5 py-2 rounded-lg text-sm font-bold transition-colors shadow-lg active:scale-95"
+                            onClick={() => navigate(currentUser ? '/oyuncu/turnuvalar' : '/login')}
+                            className="bg-gray-900 hover:bg-black text-white px-5 py-2 rounded-lg text-sm font-bold transition-colors shadow-lg active:scale-95"
                         >
                           Katıl
                         </button>
                       ) : (
                         <button 
-                            onClick={() => navigate(currentUser ? '/panel/oyuncu' : '/login')} // Redirect to panel to see details or archive
-                            className="text-gray-500 hover:text-[#1A1A1A] font-bold text-sm flex items-center gap-1"
+                            onClick={() => navigate(currentUser ? '/oyuncu/turnuvalar' : '/login')} // Redirect to panel to see details or archive
+                            className="text-gray-500 hover:text-gray-900 font-bold text-sm flex items-center gap-1"
                         >
                           Detaylar <ChevronRight size={16} />
                         </button>

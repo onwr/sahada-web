@@ -31,21 +31,70 @@ const DATE_OPTIONS = [
     { value: 'custom', label: 'Tarih Seç...' }
 ];
 
+const POSITIONS = [
+    { value: 'all', label: 'Tüm Mevkiler' },
+    { value: 'Kaleci', label: 'Kaleci' },
+    { value: 'Defans', label: 'Defans' },
+    { value: 'Ortasaha', label: 'Ortasaha' },
+    { value: 'Forvet', label: 'Forvet' },
+];
+
+const LEVELS = [
+    { value: 'all', label: 'Tüm Seviyeler' },
+    { value: 'Amatör', label: 'Amatör' },
+    { value: 'Yarı Profesyonel', label: 'Yarı Profesyonel' },
+    { value: 'Profesyonel', label: 'Profesyonel' },
+];
+
+const TIMES = [
+    { value: 'all', label: 'Tüm Saatler' },
+    { value: 'morning', label: 'Sabah (06:00 - 12:00)' },
+    { value: 'afternoon', label: 'Öğle (12:00 - 17:00)' },
+    { value: 'evening', label: 'Akşam (17:00 - 23:00)' },
+    { value: 'night', label: 'Gece (23:00 - 06:00)' },
+];
+
 const OyuncuBul = () => {
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
     const { user } = useAuth();
     
-    // State from FindPlayer logic
+    // Core Search State
     const initialSearch = searchParams.get('search') || '';
     const [searchTerm, setSearchTerm] = useState(initialSearch);
-    const [searchMode, setSearchMode] = useState('name'); 
+    const [searchMode, setSearchMode] = useState('combined'); // 'combined' | 'name' | 'location'
     const [viewMode, setViewMode] = useState('list');
     const [sortOption, setSortOption] = useState('recommended');
+    const [showFilters, setShowFilters] = useState(false);
+    
+    // Helper function for Turkish character normalization
+    const normalizeSearchText = (text) => {
+        if (!text) return '';
+        return text
+            .toString()
+            .replace(/İ/g, 'i')
+            .replace(/I/g, 'i')
+            .toLowerCase()
+            .replace(/ı/g, 'i')
+            .replace(/ğ/g, 'g')
+            .replace(/ü/g, 'u')
+            .replace(/ş/g, 's')
+            .replace(/ö/g, 'o')
+            .replace(/ç/g, 'c');
+    };
+    
+    // Match Filters
     const [selectedSport, setSelectedSport] = useState('all');
     const [selectedDateFilter, setSelectedDateFilter] = useState('all');
     const [customDate, setCustomDate] = useState('');
-    const [showFilters, setShowFilters] = useState(false);
+    const [priceRange, setPriceRange] = useState({ min: 0, max: 1000 });
+    const [selectedTime, setSelectedTime] = useState('all');
+    const [missingCount, setMissingCount] = useState('all'); // 'all', '1', '2', '3+'
+
+    // Player Filters
+    const [selectedPosition, setSelectedPosition] = useState('all');
+    const [selectedLevel, setSelectedLevel] = useState('all');
+    const [selectedAvailability, setSelectedAvailability] = useState('all');
     
     // Data state
     const [matches, setMatches] = useState([]);
@@ -97,100 +146,173 @@ const OyuncuBul = () => {
     };
 
     const filteredMatches = useMemo(() => {
+        if (activeTab !== 'match') return [];
         let result = matches.filter(match => {
+            // 1. Search Term (Name & Location combined if mode is combined)
             let matchesSearch = true;
             if (searchTerm) {
-                const term = searchTerm.toLowerCase();
+                const term = normalizeSearchText(searchTerm);
+                const title = normalizeSearchText(match.tesisName || '');
+                const city = normalizeSearchText(match.city || 'İstanbul');
+                const loc = normalizeSearchText(match.location || '');
+                const dist = normalizeSearchText(match.district || '');
+                
                 if (searchMode === 'name') {
-                    // Search in title/tesisName
-                    const title = match.tesisName || match.location || '';
-                    matchesSearch = title.toLowerCase().includes(term);
+                    matchesSearch = title.includes(term);
+                } else if (searchMode === 'location') {
+                    matchesSearch = city.includes(term) || loc.includes(term) || dist.includes(term);
                 } else {
-                    // Search in location
-                    const loc = match.location || '';
-                    matchesSearch = loc.toLowerCase().includes(term);
+                    matchesSearch = title.includes(term) || city.includes(term) || loc.includes(term) || dist.includes(term);
                 }
             }
 
+            // 2. Sport Filter
             const matchesSport = selectedSport === 'all' || match.format === selectedSport;
 
-            // Date Filter Logic
+            // 3. Date Filter
             let matchesDate = true;
+            const matchDate = match.date?.toDate ? match.date.toDate() : new Date(match.date);
+            const now = new Date();
+            now.setHours(0,0,0,0);
+            matchDate.setHours(0,0,0,0); // Normalize match date for comparison
+
+            // Only future matches check (keeping today included)
+            if (matchDate < now) return false;
+
             if (selectedDateFilter !== 'all') {
-                const matchDate = match.date?.toDate ? match.date.toDate() : new Date(match.date);
                 const today = new Date();
                 today.setHours(0,0,0,0);
                 
-                matchDate.setHours(0,0,0,0);
-
                 if (selectedDateFilter === 'today') {
                    matchesDate = matchDate.getTime() === today.getTime();
                 } else if (selectedDateFilter === 'tomorrow') {
                    const tomorrow = new Date(today);
                    tomorrow.setDate(today.getDate() + 1);
                    matchesDate = matchDate.getTime() === tomorrow.getTime();
+                } else if (selectedDateFilter === 'weekend') {
+                    const day = matchDate.getDay();
+                    matchesDate = day === 0 || day === 6; // Sunday or Saturday
                 } else if (selectedDateFilter === 'custom' && customDate) {
                    const cDate = new Date(customDate);
                    cDate.setHours(0,0,0,0);
                    matchesDate = matchDate.getTime() === cDate.getTime();
                 }
-                // 'weekend' logic left simple for now or ignored (requires day checking)
             }
-            
-            // Only future matches
-            const mDate = match.date?.toDate ? match.date.toDate() : new Date(match.date);
-            const now = new Date();
-            now.setHours(0,0,0,0);
-            if (mDate < now) return false;
 
-            return matchesSearch && matchesSport && matchesDate;
+            // 4. Time of Day Filter
+            let matchesTime = true;
+            if (selectedTime !== 'all') {
+                const mHour = (match.date?.toDate ? match.date.toDate() : new Date(match.date)).getHours();
+                if (selectedTime === 'morning') matchesTime = mHour >= 6 && mHour < 12;
+                else if (selectedTime === 'afternoon') matchesTime = mHour >= 12 && mHour < 17;
+                else if (selectedTime === 'evening') matchesTime = mHour >= 17 && mHour < 23;
+                else if (selectedTime === 'night') matchesTime = mHour >= 23 || mHour < 6;
+            }
+
+            // 5. Price Filter
+            const price = parseFloat(match.pricePerPlayer || 0);
+            const matchesPrice = price >= priceRange.min && (priceRange.max >= 1000 ? true : price <= priceRange.max);
+
+            // 6. Missing Players Filter
+            let matchesMissing = true;
+            if (missingCount !== 'all') {
+                const missing = (match.maxPlayers || 0) - (match.currentPlayers || 0);
+                if (missingCount === '1') matchesMissing = missing === 1;
+                else if (missingCount === '2') matchesMissing = missing === 2;
+                else if (missingCount === '3+') matchesMissing = missing >= 3;
+            }
+
+            return matchesSearch && matchesSport && matchesDate && matchesTime && matchesPrice && matchesMissing;
         });
 
         // Sorting
         if (sortOption === 'price_asc') {
-            result.sort((a, b) => (a.pricePerPlayer || 0) - (b.pricePerPlayer || 0));
+            result.sort((a, b) => (parseFloat(a.pricePerPlayer) || 0) - (parseFloat(b.pricePerPlayer) || 0));
         } else if (sortOption === 'price_desc') {
-            result.sort((a, b) => (b.pricePerPlayer || 0) - (a.pricePerPlayer || 0));
-        } else if (sortOption === 'rating_desc') {
-             // Mock rating or sort by something else 
-             // result.sort((a, b) => b.rating - a.rating);
+            result.sort((a, b) => (parseFloat(b.pricePerPlayer) || 0) - (parseFloat(a.pricePerPlayer) || 0));
+        } else if (sortOption === 'date_asc') {
+            result.sort((a, b) => {
+                const dateA = a.date?.toDate ? a.date.toDate() : new Date(a.date);
+                const dateB = b.date?.toDate ? b.date.toDate() : new Date(b.date);
+                return dateA - dateB;
+            });
         }
         
         return result;
-    }, [searchTerm, searchMode, selectedSport, selectedDateFilter, customDate, sortOption, matches]);
+    }, [searchTerm, searchMode, selectedSport, selectedDateFilter, customDate, sortOption, matches, selectedTime, priceRange, missingCount, activeTab]);
 
     const filteredPlayers = useMemo(() => {
         if (activeTab !== 'player') return [];
         return players.filter(player => {
+            // 1. Search Term
             let matchesSearch = true;
             if (searchTerm) {
-                const term = searchTerm.toLowerCase();
+                const term = normalizeSearchText(searchTerm);
+                
+                // Get fields with UI fallback logic applied
+                // UI shows: player.district || player.city || 'İstanbul'
+                // Search should index all available location info + default city
+                const name = normalizeSearchText(player.fullName || player.displayName || '');
+                const rawCity = player.city || 'İstanbul'; // Default to Istanbul for search relevance
+                const city = normalizeSearchText(rawCity);
+                const district = normalizeSearchText(player.district || '');
+                const uiLocation = normalizeSearchText(player.district || rawCity); // What is actually shown
+
                 if (searchMode === 'name') {
-                    matchesSearch = (player.fullName || '').toLowerCase().includes(term);
+                    matchesSearch = name.includes(term);
+                } else if (searchMode === 'location') {
+                    // Check displayed location OR city explicitly
+                    matchesSearch = city.includes(term) || district.includes(term) || uiLocation.includes(term);
                 } else {
-                    matchesSearch = (player.city || '').toLowerCase().includes(term) || (player.district || '').toLowerCase().includes(term);
+                    // Combined
+                    matchesSearch = name.includes(term) || city.includes(term) || district.includes(term);
                 }
             }
-            return matchesSearch;
+
+            // 2. Position Filter
+            const matchesPosition = selectedPosition === 'all' || 
+                (player.position === selectedPosition) || 
+                (player.sportPreferences && player.sportPreferences.some(sp => sp.position === selectedPosition));
+
+            // 3. Level Filter
+            const matchesLevel = selectedLevel === 'all' || (player.level || '') === selectedLevel;
+
+            // 4. Availability Filter
+            const matchesAvailability = selectedAvailability === 'all' || (player.availability || '').toLowerCase().includes(selectedAvailability.toLowerCase());
+
+            return matchesSearch && matchesPosition && matchesLevel && matchesAvailability;
         });
-    }, [players, searchTerm, searchMode, activeTab]);
+    }, [players, searchTerm, searchMode, activeTab, selectedPosition, selectedLevel, selectedAvailability]);
 
     const activeFiltersCount = [
         selectedSport !== 'all',
         selectedDateFilter !== 'all',
+        selectedTime !== 'all',
+        missingCount !== 'all',
+        selectedPosition !== 'all',
+        selectedLevel !== 'all',
+        selectedAvailability !== 'all',
+        priceRange.min > 0,
+        priceRange.max < 1000
     ].filter(Boolean).length;
 
     const clearFilters = () => {
         setSearchTerm('');
-        setSearchMode('name');
+        setSearchMode('combined');
         setSelectedSport('all');
         setSelectedDateFilter('all');
         setCustomDate('');
+        setPriceRange({ min: 0, max: 1000 });
+        setSelectedTime('all');
+        setMissingCount('all');
+        setSelectedPosition('all');
+        setSelectedLevel('all');
+        setSelectedAvailability('all');
     };
 
     const handleMatchClick = (match) => {
         if (match.type === 'profile_click') {
-            navigate(`/oyuncu-detay/${match.organizerId}`);
+            navigate(`/oyuncu-detay/${match.organizerSlug || match.organizerId}`);
         } else {
             navigate(`/mac-detay/${match.id}`);
         }
@@ -253,15 +375,16 @@ const OyuncuBul = () => {
                 <div className="bg-white rounded-2xl shadow-lg p-4 mb-8 -mt-16 relative z-10">
                     <div className="flex flex-col lg:flex-row gap-4">
                         {/* Search Input with Mode */}
-                        <div className="flex-1 relative flex items-center bg-white border border-gray-200 rounded-xl focus-within:ring-2 focus-within:ring-green-500/20 overflow-hidden">
-                            <div className="relative border-r border-gray-100">
+                        <div className="flex-1 relative flex items-center bg-white border border-gray-200 rounded-xl focus-within:ring-2 focus-within:ring-green-500/20 overflow-hidden shadow-sm">
+                            <div className="relative border-r border-gray-100 hidden sm:block">
                                 <select
                                     value={searchMode}
                                     onChange={(e) => setSearchMode(e.target.value)}
-                                    className="appearance-none bg-gray-50 text-gray-700 font-medium py-3 pl-4 pr-8 focus:outline-none cursor-pointer hover:bg-gray-100 transition-colors h-full"
+                                    className="appearance-none bg-gray-50 text-gray-700 font-medium py-3 pl-4 pr-8 focus:outline-none cursor-pointer hover:bg-gray-100 transition-colors h-full text-sm"
                                 >
-                                    <option value="name">Maç Adı</option>
-                                    <option value="location">Konum</option>
+                                    <option value="combined">Tümü</option>
+                                    <option value="name">İsimle</option>
+                                    <option value="location">Konumla</option>
                                 </select>
                                 <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={14} />
                             </div>
@@ -270,8 +393,8 @@ const OyuncuBul = () => {
                                 <input
                                     type="text"
                                     placeholder={activeTab === 'match' 
-                                        ? (searchMode === 'name' ? "Maç adı ara..." : "İlçe veya şehir ara...")
-                                        : (searchMode === 'name' ? "Oyuncu ismi ara..." : "İlçe veya şehir ara...")
+                                        ? "Maç adı, konum veya tesis ara..."
+                                        : "Oyuncu adı, şehir veya ilçe ara..."
                                     }
                                     value={searchTerm}
                                     onChange={(e) => setSearchTerm(e.target.value)}
@@ -281,75 +404,179 @@ const OyuncuBul = () => {
                         </div>
 
                         {/* Quick Filters */}
-                        {activeTab === 'match' ? (
-                            <div className="flex gap-3 flex-wrap lg:flex-nowrap">
-                                {/* Sport */}
-                                <div className="relative">
-                                    <select
-                                        value={selectedSport}
-                                        onChange={(e) => setSelectedSport(e.target.value)}
-                                        className="appearance-none bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 pr-10 text-sm font-medium text-gray-700 focus:outline-none cursor-pointer"
-                                    >
-                                        {SPORTS.map(sport => (
-                                            <option key={sport.value} value={sport.value}>{sport.label}</option>
-                                        ))}
-                                    </select>
-                                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={16} />
-                                </div>
-
-                                {/* Date Filter */}
-                                <div className="relative flex items-center gap-2">
-                                    <div className="relative">
-                                        <select
-                                            value={selectedDateFilter}
-                                            onChange={(e) => setSelectedDateFilter(e.target.value)}
-                                            className="appearance-none bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 pr-10 text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-green-500/20 cursor-pointer"
-                                        >
-                                            {DATE_OPTIONS.map(opt => (
-                                                <option key={opt.value} value={opt.value}>📅 {opt.label}</option>
-                                            ))}
-                                        </select>
-                                        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={16} />
-                                    </div>
-                                    {selectedDateFilter === 'custom' && (
-                                        <input
-                                            type="date"
-                                            value={customDate}
-                                            onChange={(e) => setCustomDate(e.target.value)}
-                                            className="bg-white border border-gray-200 rounded-xl px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500/20"
-                                        />
-                                    )}
-                                </div>
-
-                                {/* More Filters */}
-                                <button
-                                    onClick={() => setShowFilters(!showFilters)}
-                                    className={`flex items-center gap-2 px-4 py-3 rounded-xl text-sm font-bold transition-colors ${showFilters || activeFiltersCount > 0
-                                        ? 'bg-green-600 text-white'
-                                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                                        }`}
-                                >
-                                    <SlidersHorizontal size={18} />
-                                    Filtreler
-                                </button>
+                        <div className="flex gap-3 flex-wrap lg:flex-nowrap">
+                             <button
+                                onClick={() => setShowFilters(!showFilters)}
+                                className={`flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-bold transition-all shadow-sm ${showFilters || activeFiltersCount > 0
+                                    ? 'bg-green-600 text-white shadow-green-200'
+                                    : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50'
+                                    }`}
+                            >
+                                <SlidersHorizontal size={18} />
+                                <span>Filtreler</span>
                                 {activeFiltersCount > 0 && (
-                                    <button onClick={clearFilters} className="text-red-500 font-medium text-sm">Temizle</button>
+                                    <span className="ml-1 bg-white text-green-600 px-1.5 py-0.5 rounded-full text-xs font-black">
+                                        {activeFiltersCount}
+                                    </span>
                                 )}
-                            </div>
-                        ) : (
-                            <div className="flex gap-3">
-                                <button
-                                    className="flex items-center gap-2 px-6 py-3 bg-gray-100 text-gray-700 rounded-xl text-sm font-bold hover:bg-gray-200 transition-colors"
+                            </button>
+                            {activeFiltersCount > 0 && (
+                                <button 
+                                    onClick={clearFilters} 
+                                    className="text-red-500 font-bold text-sm bg-red-50 hover:bg-red-100 px-4 py-3 rounded-xl transition-colors"
                                 >
-                                    <Filter size={18} />
-                                    <span>Gelişmiş Filtreler</span>
+                                    Temizle
                                 </button>
-                                {searchTerm && (
-                                    <button onClick={() => setSearchTerm('')} className="text-red-500 font-medium text-sm">Temizle</button>
-                                )}
-                            </div>
-                        )}
+                            )}
+                        </div>
                     </div>
+
+                    {/* Expanded Filters */}
+                    {showFilters && (
+                        <div className="mt-4 pt-4 border-t border-gray-100 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 animate-in fade-in slide-in-from-top-4 duration-200">
+                            
+                            {activeTab === 'match' ? (
+                                <>
+                                    {/* Match Specific Filters */}
+                                    <div className="space-y-1.5">
+                                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Spor</label>
+                                        <div className="relative">
+                                            <select
+                                                value={selectedSport}
+                                                onChange={(e) => setSelectedSport(e.target.value)}
+                                                className="w-full appearance-none bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 pr-10 text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-green-500/20"
+                                            >
+                                                {SPORTS.map(sport => (
+                                                    <option key={sport.value} value={sport.value}>{sport.label}</option>
+                                                ))}
+                                            </select>
+                                            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={16} />
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-1.5">
+                                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Tarih</label>
+                                        <div className="relative flex items-center gap-2">
+                                            <div className="relative flex-1">
+                                                <select
+                                                    value={selectedDateFilter}
+                                                    onChange={(e) => setSelectedDateFilter(e.target.value)}
+                                                    className="w-full appearance-none bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 pr-10 text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-green-500/20"
+                                                >
+                                                    {DATE_OPTIONS.map(opt => (
+                                                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                                    ))}
+                                                </select>
+                                                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={16} />
+                                            </div>
+                                        </div>
+                                        {selectedDateFilter === 'custom' && (
+                                            <input
+                                                type="date"
+                                                value={customDate}
+                                                onChange={(e) => setCustomDate(e.target.value)}
+                                                className="w-full mt-2 bg-white border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500/20"
+                                            />
+                                        )}
+                                    </div>
+
+                                    <div className="space-y-1.5">
+                                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Saat Aralığı</label>
+                                        <div className="relative">
+                                            <select
+                                                value={selectedTime}
+                                                onChange={(e) => setSelectedTime(e.target.value)}
+                                                className="w-full appearance-none bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 pr-10 text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-green-500/20"
+                                            >
+                                                {TIMES.map(time => (
+                                                    <option key={time.value} value={time.value}>{time.label}</option>
+                                                ))}
+                                            </select>
+                                            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={16} />
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-1.5">
+                                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Eksik Oyuncu</label>
+                                        <div className="flex bg-gray-50 p-1 rounded-xl border border-gray-200">
+                                            {['all', '1', '2', '3+'].map((cnt) => (
+                                                <button
+                                                    key={cnt}
+                                                    onClick={() => setMissingCount(cnt)}
+                                                    className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                                                        missingCount === cnt ? 'bg-white shadow text-green-600' : 'text-gray-500 hover:text-gray-700'
+                                                    }`}
+                                                >
+                                                    {cnt === 'all' ? 'Tümü' : cnt}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="space-y-1.5 md:col-span-2 lg:col-span-4">
+                                         <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1">
+                                            Fiyat Aralığı: {priceRange.min}₺ - {priceRange.max >= 1000 ? '1000₺+' : priceRange.max + '₺'}
+                                         </label>
+                                         <div className="flex items-center gap-4 px-2">
+                                            <input 
+                                                type="range" 
+                                                min="0" max="1000" step="50"
+                                                value={priceRange.max}
+                                                onChange={(e) => setPriceRange(prev => ({ ...prev, max: parseInt(e.target.value) }))}
+                                                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-green-600"
+                                            />
+                                         </div>
+                                    </div>
+                                </>
+                            ) : (
+                                <>
+                                    {/* Player Specific Filters */}
+                                    <div className="space-y-1.5">
+                                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Mevki</label>
+                                        <div className="relative">
+                                            <select
+                                                value={selectedPosition}
+                                                onChange={(e) => setSelectedPosition(e.target.value)}
+                                                className="w-full appearance-none bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 pr-10 text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-green-500/20"
+                                            >
+                                                {POSITIONS.map(pos => (
+                                                    <option key={pos.value} value={pos.value}>{pos.label}</option>
+                                                ))}
+                                            </select>
+                                            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={16} />
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-1.5">
+                                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Seviye</label>
+                                        <div className="relative">
+                                            <select
+                                                value={selectedLevel}
+                                                onChange={(e) => setSelectedLevel(e.target.value)}
+                                                className="w-full appearance-none bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 pr-10 text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-green-500/20"
+                                            >
+                                                {LEVELS.map(lvl => (
+                                                    <option key={lvl.value} value={lvl.value}>{lvl.label}</option>
+                                                ))}
+                                            </select>
+                                            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={16} />
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-1.5 md:col-span-2">
+                                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Müsaitlik Durumu</label>
+                                        <input
+                                            type="text"
+                                            placeholder="Örn: Hafta içi akşam, Pazar..."
+                                            value={selectedAvailability === 'all' ? '' : selectedAvailability}
+                                            onChange={(e) => setSelectedAvailability(e.target.value || 'all')}
+                                            className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-green-500/20 placeholder:text-gray-400"
+                                        />
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    )}
                 </div>
 
                 {/* Results Count & View Toggles */}
@@ -462,7 +689,11 @@ const OyuncuBul = () => {
                                 <div className="grid grid-cols-2 gap-2 w-full mb-6">
                                     <div className="bg-gray-50 rounded-2xl p-2.5">
                                         <div className="text-[10px] text-gray-400 uppercase font-black tracking-tighter mb-0.5">Pozisyon</div>
-                                        <div className="text-xs font-bold text-gray-900">{player.position || 'Ortasaha'}</div>
+                                        <div className="text-xs font-bold text-gray-900">
+                                            {selectedPosition !== 'all' && (player.position === selectedPosition || player.sportPreferences?.some(sp => sp.position === selectedPosition)) 
+                                                ? selectedPosition 
+                                                : (player.position || 'Belirtilmemiş')}
+                                        </div>
                                     </div>
                                     <div className="bg-gray-50 rounded-2xl p-2.5">
                                         <div className="text-[10px] text-gray-400 uppercase font-black tracking-tighter mb-0.5">Müsaitlik</div>

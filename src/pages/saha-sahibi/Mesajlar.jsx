@@ -464,8 +464,12 @@ const Mesajlar = () => {
                 <button
                   key={conversation.id}
                   onClick={() => handleSelectConversation(conversation)}
-                  className={`w-full p-4 flex items-center space-x-3 hover:bg-gray-50 border-b border-gray-100 ${
-                    selectedConversation?.id === conversation.id ? 'bg-green-50' : ''
+                  className={`w-full p-4 flex items-center space-x-3 hover:bg-gray-50 border-b border-gray-100 transition-colors ${
+                    selectedConversation?.id === conversation.id 
+                      ? 'bg-green-50' 
+                      : (unreadCount > 0 || (conversation.status === 'pending' && conversation.initiatorId !== user?.uid))
+                        ? 'bg-blue-50/40' 
+                        : 'bg-white'
                   }`}
                 >
                   <div className="relative">
@@ -482,15 +486,27 @@ const Mesajlar = () => {
                   </div>
                   <div className="flex-1 text-left min-w-0">
                     <div className="flex items-center justify-between">
-                      <h3 className="font-semibold text-gray-900 truncate">{displayName}</h3>
+                      <h3 className={`truncate ${
+                        (unreadCount > 0 || (conversation.status === 'pending' && conversation.initiatorId !== user?.uid))
+                          ? 'font-bold text-gray-900' 
+                          : 'font-semibold text-gray-700'
+                      }`}>
+                        {displayName}
+                      </h3>
                       {conversation.lastMessageAt && (
                         <span className="text-xs text-gray-500 ml-2">
                           {formatTime(conversation.lastMessageAt)}
                         </span>
                       )}
                     </div>
-                    <p className="text-sm text-gray-600 truncate">
-                      {conversation.lastMessage?.text || 'Henüz mesaj yok'}
+                    <p className={`text-sm truncate ${
+                      (unreadCount > 0 || (conversation.status === 'pending' && conversation.initiatorId !== user?.uid))
+                        ? 'font-medium text-blue-800' 
+                        : 'text-gray-500'
+                    }`}>
+                      {conversation.status === 'pending' && conversation.initiatorId !== user?.uid 
+                        ? '📩 Mesajlaşma isteği gönderdi' 
+                        : (conversation.lastMessage?.text || 'Henüz mesaj yok')}
                     </p>
                   </div>
                 </button>

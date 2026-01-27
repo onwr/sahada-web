@@ -94,21 +94,25 @@ export const loginWithGoogle = async (userType = 'player') => {
     
     // Kullanıcı verilerini Firestore'da kontrol et
     const userDoc = await getDoc(doc(db, 'users', user.uid));
+    const isNewUser = !userDoc.exists();
     
-    if (!userDoc.exists()) {
-      // Yeni kullanıcı ise Firestore'a kaydet
+    if (isNewUser) {
+      // Yeni kullanıcı - Firestore'a kaydet (telefon numarası onboarding'de eklenecek)
+      const slug = `${slugify(user.displayName)}-${user.uid.slice(0, 5)}`;
+      
       const userData = {
         uid: user.uid,
         email: user.email,
         fullName: user.displayName,
         photoURL: user.photoURL || '',
-        phone: user.phoneNumber || '',
-        slug: `${slugify(user.displayName)}-${user.uid.slice(0, 5)}`,
-        userType: userType, // Seçilen kullanıcı tipi
+        phone: '', // Onboarding'de eklenecek
+        slug,
+        userType: userType,
         createdAt: new Date(),
         emailVerified: user.emailVerified,
         onboardingCompleted: false,
-        profileCompleted: false
+        profileCompleted: false,
+        phoneVerified: false // Telefon henüz doğrulanmadı
       };
       
       await setDoc(doc(db, 'users', user.uid), userData);
@@ -116,6 +120,7 @@ export const loginWithGoogle = async (userType = 'player') => {
     
     return {
       success: true,
+      isNewUser,
       user: {
         uid: user.uid,
         email: user.email,
@@ -141,21 +146,25 @@ export const loginWithFacebook = async (userType = 'player') => {
     
     // Kullanıcı verilerini Firestore'da kontrol et
     const userDoc = await getDoc(doc(db, 'users', user.uid));
+    const isNewUser = !userDoc.exists();
     
-    if (!userDoc.exists()) {
-      // Yeni kullanıcı ise Firestore'a kaydet
+    if (isNewUser) {
+      // Yeni kullanıcı - Firestore'a kaydet (telefon numarası onboarding'de eklenecek)
+      const slug = `${slugify(user.displayName)}-${user.uid.slice(0, 5)}`;
+      
       const userData = {
         uid: user.uid,
         email: user.email,
         fullName: user.displayName,
         photoURL: user.photoURL || '',
-        phone: user.phoneNumber || '',
-        slug: `${slugify(user.displayName)}-${user.uid.slice(0, 5)}`,
-        userType: userType, // Seçilen kullanıcı tipi
+        phone: '', // Onboarding'de eklenecek
+        slug,
+        userType: userType,
         createdAt: new Date(),
         emailVerified: user.emailVerified,
         onboardingCompleted: false,
-        profileCompleted: false
+        profileCompleted: false,
+        phoneVerified: false // Telefon henüz doğrulanmadı
       };
       
       await setDoc(doc(db, 'users', user.uid), userData);
@@ -163,6 +172,7 @@ export const loginWithFacebook = async (userType = 'player') => {
     
     return {
       success: true,
+      isNewUser,
       user: {
         uid: user.uid,
         email: user.email,
@@ -222,6 +232,47 @@ export const updateUserData = async (uid, userData) => {
     return { success: true };
   } catch (error) {
     console.error('Kullanıcı güncelleme hatası:', error);
+    return {
+      success: false,
+      error: getErrorMessage(error.code)
+    };
+  }
+};
+
+// Sosyal medya ile giriş yapan yeni kullanıcıyı kaydet
+export const completeSocialMediaRegistration = async (userData) => {
+  try {
+    const { uid, email, displayName, photoURL, phone, userType } = userData;
+    
+    const slug = `${slugify(displayName)}-${uid.slice(0, 5)}`;
+    
+    const userDoc = {
+      uid,
+      email,
+      fullName: displayName,
+      photoURL: photoURL || '',
+      phone,
+      slug,
+      userType,
+      createdAt: new Date(),
+      emailVerified: true, // Sosyal medya ile giriş yapanlar zaten doğrulanmış
+      profileCompleted: false,
+      onboardingCompleted: false
+    };
+    
+    await setDoc(doc(db, 'users', uid), userDoc);
+    
+    return {
+      success: true,
+      user: {
+        uid,
+        email,
+        displayName,
+        userType
+      }
+    };
+  } catch (error) {
+    console.error('Sosyal medya kayıt tamamlama hatası:', error);
     return {
       success: false,
       error: getErrorMessage(error.code)

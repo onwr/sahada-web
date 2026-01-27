@@ -57,23 +57,23 @@ const Pricing = () => {
                         </div>
 
                         {/* Pro Plan */}
-                        <div className="bg-gray-900 text-white rounded-3xl p-8 border border-gray-900 shadow-2xl relative overflow-hidden transform md:-translate-y-4">
+                        <div className="bg-white text-gray-900 rounded-3xl p-8 border-2 border-green-500 shadow-2xl relative overflow-hidden transform md:-translate-y-4">
                             <div className="absolute top-0 right-0 bg-green-500 text-white text-[10px] font-bold px-3 py-1 rounded-bl-xl uppercase">En Popüler</div>
-                            <div className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-2">{type === 'PLAYER' ? 'Pro Oyuncu' : 'Business'}</div>
+                            <div className="text-sm font-bold text-green-600 uppercase tracking-wider mb-2">{type === 'PLAYER' ? 'Pro Oyuncu' : 'Business'}</div>
                             <div className="flex items-end gap-1 mb-6">
-                                <div className="text-4xl font-black">{type === 'PLAYER' ? '99' : '499'} ₺</div>
-                                <div className="text-gray-400 text-sm mb-1">/ ay</div>
+                                <div className="text-4xl font-black text-gray-900">{type === 'PLAYER' ? '99' : '499'} ₺</div>
+                                <div className="text-gray-500 text-sm mb-1">/ ay</div>
                             </div>
-                            <p className="text-gray-300 text-sm mb-8 min-h-[40px]">
+                            <p className="text-gray-600 text-sm mb-8 min-h-[40px]">
                                 {type === 'PLAYER' ? 'İstatistiklerini takip et, MVP ol ve sınırsız ilan ver.' : 'Tesisini öne çıkar, doluluk oranını %100\'e ulaştır.'}
                             </p>
                             <ul className="space-y-4 mb-8">
-                                <li className="flex items-center gap-3 text-sm text-gray-200"><Crown size={18} className="text-green-400" /> {type === 'PLAYER' ? 'Gelişmiş İstatistikler' : 'Öne Çıkan Tesis Rozeti'}</li>
-                                <li className="flex items-center gap-3 text-sm text-gray-200"><Zap size={18} className="text-green-400" /> {type === 'PLAYER' ? 'Sınırsız Pazar İlanı' : 'Rezervasyon Önceliği'}</li>
-                                <li className="flex items-center gap-3 text-sm text-gray-200"><Star size={18} className="text-green-400" /> {type === 'PLAYER' ? 'Öncelikli Maç Bildirimleri' : 'Gelişmiş Gelir Raporları'}</li>
-                                <li className="flex items-center gap-3 text-sm text-gray-200"><Shield size={18} className="text-green-400" /> {type === 'PLAYER' ? 'Onaylı Profil Rozeti' : '7/24 Öncelikli Destek'}</li>
+                                <li className="flex items-center gap-3 text-sm text-gray-700"><Crown size={18} className="text-green-500" /> {type === 'PLAYER' ? 'Gelişmiş İstatistikler' : 'Öne Çıkan Tesis Rozeti'}</li>
+                                <li className="flex items-center gap-3 text-sm text-gray-700"><Zap size={18} className="text-green-500" /> {type === 'PLAYER' ? 'Sınırsız Pazar İlanı' : 'Rezervasyon Önceliği'}</li>
+                                <li className="flex items-center gap-3 text-sm text-gray-700"><Star size={18} className="text-green-500" /> {type === 'PLAYER' ? 'Öncelikli Maç Bildirimleri' : 'Gelişmiş Gelir Raporları'}</li>
+                                <li className="flex items-center gap-3 text-sm text-gray-700"><Shield size={18} className="text-green-500" /> {type === 'PLAYER' ? 'Onaylı Profil Rozeti' : '7/24 Öncelikli Destek'}</li>
                             </ul>
-                            <button className="w-full py-4 rounded-xl bg-green-600 hover:bg-green-700 font-bold text-white transition-all shadow-lg shadow-green-900/20">
+                            <button className="w-full py-4 rounded-xl bg-green-600 hover:bg-green-700 font-bold text-white transition-all shadow-lg shadow-green-200">
                                 Paketi Seç
                             </button>
                         </div>

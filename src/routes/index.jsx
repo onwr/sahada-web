@@ -22,6 +22,7 @@ import PublicRoute from '../components/PublicRoute';
 import ProductDetail from '../pages/ProductDetail';
 import Community from '../pages/Community';
 import Pricing from '../pages/Pricing';
+import Iletisim from '../pages/Iletisim';
 
 import SahaSahibiLogin from '../pages/saha-sahibi/SahaSahibiLogin';
 import DynamicPage from '../pages/DynamicPage';
@@ -33,6 +34,7 @@ const AppRoutes = () => {
       <Route path="/" element={<Home />} />
       <Route path="/gizlilik-sozlesmesi" element={<GizlilikSozlesmesi />} />
       <Route path="/pricing" element={<Pricing />} />
+      <Route path="/iletisim" element={<Iletisim />} />
       <Route path="/saha/:idOrSlug" element={<SahaDetay />} />
       <Route path="/saha-detay/:idOrSlug" element={<SahaDetay />} />
       <Route path="/rezervasyon/:id" element={<Rezervasyon />} />

@@ -25,6 +25,8 @@ const DashboardHeader = ({ title, showMenuButton, onMenuClick, children, variant
   const userMenuRef = useRef(null);
   const [logoUrl, setLogoUrl] = useState('/images/logo-svg.png');
   const [loadingLogo, setLoadingLogo] = useState(true);
+  const audioRef = useRef(null);
+  const [hasPlayedInitialSound, setHasPlayedInitialSound] = useState(false);
 
   const isHero = variant === 'hero';
 
@@ -47,7 +49,7 @@ const DashboardHeader = ({ title, showMenuButton, onMenuClick, children, variant
   
   const headerClasses = isHero 
     ? "bg-transparent absolute top-0 left-0 w-full z-30 px-4 py-3 sm:px-6"
-    : "bg-white/80 backdrop-blur-md sticky top-0 z-[1001] border-b border-gray-100 px-4 py-3 sm:px-6";
+    : "bg-white/80 backdrop-blur-md sticky top-0 z-[40] border-b border-gray-100 px-4 py-3 sm:px-6";
 
   const iconClasses = isHero
     ? "text-white hover:bg-white/10"
@@ -84,15 +86,27 @@ const DashboardHeader = ({ title, showMenuButton, onMenuClick, children, variant
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const notifs = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
       
-      // Client-side sorting to avoid Firestore Index requirements
+      // Client-side sorting
       notifs.sort((a, b) => {
         const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt || 0);
         const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt || 0);
         return dateB - dateA;
       });
 
+      const newUnreadCount = notifs.filter(n => !n.read).length;
+      
+      // Sound logic
+      if (!hasPlayedInitialSound) {
+        if (newUnreadCount > 0) {
+          playNotificationSound();
+        }
+        setHasPlayedInitialSound(true);
+      } else if (newUnreadCount > unreadCount) {
+        playNotificationSound();
+      }
+
       setNotifications(notifs);
-      setUnreadCount(notifs.filter(n => !n.read).length);
+      setUnreadCount(newUnreadCount);
     }, (error) => {
       console.error("Bildirimler yüklenirken hata:", error);
     });
@@ -109,14 +123,53 @@ const DashboardHeader = ({ title, showMenuButton, onMenuClick, children, variant
     await markAllNotificationsAsRead(user.uid);
   };
 
+  const playNotificationSound = () => {
+    try {
+      const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+      audio.volume = 0.5;
+      audio.play().catch(e => console.log('Ses çalma engellendi:', e));
+    } catch (error) {
+      console.error('Ses çalma hatası:', error);
+    }
+  };
+
   const handleNotificationClick = async (notification) => {
       if (!notification.read) {
           markAsRead(notification.id);
       }
+      
       if (notification.link) {
           navigate(notification.link);
-          setIsNotificationsOpen(false);
+      } else {
+          // Type-based navigation
+          switch (notification.type) {
+              case 'message_request':
+              case 'team_invitation':
+              case 'match_join_request':
+              case 'contact_request':
+                  navigate('/oyuncu/bildirimler');
+                  break;
+              case 'message':
+                  navigate('/oyuncu/mesajlar');
+                  break;
+              case 'reservation':
+                  navigate('/oyuncu/rezervasyonlar');
+                  break;
+              case 'system':
+                  if (notification.title?.toLowerCase().includes('maç') || notification.message?.toLowerCase().includes('maç')) {
+                      if (notification.relatedId) navigate(`/mac-detay/${notification.relatedId}`);
+                      else navigate('/oyuncu/bildirimler');
+                  } else if (notification.relatedId || notification.senderId) {
+                      navigate(`/oyuncu-detay/${notification.relatedId || notification.senderId}`);
+                  } else {
+                      navigate('/oyuncu/bildirimler');
+                  }
+                  break;
+              default:
+                  navigate('/oyuncu/bildirimler');
+          }
       }
+      setIsNotificationsOpen(false);
   };
 
   const formatNotificationDate = (timestamp) => {
@@ -178,6 +231,48 @@ const DashboardHeader = ({ title, showMenuButton, onMenuClick, children, variant
         {/* Right Section: Notifications & Actions */}
         <div className="flex items-center gap-2 sm:gap-4">
           
+          {/* Trial Status Indicator */}
+          {(() => {
+            if (userData?.userType === 'owner' || userData?.role === 'owner') {
+              if (userData?.subscriptionType === 'trial' && userData?.trialEndDate) {
+                const endDate = userData.trialEndDate.toDate ? userData.trialEndDate.toDate() : new Date(userData.trialEndDate);
+                const now = new Date();
+                const diffTime = endDate - now;
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                
+                if (diffDays > 0) {
+                  return (
+                    <button 
+                      onClick={() => navigate('/saha-sahibi/ayarlar?tab=membership')}
+                      className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-amber-500 to-orange-600 text-white rounded-full text-xs font-bold shadow-lg shadow-orange-200 animate-pulse hover:scale-105 transition-all"
+                    >
+                      <Zap size={14} className="fill-current" />
+                      Deneme: {diffDays} Gün Kaldı
+                    </button>
+                  );
+                } else if (userData?.subscriptionStatus !== 'active') {
+                   return (
+                    <button 
+                      onClick={() => navigate('/saha-sahibi/ayarlar?tab=membership')}
+                      className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-red-500 text-white rounded-full text-xs font-bold shadow-lg shadow-red-200"
+                    >
+                      <Lock size={14} />
+                      Süre Doldu - Paket Seçin
+                    </button>
+                  );
+                }
+              } else if (userData?.subscriptionStatus === 'active' && userData?.subscriptionType !== 'trial') {
+                 return (
+                    <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-green-50 text-green-700 rounded-full text-xs font-bold border border-green-100">
+                      <Check size={14} />
+                      Premium Aktif
+                    </div>
+                  );
+              }
+            }
+            return null;
+          })()}
+
           {children}
           
           {/* Notifications */}
@@ -193,8 +288,10 @@ const DashboardHeader = ({ title, showMenuButton, onMenuClick, children, variant
               <Bell className={`${isHero ? 'w-5 h-5' : 'w-6 h-6'}`} />
               {isHero && <span className="text-sm font-medium mr-1 md:hidden">Bildirimler</span>}
               
-              {unreadCount > 0 && (
-                <span className={`absolute ${isHero ? 'top-1 right-1' : 'top-1.5 right-1.5'} w-2.5 h-2.5 bg-red-500 border-2 border-white rounded-full animate-pulse`}></span>
+               {unreadCount > 0 && (
+                <span className={`absolute ${isHero ? '-top-1 -right-1' : 'top-0 right-0'} min-w-[18px] h-4 flex items-center justify-center bg-red-500 text-white text-[10px] font-bold rounded-full border border-white shadow-sm px-1`}>
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
               )}
             </button>
 
@@ -222,11 +319,11 @@ const DashboardHeader = ({ title, showMenuButton, onMenuClick, children, variant
                           !notification.read ? 'bg-green-50/30' : ''
                         }`}
                       >
-                        <div className="flex gap-3">
-                          <div className={`mt-0.5 p-2 rounded-full flex-shrink-0 ${
+                          <div className="flex items-center gap-3">
+                          <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
                               !notification.read ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-500'
                           }`}>
-                              <Info size={16} />
+                              <Info size={20} />
                           </div>
                           <div className="flex-1 min-w-0">
                             <p className={`text-sm ${!notification.read ? 'font-semibold text-gray-900' : 'text-gray-700'}`}>

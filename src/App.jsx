@@ -8,6 +8,8 @@ import AnalyticsLoader from './components/AnalyticsLoader';
 
 import TopBar from './components/TopBar';
 
+import ScrollToTop from './components/ScrollToTop';
+
 const App = () => {
   useEffect(() => {
     const applyPlatformSettings = async () => {
@@ -38,6 +40,7 @@ const App = () => {
 
   return (
     <BrowserRouter>
+      <ScrollToTop />
       <AuthProvider>
         <AnalyticsLoader />
         <TopBar />

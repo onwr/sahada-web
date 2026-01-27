@@ -13,7 +13,7 @@ import { collection, query, onSnapshot, where } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import {
   MapPin, Search, Star, Clock, DollarSign, Users, Filter,
-  Navigation, Car, Droplet, Lightbulb, ChevronRight, X, User
+  Navigation, Car, Droplet, Lightbulb, ChevronRight, X, User, Map, ChevronUp, ChevronDown
 } from 'lucide-react';
 import toast from '../utils/toast';
 
@@ -65,7 +65,6 @@ const sportIcons = {
   'default': createCustomIcon('#6b7280', '📍'),
 };
 
-// ... (lines 66-583 remain unchanged)
 
 const userLocationIcon = new DivIcon({
   html: `
@@ -133,7 +132,7 @@ const YakinSahalar = () => {
   const [mapCenter, setMapCenter] = useState({ lat: 41.0082, lng: 28.9784 });
   const [mapZoom, setMapZoom] = useState(12);
   const [mapLayer, setMapLayer] = useState('satellite'); // 'standard' veya 'satellite' - varsayılan uydu
-  const [viewMode, setViewMode] = useState('both'); // 'facilities', 'players', 'both'
+  const [viewMode, setViewMode] = useState('facilities'); // 'facilities', 'players', 'both'
   const [tesisler, setTesisler] = useState([]);
   const [filteredTesisler, setFilteredTesisler] = useState([]);
   const [oyuncular, setOyuncular] = useState([]);
@@ -141,8 +140,25 @@ const YakinSahalar = () => {
   const [selectedTesis, setSelectedTesis] = useState(null);
   const [selectedOyuncu, setSelectedOyuncu] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [locationLoading, setLocationLoading] = useState(false);
-  const [showLocationModal, setShowLocationModal] = useState(false);
+    const [locationLoading, setLocationLoading] = useState(false);
+    const [showLocationModal, setShowLocationModal] = useState(false);
+    const [showMap, setShowMap] = useState(true); // Mobilde haritayı gizlemek/göstermek için
+    
+    // Helper function for Turkish character normalization
+    const normalizeSearchText = (text) => {
+        if (!text) return '';
+        return text
+            .toString()
+            .replace(/İ/g, 'i')
+            .replace(/I/g, 'i')
+            .toLowerCase()
+            .replace(/ı/g, 'i')
+            .replace(/ğ/g, 'g')
+            .replace(/ü/g, 'u')
+            .replace(/ş/g, 's')
+            .replace(/ö/g, 'o')
+            .replace(/ç/g, 'c');
+    };
   
   // Filtreler
   const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '');
@@ -186,16 +202,17 @@ const YakinSahalar = () => {
   // Center map on search results or city name
   useEffect(() => {
     if (searchQuery && !loading) {
-      if (viewMode === 'players' && filteredOyuncular.length > 0) {
+      // Prioritize facilities if viewMode is facilities or both
+      if ((viewMode === 'facilities' || viewMode === 'both') && filteredTesisler.length > 0) {
+         setMapCenter({ 
+          lat: filteredTesisler[0].latitude, 
+          lng: filteredTesisler[0].longitude 
+        });
+        setMapZoom(13);
+      } else if ((viewMode === 'players' || viewMode === 'both') && filteredOyuncular.length > 0) {
         setMapCenter({ 
           lat: filteredOyuncular[0].latitude, 
           lng: filteredOyuncular[0].longitude 
-        });
-        setMapZoom(13);
-      } else if (filteredTesisler.length > 0) {
-        setMapCenter({ 
-          lat: filteredTesisler[0].latitude, 
-          lng: filteredTesisler[0].longitude 
         });
         setMapZoom(13);
       } else {
@@ -207,7 +224,7 @@ const YakinSahalar = () => {
         }
       }
     }
-  }, [searchQuery, filteredTesisler.length, filteredOyuncular.length, loading]);
+  }, [searchQuery, filteredTesisler.length, filteredOyuncular.length, loading, viewMode]);
 
   const getUserLocation = async () => {
     setLocationLoading(true);
@@ -432,11 +449,13 @@ const YakinSahalar = () => {
 
     // Arama filtresi
     if (searchQuery) {
-      const query = searchQuery.toLowerCase();
+      const query = normalizeSearchText(searchQuery);
       filtered = filtered.filter(tesis =>
-        tesis.name?.toLowerCase().includes(query) ||
-        tesis.location?.toLowerCase().includes(query) ||
-        tesis.address?.toLowerCase().includes(query)
+        normalizeSearchText(tesis.name || '').includes(query) ||
+        normalizeSearchText(tesis.location || '').includes(query) ||
+        normalizeSearchText(tesis.address || '').includes(query) ||
+        normalizeSearchText(tesis.city || '').includes(query) ||
+        normalizeSearchText(tesis.district || '').includes(query)
       );
     }
 
@@ -471,7 +490,9 @@ const YakinSahalar = () => {
     filtered.sort((a, b) => {
       switch (sortBy) {
         case 'distance':
-          return a.distance - b.distance;
+          const distA = (a.distance === null || a.distance === undefined) ? Infinity : a.distance;
+          const distB = (b.distance === null || b.distance === undefined) ? Infinity : b.distance;
+          return distA - distB;
         case 'rating':
           return (b.rating || 0) - (a.rating || 0);
         case 'price-low':
@@ -491,12 +512,12 @@ const YakinSahalar = () => {
 
     // Arama filtresi
     if (searchQuery) {
-      const query = searchQuery.toLowerCase();
+      const query = normalizeSearchText(searchQuery);
       filtered = filtered.filter(oyuncu =>
-        oyuncu.fullName?.toLowerCase().includes(query) ||
-        oyuncu.displayName?.toLowerCase().includes(query) ||
-        oyuncu.city?.toLowerCase().includes(query) ||
-        oyuncu.district?.toLowerCase().includes(query)
+        normalizeSearchText(oyuncu.fullName || '').includes(query) ||
+        normalizeSearchText(oyuncu.displayName || '').includes(query) ||
+        normalizeSearchText(oyuncu.city || 'İstanbul').includes(query) ||
+        normalizeSearchText(oyuncu.district || '').includes(query)
       );
     }
 
@@ -515,29 +536,7 @@ const YakinSahalar = () => {
       });
     }
 
-// ... (lines 471-765)
 
-            {/* Spor türü filtreleri */}
-            <div className="flex flex-wrap gap-2">
-              {['Tümü', 'Futbol', 'Basketbol', 'Tenis', 'Voleybol', 'Yüzme'].map((sport) => (
-                <button
-                  key={sport}
-                  onClick={() => setSportFilter(sport)}
-                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                    sportFilter === sport
-                      ? 'bg-green-600 text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
-                >
-                  {sport === 'Futbol' && '⚽ '}
-                  {sport === 'Basketbol' && '🏀 '}
-                  {sport === 'Tenis' && '🎾 '}
-                  {sport === 'Voleybol' && '🏐 '}
-                  {sport === 'Yüzme' && '🏊 '}
-                  {sport}
-                </button>
-              ))}
-            </div>
 
     // Mesafe hesaplama
     filtered = filtered.map(oyuncu => ({
@@ -554,7 +553,9 @@ const YakinSahalar = () => {
     filtered.sort((a, b) => {
       switch (sortBy) {
         case 'distance':
-          return a.distance - b.distance;
+          const distA = (a.distance === null || a.distance === undefined) ? Infinity : a.distance;
+          const distB = (b.distance === null || b.distance === undefined) ? Infinity : b.distance;
+          return distA - distB;
         default:
           return 0;
       }
@@ -622,9 +623,9 @@ const YakinSahalar = () => {
     <div className="min-h-screen bg-gray-50">
       <Header />
       
-      <div className="flex flex-col lg:flex-row h-[calc(100vh-80px)]">
+      <div className="flex flex-col lg:flex-row h-[calc(100vh-64px)] overflow-hidden relative">
         {/* Sol Taraf - Harita */}
-        <div className="flex-1 relative h-96 lg:h-full">
+        <div className={`relative transition-all duration-300 ${showMap ? 'h-[35vh]' : 'h-0'} lg:h-auto lg:flex-1 shrink-0 overflow-hidden`}>
           <MapContainer
             center={mapCenter}
             zoom={mapZoom}
@@ -831,7 +832,7 @@ const YakinSahalar = () => {
                           <button 
                             onClick={(e) => {
                               e.stopPropagation();
-                              navigate(`/oyuncu-detay/${oyuncu.id}`);
+                              navigate(`/oyuncu-detay/${oyuncu.slug || oyuncu.id}`);
                             }}
                             className="text-xs text-purple-600 font-bold hover:text-purple-700 hover:underline transition-all flex items-center gap-0.5"
                           >
@@ -901,8 +902,19 @@ const YakinSahalar = () => {
           </div>
         </div>
 
+        {/* Mobilde Haritayı Açma/Kapama Butonu */}
+        <button 
+          onClick={() => setShowMap(!showMap)}
+          className={`lg:hidden absolute right-4 z-[1002] bg-green-600 text-white p-3 rounded-full shadow-2xl flex items-center justify-center hover:bg-green-700 active:scale-95 transition-all duration-300 ${
+            showMap ? 'top-[35vh] -translate-y-1/2' : 'top-4'
+          }`}
+          title={showMap ? "Haritayı Gizle" : "Haritayı Göster"}
+        >
+          {showMap ? <ChevronUp size={24} /> : <Map size={24} />}
+        </button>
+
         {/* Sağ Taraf - Liste */}
-        <div className="w-full lg:w-96 bg-white border-t lg:border-t-0 lg:border-l border-gray-200 flex flex-col h-96 lg:h-full">
+        <div className="w-full lg:w-96 bg-white border-t lg:border-t-0 lg:border-l border-gray-200 flex flex-col flex-1 lg:h-full min-h-0 overflow-hidden">
           {/* Header */}
           <div className="p-4 border-b border-gray-200">
             <h1 className="text-xl font-bold text-gray-900 mb-3">Yakındakiler</h1>

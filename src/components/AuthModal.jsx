@@ -157,9 +157,10 @@ const AuthModal = ({ isOpen, onClose, onSuccess }) => {
                             value={formData.firstName}
                             onChange={handleInputChange}
                             placeholder="Ad"
-                            className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:bg-white outline-none transition-all text-sm"
+                            className={`w-full px-4 py-2 bg-gray-50 border ${errors.firstName ? 'border-red-500' : 'border-gray-200'} rounded-xl focus:ring-2 focus:ring-green-500 focus:bg-white outline-none transition-all text-sm`}
                             required
                         />
+                        {errors.firstName && <p className="text-[10px] text-red-500 font-bold px-1">{errors.firstName}</p>}
                     </div>
                     <div className="space-y-1">
                         <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Soyad</label>
@@ -169,9 +170,10 @@ const AuthModal = ({ isOpen, onClose, onSuccess }) => {
                             value={formData.lastName}
                             onChange={handleInputChange}
                             placeholder="Soyad"
-                            className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:bg-white outline-none transition-all text-sm"
+                            className={`w-full px-4 py-2 bg-gray-50 border ${errors.lastName ? 'border-red-500' : 'border-gray-200'} rounded-xl focus:ring-2 focus:ring-green-500 focus:bg-white outline-none transition-all text-sm`}
                             required
                         />
+                        {errors.lastName && <p className="text-[10px] text-red-500 font-bold px-1">{errors.lastName}</p>}
                     </div>
                 </div>
                 <div className="space-y-1">
@@ -182,9 +184,10 @@ const AuthModal = ({ isOpen, onClose, onSuccess }) => {
                         value={formData.phone}
                         onChange={handleInputChange}
                         placeholder="05xx xxx xx xx"
-                        className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:bg-white outline-none transition-all text-sm"
+                        className={`w-full px-4 py-2 bg-gray-50 border ${errors.phone ? 'border-red-500' : 'border-gray-200'} rounded-xl focus:ring-2 focus:ring-green-500 focus:bg-white outline-none transition-all text-sm`}
                         required
                     />
+                    {errors.phone && <p className="text-[10px] text-red-500 font-bold px-1">{errors.phone}</p>}
                 </div>
               </>
             )}
@@ -197,9 +200,10 @@ const AuthModal = ({ isOpen, onClose, onSuccess }) => {
                 value={formData.email}
                 onChange={handleInputChange}
                 placeholder="ornek@email.com"
-                className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:bg-white outline-none transition-all text-sm"
+                className={`w-full px-4 py-2 bg-gray-50 border ${errors.email ? 'border-red-500' : 'border-gray-200'} rounded-xl focus:ring-2 focus:ring-green-500 focus:bg-white outline-none transition-all text-sm`}
                 required
               />
+              {errors.email && <p className="text-[10px] text-red-500 font-bold px-1">{errors.email}</p>}
             </div>
 
             <div className="space-y-1">
@@ -211,7 +215,7 @@ const AuthModal = ({ isOpen, onClose, onSuccess }) => {
                   value={formData.password}
                   onChange={handleInputChange}
                   placeholder="••••••"
-                  className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:bg-white outline-none transition-all text-sm"
+                  className={`w-full px-4 py-2 bg-gray-50 border ${errors.password ? 'border-red-500' : 'border-gray-200'} rounded-xl focus:ring-2 focus:ring-green-500 focus:bg-white outline-none transition-all text-sm`}
                   required
                 />
                 <button
@@ -222,6 +226,7 @@ const AuthModal = ({ isOpen, onClose, onSuccess }) => {
                   {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
+              {errors.password && <p className="text-[10px] text-red-500 font-bold px-1">{errors.password}</p>}
             </div>
 
             {activeTab === 'kayit' && (
@@ -233,9 +238,10 @@ const AuthModal = ({ isOpen, onClose, onSuccess }) => {
                   value={formData.confirmPassword}
                   onChange={handleInputChange}
                   placeholder="••••••"
-                  className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:bg-white outline-none transition-all text-sm"
+                  className={`w-full px-4 py-2 bg-gray-50 border ${errors.confirmPassword ? 'border-red-500' : 'border-gray-200'} rounded-xl focus:ring-2 focus:ring-green-500 focus:bg-white outline-none transition-all text-sm`}
                   required
                 />
+                {errors.confirmPassword && <p className="text-[10px] text-red-500 font-bold px-1">{errors.confirmPassword}</p>}
               </div>
             )}
 
@@ -257,7 +263,7 @@ const AuthModal = ({ isOpen, onClose, onSuccess }) => {
           </form>
 
           <p className="text-center text-xs text-gray-400 mt-6">
-            Giriş yaparak <span className="text-green-600 hover:underline cursor-pointer">Kullanım Koşulları</span>'nı kabul etmiş olursunuz.
+            Giriş veya kayıt yaparak <span className="text-green-600 hover:underline cursor-pointer">Kullanım Koşulları</span>'nı kabul etmiş olursunuz.
           </p>
         </div>
       </motion.div>

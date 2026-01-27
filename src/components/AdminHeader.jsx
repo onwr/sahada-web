@@ -214,8 +214,8 @@ const AdminHeader = ({ title, description, children, showSearch, onSearch, searc
                                     key={item.id + index}
                                     className="px-4 py-3 hover:bg-gray-50 border-b border-gray-100 transition-colors group relative"
                                 >
-                                    <div className="flex items-start gap-3">
-                                        <div className="mt-1 flex-shrink-0">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 bg-gray-50 border border-gray-100">
                                             {getNotificationIcon(item.type)}
                                         </div>
                                         <div className="flex-1 min-w-0 pr-8">

@@ -120,11 +120,6 @@ const TournamentDetail = ({ tournament, userId, userType = 'player', userData = 
         participantsData.push({ id: doc.id, ...doc.data() });
       });
       setParticipants(participantsData);
-      
-      const userRegistered = participantsData.some(
-        p => p.participantId === userId
-      );
-      setIsRegistered(userRegistered);
     });
     unsubscribeFunctions.push(unsubscribeParticipants);
 
@@ -177,6 +172,27 @@ const TournamentDetail = ({ tournament, userId, userType = 'player', userData = 
     };
   };
 
+  // Update isRegistered whenever participants or userTeams change
+  useEffect(() => {
+    if (!userId) {
+      setIsRegistered(false);
+      return;
+    }
+
+    let userRegistered = false;
+    if (tournament?.type === 'team') {
+      const userTeamIds = userTeams.map(t => t.id);
+      userRegistered = participants.some(
+        p => p.participantType === 'team' && userTeamIds.includes(p.participantId)
+      );
+    } else {
+      userRegistered = participants.some(
+        p => p.participantId === userId
+      );
+    }
+    setIsRegistered(userRegistered);
+  }, [participants, userTeams, tournament?.type, userId]);
+
   const loadTournamentData = async () => {
     if (!tournament?.id) return;
 
@@ -190,10 +206,6 @@ const TournamentDetail = ({ tournament, userId, userType = 'player', userData = 
 
       if (participantsResult.success) {
         setParticipants(participantsResult.data);
-        const userRegistered = participantsResult.data.some(
-          p => p.participantId === userId
-        );
-        setIsRegistered(userRegistered);
       }
 
       if (matchesResult.success) {
@@ -733,7 +745,7 @@ const TournamentDetail = ({ tournament, userId, userType = 'player', userData = 
 
       {/* Team Selection/Creation Modal */}
       {showTeamModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-[60]">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-[110]">
           <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-bold text-gray-900">
