@@ -16,18 +16,37 @@ const App = () => {
       try {
         const result = await getPlatformSettings();
         if (result.success && result.data) {
-          const { faviconUrl, siteTitle } = result.data;
+          const { faviconUrl, logoUrl, siteTitle, siteDescription } = result.data;
+          const dynamicFavicon = faviconUrl || logoUrl;
           
-          if (faviconUrl) {
+          if (dynamicFavicon) {
             const link = document.querySelector("link[rel*='icon']") || document.createElement('link');
-            link.type = 'image/x-icon';
             link.rel = 'shortcut icon';
-            link.href = faviconUrl;
+            link.href = dynamicFavicon;
             document.getElementsByTagName('head')[0].appendChild(link);
+
+            // Update Open Graph and Twitter images
+            const ogImage = document.querySelector('meta[property="og:image"]');
+            if (ogImage) ogImage.content = dynamicFavicon;
+            const twitterImage = document.querySelector('meta[property="twitter:image"]');
+            if (twitterImage) twitterImage.content = dynamicFavicon;
           }
 
           if (siteTitle) {
             document.title = siteTitle;
+            const ogTitle = document.querySelector('meta[property="og:title"]');
+            if (ogTitle) ogTitle.content = siteTitle;
+            const twitterTitle = document.querySelector('meta[property="twitter:title"]');
+            if (twitterTitle) twitterTitle.content = siteTitle;
+          }
+
+          if (siteDescription) {
+            const descriptionMeta = document.querySelector('meta[name="description"]');
+            if (descriptionMeta) descriptionMeta.content = siteDescription;
+            const ogDesc = document.querySelector('meta[property="og:description"]');
+            if (ogDesc) ogDesc.content = siteDescription;
+            const twitterDesc = document.querySelector('meta[property="twitter:description"]');
+            if (twitterDesc) twitterDesc.content = siteDescription;
           }
         }
       } catch (error) {

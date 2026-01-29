@@ -596,7 +596,8 @@ const Bildirimler = () => {
                                 if (n.relatedId) navigate(`/oyuncu-detay/${n.relatedId}`);
                                 else if (n.senderId) navigate(`/oyuncu-detay/${n.senderId}`);
                               } else if (n.type === 'message') {
-                                navigate(`/oyuncu/mesajlar`);
+                                if (n.relatedId) navigate(`/mac-detay/${n.relatedId}?chat=true`);
+                                else navigate(`/oyuncu/mesajlar`);
                               } else if (n.type === 'reservation') {
                                 navigate(`/oyuncu/rezervasyonlar`);
                               }

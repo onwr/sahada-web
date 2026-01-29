@@ -8777,7 +8777,7 @@ export const getBlogPosts = async (filters = {}) => {
     }
     
     if (filters.limit) {
-      q = query(q, limitFn(filters.limit));
+      q = query(q, limit(filters.limit));
     }
     
     const querySnapshot = await getDocs(q);
@@ -9878,6 +9878,7 @@ export const sendMatchMessage = async (matchId, senderId, senderName, text) => {
                    title: `Yeni Mesaj: ${matchData.title || matchData.tesisName || 'Futbol Maçı'}`,
                    message: `${senderName}: ${text}`,
                    relatedId: matchId, // Link to match details
+                   link: `/mac-detay/${matchId}?chat=true`,
                    read: false,
                    createdAt: serverTimestamp()
                });

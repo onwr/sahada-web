@@ -245,7 +245,9 @@ const Destek = () => {
             label: 'Ticket Sayısı',
             data: categoryEntries.map(([, count]) => count),
             backgroundColor: '#10b981',
-            borderRadius: 8
+            borderRadius: 8,
+            barThickness: 45,
+            maxBarThickness: 50
           }]
         };
 
@@ -260,7 +262,9 @@ const Destek = () => {
               data.byPriority?.low || 0
             ],
             backgroundColor: ['#ef4444', '#f59e0b', '#10b981'],
-            borderRadius: 8
+            borderRadius: 8,
+            barThickness: 45,
+            maxBarThickness: 50
           }]
         };
 
@@ -742,6 +746,11 @@ const Destek = () => {
                   scales: {
                     y: {
                       beginAtZero: true
+                    },
+                    x: {
+                      grid: {
+                        display: false
+                      }
                     }
                   }
                 }} />
@@ -759,6 +768,11 @@ const Destek = () => {
                   scales: {
                     y: {
                       beginAtZero: true
+                    },
+                    x: {
+                      grid: {
+                        display: false
+                      }
                     }
                   }
                 }} />

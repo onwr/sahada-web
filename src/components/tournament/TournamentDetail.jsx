@@ -39,6 +39,7 @@ const TournamentDetail = ({ tournament, userId, userType = 'player', userData = 
   const [loading, setLoading] = useState(false);
   const [registering, setRegistering] = useState(false);
   const [isRegistered, setIsRegistered] = useState(false);
+  const [userParticipation, setUserParticipation] = useState(null);
   
   // Team registration states
   const [showTeamModal, setShowTeamModal] = useState(false);
@@ -176,21 +177,24 @@ const TournamentDetail = ({ tournament, userId, userType = 'player', userData = 
   useEffect(() => {
     if (!userId) {
       setIsRegistered(false);
+      setUserParticipation(null);
       return;
     }
 
-    let userRegistered = false;
+    let participation = null;
     if (tournament?.type === 'team') {
       const userTeamIds = userTeams.map(t => t.id);
-      userRegistered = participants.some(
+      participation = participants.find(
         p => p.participantType === 'team' && userTeamIds.includes(p.participantId)
       );
     } else {
-      userRegistered = participants.some(
+      participation = participants.find(
         p => p.participantId === userId
       );
     }
-    setIsRegistered(userRegistered);
+    
+    setUserParticipation(participation);
+    setIsRegistered(!!participation);
   }, [participants, userTeams, tournament?.type, userId]);
 
   const loadTournamentData = async () => {
@@ -416,12 +420,38 @@ const TournamentDetail = ({ tournament, userId, userType = 'player', userData = 
         {userType === 'player' && userId && (
           <div className="mt-6">
             {isRegistered ? (
-              <div className="p-4 bg-white/20 backdrop-blur-sm rounded-lg">
-                <div className="flex items-center space-x-2">
-                  <CheckCircle className="w-5 h-5" />
-                  <span className="font-semibold">Turnuvaya kayıtlısınız</span>
+              userParticipation?.status === 'pending_payment' && tournament.registrationFee > 0 ? (
+                <div className="bg-white/20 backdrop-blur-sm rounded-lg p-5 border border-white/30">
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                    <div className="flex items-center space-x-3 text-white">
+                      <div className="w-10 h-10 bg-yellow-400/30 rounded-full flex items-center justify-center">
+                        <CreditCard className="w-6 h-6 text-yellow-300" />
+                      </div>
+                      <div>
+                        <p className="font-bold text-lg">Ödeme Bekleniyor</p>
+                        <p className="text-sm text-green-100 italic">Kayıt işlemini tamamlamak için ödeme yapmalısınız.</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => onRegister && onRegister(tournament.id, userParticipation.participantId)}
+                      className="w-full sm:w-auto px-6 py-3 bg-white text-green-700 font-bold rounded-xl hover:bg-yellow-50 transition-all flex items-center justify-center gap-2 shadow-lg hover:scale-105 active:scale-95"
+                    >
+                      <CreditCard className="w-5 h-5" />
+                      <span>{tournament.registrationFee} ₺ Ödeme Yap</span>
+                    </button>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="p-4 bg-white/20 backdrop-blur-sm rounded-lg border border-white/30">
+                  <div className="flex items-center space-x-2">
+                    <CheckCircle className="w-6 h-6 text-white" />
+                    <div>
+                      <span className="font-bold text-lg block leading-tight">Turnuvaya Kayıtlısınız</span>
+                      <span className="text-xs text-green-100">Katılımınız onaylanmıştır.</span>
+                    </div>
+                  </div>
+                </div>
+              )
             ) : showRegisterButton ? (
               <button
                 onClick={handleRegister}
@@ -530,10 +560,41 @@ const TournamentDetail = ({ tournament, userId, userType = 'player', userData = 
             )}
 
             {userType === 'player' && userId && isRegistered && (
-              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                <div className="flex items-center space-x-2">
-                  <CheckCircle className="w-5 h-5 text-green-600" />
-                  <span className="font-semibold text-gray-900">Turnuvaya kayıtlısınız</span>
+              <div className={`border rounded-lg p-5 ${
+                userParticipation?.status === 'pending_payment' 
+                  ? 'bg-yellow-50 border-yellow-200' 
+                  : 'bg-green-50 border-green-200'
+              }`}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    {userParticipation?.status === 'pending_payment' ? (
+                      <div className="w-10 h-10 bg-yellow-100 rounded-full flex items-center justify-center text-yellow-600">
+                        <CreditCard size={20} />
+                      </div>
+                    ) : (
+                      <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center text-green-600">
+                        <CheckCircle size={20} />
+                      </div>
+                    )}
+                    <div>
+                      <h4 className={`font-bold ${userParticipation?.status === 'pending_payment' ? 'text-yellow-800' : 'text-green-800'}`}>
+                        {userParticipation?.status === 'pending_payment' ? 'Ödeme Bekleniyor' : 'Turnuvaya Kayıtlısınız'}
+                      </h4>
+                      <p className={`text-sm ${userParticipation?.status === 'pending_payment' ? 'text-yellow-700' : 'text-green-700'}`}>
+                        {userParticipation?.status === 'pending_payment' 
+                          ? 'Kayıt işleminiz ödeme sonrası onaylanacaktır.' 
+                          : 'Katılımınız başarıyla tamamlandı.'}
+                      </p>
+                    </div>
+                  </div>
+                  {userParticipation?.status === 'pending_payment' && tournament.registrationFee > 0 && (
+                    <button
+                      onClick={() => onRegister && onRegister(tournament.id, userParticipation.participantId)}
+                      className="px-5 py-2.5 bg-yellow-600 text-white font-bold rounded-xl hover:bg-yellow-700 transition-colors shadow-sm text-sm"
+                    >
+                      Bakiye Öde
+                    </button>
+                  )}
                 </div>
               </div>
             )}

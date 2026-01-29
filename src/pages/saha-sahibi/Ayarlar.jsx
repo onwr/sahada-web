@@ -7,15 +7,15 @@ import {
   updateUserSettings,
   updateUserPassword,
   getTesisler,
-  getPlatformSettings
+  getPlatformSettings,
+  updateTesis
 } from '../../services/firestoreService';
+import { uploadProfileImage } from '../../services/cdnService';
+import toast from '../../utils/toast';
 import { doc, onSnapshot, collection, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import { 
   User,
-  Mail,
-  Phone,
-  MapPin,
   Building2,
   Bell,
   Shield,
@@ -26,14 +26,10 @@ import {
   Check,
   X,
   AlertCircle,
-  Camera,
-  Globe,
   CreditCard,
-  Smartphone,
-  Calendar,
-  Clock,
-  CheckCircle,
-  AlertTriangle
+  AlertTriangle,
+  Camera,
+  Globe
 } from 'lucide-react';
 import { createPaymentForm, retrieveCheckoutForm } from '../../services/paymentApiService';
 
@@ -408,12 +404,62 @@ const Ayarlar = () => {
 
 
 
-  // Security settings
   const [securitySettings, setSecuritySettings] = useState({
     twoFactorAuth: false,
     loginAlerts: true,
     sessionTimeout: 30
   });
+
+  const formatPhoneNumber = (value) => {
+    if (!value) return '';
+    const numbers = value.replace(/\D/g, '');
+    let formatted = '';
+    if (numbers.length > 0) {
+      formatted += '(' + numbers.substring(0, 3);
+    }
+    if (numbers.length >= 3) {
+      formatted += ') ' + numbers.substring(3, 6);
+    }
+    if (numbers.length >= 6) {
+      formatted += ' ' + numbers.substring(6, 8);
+    }
+    if (numbers.length >= 8) {
+      formatted += ' ' + numbers.substring(8, 10);
+    }
+    return formatted;
+  };
+
+  const handlePhoneChange = (e) => {
+    const val = e.target.value;
+    const numbers = val.replace(/\D/g, '');
+    if (numbers.length <= 10) {
+       const formatted = formatPhoneNumber(val);
+       setProfileForm(prev => ({ ...prev, phone: formatted }));
+    }
+  };
+
+  const handlePhotoUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file || !user) return;
+
+    setLoading(true);
+    setError(null);
+    try {
+      const result = await uploadProfileImage(file, user.uid);
+      if (result.success) {
+        const newPhotoURL = result.data.url;
+        await updateUserData(user.uid, { photoURL: newPhotoURL });
+        setUserData(prev => ({ ...prev, photoURL: newPhotoURL }));
+        toast.success('Profil fotoğrafı başarıyla güncellendi');
+      } else {
+        setError(result.error || 'Fotoğraf yüklenirken hata oluştu');
+      }
+    } catch (err) {
+      setError('Fotoğraf yüklenemedi');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Populate form with user data on load
   useEffect(() => {
@@ -422,7 +468,7 @@ const Ayarlar = () => {
         ...prev,
         displayName: userData.displayName || userData.fullName || '',
         email: userData.email || '',
-        phone: userData.phone || userData.phoneNumber || '',
+        phone: formatPhoneNumber(userData.phone || userData.phoneNumber || userData.businessPhone || ''),
         businessName: userData.businessName || '',
         city: userData.city || '',
         address: userData.address || '',
@@ -452,11 +498,9 @@ const Ayarlar = () => {
     setError(null);
     setSuccess(null);
     isSavingRef.current = true; // Listener'ı devre dışı bırak
-
+    
     try {
-      const result = await updateUserData(user.uid, profileForm);
-      if (result.success) {
-        // Son kaydedilen veriyi sakla
+
         lastSavedDataRef.current = JSON.stringify({
           displayName: profileForm.displayName,
           email: profileForm.email,
@@ -468,11 +512,29 @@ const Ayarlar = () => {
           description: profileForm.description
         });
         
-        setUserData({ ...userData, ...profileForm });
-        setSuccess('Profil bilgileri başarıyla güncellendi');
-      } else {
-        setError(result.error || 'Profil güncellenirken hata oluştu');
-      }
+        const updatePayload = {
+          ...profileForm,
+          businessPhone: profileForm.phone // Consistency
+        };
+        const result = await updateUserData(user.uid, updatePayload);
+        
+        if (result.success) {
+          // Optional: Update first tesis description if it matches
+          try {
+            const tesisler = await getTesisler(user.uid);
+            if (tesisler.success && tesisler.data.length > 0) {
+              const firstTesis = tesisler.data[0];
+              await updateTesis(firstTesis.id, { description: profileForm.description });
+            }
+          } catch (tesisErr) {
+            console.warn('Facility description update skipped', tesisErr);
+          }
+
+          setUserData({ ...userData, ...updatePayload });
+          setSuccess('Profil bilgileri başarıyla güncellendi');
+        } else {
+          setError(result.error || 'Profil güncellenirken hata oluştu');
+        }
     } catch (err) {
       setError('Profil güncellenirken hata oluştu');
     } finally {
@@ -684,6 +746,29 @@ const Ayarlar = () => {
           {activeTab === 'profile' && (
             <div className="space-y-6">
               <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                <div className="flex flex-col md:flex-row md:items-center gap-6 mb-8 pb-8 border-b border-gray-50">
+                   <div className="relative">
+                      <div className="w-24 h-24 rounded-2xl bg-green-50 border-2 border-green-100 flex items-center justify-center overflow-hidden">
+                        {userData?.photoURL || user?.photoURL ? (
+                          <img src={userData.photoURL || user.photoURL} alt="Profil" className="w-full h-full object-cover" />
+                        ) : (
+                          <User className="w-10 h-10 text-green-600" />
+                        )}
+                      </div>
+                      <label className="absolute -bottom-2 -right-2 p-2 bg-white rounded-xl shadow-lg border border-gray-100 text-green-600 cursor-pointer hover:bg-green-50 transition-colors">
+                        <Camera size={16} />
+                        <input type="file" className="hidden" accept="image/*" onChange={handlePhotoUpload} />
+                      </label>
+                   </div>
+                   <div>
+                      <h4 className="text-lg font-bold text-gray-900">{profileForm.displayName || 'İsimsiz Kullanıcı'}</h4>
+                      <p className="text-sm text-gray-500">{profileForm.businessName || 'İşletme Belirtilmemiş'}</p>
+                      <span className="inline-flex items-center mt-2 px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 uppercase tracking-wider">
+                        SAHA SAHİBİ
+                      </span>
+                   </div>
+                </div>
+
                 <h3 className="text-lg font-semibold text-gray-900 mb-6">Profil Bilgileri</h3>
                 
                 <form onSubmit={handleProfileUpdate} className="space-y-6">
@@ -721,9 +806,9 @@ const Ayarlar = () => {
                       <input
                         type="tel"
                         value={profileForm.phone}
-                        onChange={(e) => setProfileForm(prev => ({ ...prev, phone: e.target.value }))}
+                        onChange={handlePhoneChange}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                        placeholder="0555 123 45 67"
+                        placeholder="(555) 123 45 67"
                       />
                     </div>
 

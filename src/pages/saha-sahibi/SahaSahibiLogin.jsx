@@ -444,7 +444,8 @@ const SahaSahibiLogin = () => {
               <button
                 type="button"
                 onClick={() => handleSocialLogin('google')}
-                className="w-full flex items-center justify-center gap-3 py-3 px-4 rounded-xl border border-gray-200 hover:bg-gray-50 hover:border-gray-300 transition-all duration-200"
+                disabled={isLoading}
+                className={`w-full flex items-center justify-center gap-3 py-3 px-4 rounded-xl border border-gray-200 hover:bg-gray-50 hover:border-gray-300 transition-all duration-200 ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
                 <span className="text-lg font-bold text-gray-800">G</span>
                 <span className="font-medium text-gray-700">Google ile {activeTab === 'login' ? 'Giriş Yap' : 'Kayıt Ol'}</span>
@@ -453,7 +454,8 @@ const SahaSahibiLogin = () => {
               <button
                 type="button"
                 onClick={() => handleSocialLogin('facebook')}
-                className="w-full flex items-center justify-center gap-3 py-3 px-4 rounded-xl border border-blue-600 bg-[#1877F2] hover:bg-[#166fe5] transition-all duration-200"
+                disabled={isLoading}
+                className={`w-full flex items-center justify-center gap-3 py-3 px-4 rounded-xl border border-blue-600 bg-[#1877F2] hover:bg-[#166fe5] transition-all duration-200 ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
                 <Facebook className="text-white" size={20} />
                 <span className="font-medium text-white">Facebook ile {activeTab === 'login' ? 'Giriş Yap' : 'Kayıt Ol'}</span>

@@ -7,7 +7,9 @@ import {
   LogOut,
   User,
   Info,
-  Check
+  Check,
+  Zap,
+  Lock
 } from 'lucide-react';
 import { collection, query, onSnapshot, where, orderBy, limit, updateDoc, doc, writeBatch, getDocs, serverTimestamp } from 'firebase/firestore';
 import { db } from '../config/firebase';
@@ -150,7 +152,11 @@ const DashboardHeader = ({ title, showMenuButton, onMenuClick, children, variant
                   navigate('/oyuncu/bildirimler');
                   break;
               case 'message':
-                  navigate('/oyuncu/mesajlar');
+                  if (notification.relatedId) {
+                      navigate(`/mac-detay/${notification.relatedId}?chat=true`);
+                  } else {
+                      navigate('/oyuncu/mesajlar');
+                  }
                   break;
               case 'reservation':
                   navigate('/oyuncu/rezervasyonlar');

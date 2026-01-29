@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { collection, query, where, orderBy, onSnapshot } from 'firebase/firestore';
+import { db } from '../config/firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { getPlatformSettings } from '../services/firestoreService';
 import OnBoard from '../pages/saha-sahibi/OnBoard';
@@ -51,12 +53,17 @@ const SahaSahibiLayout = () => {
     const plansQuery = query(
       collection(db, 'premiumPlans'),
       where('userType', '==', 'owner'),
-      where('isActive', '==', true),
-      orderBy('createdAt', 'desc')
+      where('isActive', '==', true)
     );
     const unsubPlans = onSnapshot(plansQuery, (snap) => {
       const d = [];
       snap.forEach(doc => d.push({id: doc.id, ...doc.data()}));
+      // Client-side sorting
+      d.sort((a, b) => {
+        const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt || 0);
+        const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt || 0);
+        return dateB - dateA;
+      });
       setPlans(d);
     });
 
@@ -123,7 +130,7 @@ const SahaSahibiLayout = () => {
           // Check for missing mandatory fields
           const missingFields = [];
           if (!userData?.displayName && !userData?.fullName) missingFields.push('Ad Soyad');
-          if (!userData?.phone && !userData?.phoneNumber) missingFields.push('Telefon');
+          if (!userData?.phone && !userData?.phoneNumber && !userData?.businessPhone) missingFields.push('Telefon');
           if (!userData?.city) missingFields.push('Şehir');
           if (!userData?.businessName) missingFields.push('İşletme Adı');
 

@@ -73,6 +73,50 @@ const Header = () => {
     await markAllNotificationsAsRead(user.uid);
   };
 
+  const handleNotificationClick = async (notification) => {
+    if (!notification.read) {
+        markAsRead(notification.id);
+    }
+    
+    if (notification.link) {
+        navigate(notification.link);
+    } else {
+        // Type-based navigation
+        switch (notification.type) {
+            case 'message_request':
+            case 'team_invitation':
+            case 'match_join_request':
+            case 'contact_request':
+                navigate('/oyuncu/bildirimler');
+                break;
+            case 'message':
+                if (notification.relatedId) {
+                    navigate(`/mac-detay/${notification.relatedId}?chat=true`);
+                } else {
+                    navigate('/oyuncu/mesajlar');
+                }
+                break;
+            case 'reservation':
+                navigate('/oyuncu/rezervasyonlar');
+                break;
+            case 'system':
+                if (notification.title?.toLowerCase().includes('maç') || notification.message?.toLowerCase().includes('maç')) {
+                    if (notification.relatedId) navigate(`/mac-detay/${notification.relatedId}`);
+                    else navigate('/oyuncu/bildirimler');
+                } else if (notification.relatedId || notification.senderId) {
+                    navigate(`/oyuncu-detay/${notification.relatedId || notification.senderId}`);
+                } else {
+                    navigate('/oyuncu/bildirimler');
+                }
+                break;
+            default:
+                if (notification.relatedId) navigate(`/mac-detay/${notification.relatedId}`);
+                else navigate('/oyuncu/bildirimler');
+        }
+    }
+    setIsNotificationsOpen(false);
+  };
+
   const cleanMessage = (msg) => {
     if (!msg || typeof msg !== 'string') return '';
     return msg
@@ -285,11 +329,7 @@ const Header = () => {
                           notifications.map((n) => (
                             <div
                               key={n.id}
-                              onClick={() => {
-                                markAsRead(n.id);
-                                if (n.link) navigate(n.link);
-                                setIsNotificationsOpen(false);
-                              }}
+                              onClick={() => handleNotificationClick(n)}
                               className={`px-4 py-3 hover:bg-gray-50 cursor-pointer border-b border-gray-50 last:border-0 transition-colors ${!n.read ? 'bg-green-50/20' : ''}`}
                             >
                               <div className="flex items-center gap-3">

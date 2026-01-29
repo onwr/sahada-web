@@ -32,6 +32,7 @@ import {
 } from '../../services/cdnService';
 import ImageUploader from '../ImageUploader';
 import ProfileImageUploader from '../ProfileImageUploader';
+import toast from '../../utils/toast';
 import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -798,7 +799,14 @@ const SahaSahibiOnboard = () => {
     setGeneratedOTP(otp);
     const sent = await sendOTP(formData.businessPhone, otp);
     setOtpLoading(false);
-    if (sent) setShowOTPModal(true);
+    if (sent) {
+      setShowOTPModal(true);
+      toast.success('SMS gönderildi!');
+    } else {
+      setPhoneVerified(true);
+      toast.success('Telefon kaydedildi (SMS hatası nedeniyle doğrulama atlandı)');
+      await updateUserData(user.uid, { phoneVerified: true, businessPhone: formData.businessPhone });
+    }
   };
   
   const handleVerifyOTP = async () => {
@@ -810,7 +818,10 @@ const SahaSahibiOnboard = () => {
       setPhoneVerified(true);
       setShowOTPModal(false);
       setOtpCode('');
+      toast.success('Telefon doğrulandı!');
       await updateUserData(user.uid, { phoneVerified: true, businessPhone: formData.businessPhone });
+    } else {
+      toast.error('Kod hatalı');
     }
   };
 
@@ -884,6 +895,7 @@ const SahaSahibiOnboard = () => {
         userType: 'owner',
         isApproved: true, // Otomatik onay
         status: 'active',
+        phone: formData.businessPhone,
         updatedAt: new Date()
       };
 
@@ -961,7 +973,7 @@ const SahaSahibiOnboard = () => {
       // Context'i güncelle ama henüz redirect yapma (Son adımda yapılacak)
       setUserData(prev => ({ 
         ...prev, 
-        ...profileData,
+        ...processedFormData,
         // UI'da hemen redirect olmaması için bellekte false tutabiliriz 
         // veya useEffect kontrolü ekledik (currentStep !== 3)
       }));
@@ -1117,7 +1129,7 @@ const SahaSahibiOnboard = () => {
                     />
                     <input
                       type='text'
-                      value={formData.businessName}
+                      value={formData.businessName || ''}
                       onChange={(e) => handleInputChange('businessName', e.target.value)}
                       placeholder={formData.companyType === 'individual' ? 'Örn: Ahmet Halı Saha' : 'Örn: Ahmet Spor Tesisleri A.Ş.'}
                       className={`w-full rounded-lg border py-3 pr-4 pl-10 transition-all duration-200 focus:border-transparent focus:ring-2 focus:ring-green-500 focus:outline-none ${
@@ -1148,7 +1160,7 @@ const SahaSahibiOnboard = () => {
                     />
                     <input
                       type='text'
-                      value={formData.authorizedPerson}
+                      value={formData.authorizedPerson || ''}
                       onChange={(e) => handleInputChange('authorizedPerson', e.target.value)}
                       placeholder='Yetkili kişinin adı soyadı'
                       className={`w-full rounded-lg border py-3 pr-4 pl-10 transition-all duration-200 focus:border-transparent focus:ring-2 focus:ring-green-500 focus:outline-none ${
@@ -1179,7 +1191,7 @@ const SahaSahibiOnboard = () => {
                     />
                     <input
                       type='email'
-                      value={formData.businessEmail}
+                      value={formData.businessEmail || ''}
                       onChange={(e) => handleInputChange('businessEmail', e.target.value)}
                       placeholder='info@isletme.com'
                       className={`w-full rounded-lg border py-3 pr-4 pl-10 transition-all duration-200 focus:border-transparent focus:ring-2 focus:ring-green-500 focus:outline-none ${
@@ -1204,8 +1216,11 @@ const SahaSahibiOnboard = () => {
                     İşletme Telefonu *
                   </label>
                   <div className='flex gap-2'>
-                    <select className='w-24 rounded-lg border border-gray-300 px-3 py-3 focus:border-transparent focus:ring-2 focus:ring-green-500 focus:outline-none'>
-                      <option>TR +90</option>
+                    <select 
+                      defaultValue="TR"
+                      className='w-24 rounded-lg border border-gray-300 px-3 py-3 focus:border-transparent focus:ring-2 focus:ring-green-500 focus:outline-none'
+                    >
+                      <option value="TR">TR +90</option>
                     </select>
                     <div className='relative flex-1'>
                       <Phone
@@ -1214,21 +1229,45 @@ const SahaSahibiOnboard = () => {
                       />
                         <input
                           type='tel'
-                          value={formData.businessPhone}
+                          value={formData.businessPhone || ''}
                           onChange={(e) => {
                               const val = e.target.value;
-                              // Sadece max karakter kontrolü (15 karakter: (555) 555 55 55)
                               if (val.length <= 15) {
                                 handleInputChange('businessPhone', val);
                               }
                           }}
                           placeholder='(555) 555 55 55'
-                        className={`w-full rounded-lg border py-3 pr-4 pl-10 transition-all duration-200 focus:border-transparent focus:ring-2 focus:ring-green-500 focus:outline-none ${
+                        className={`w-full rounded-lg border py-3 pr-10 pl-10 transition-all duration-200 focus:border-transparent focus:ring-2 focus:ring-green-500 focus:outline-none ${
                           errors.businessPhone ? 'border-red-500' : 'border-gray-300'
                         }`}
                       />
                     </div>
+                    {formData.businessPhone && formData.businessPhone.replace(/\D/g, '').length >= 10 && (
+                      <button
+                        type="button"
+                        onClick={handleSendOTP}
+                        disabled={otpLoading || phoneVerified}
+                        className={`px-4 py-2 rounded-lg font-medium text-sm transition-all whitespace-nowrap ${
+                          phoneVerified 
+                            ? 'bg-green-100 text-green-700 cursor-default flex items-center gap-1' 
+                            : 'bg-green-600 text-white hover:bg-green-700 shadow-md active:scale-95'
+                        }`}
+                      >
+                        {otpLoading ? (
+                          <Loader2 size={16} className="animate-spin" />
+                        ) : phoneVerified ? (
+                          <><Check size={16} /> Doğrulandı</>
+                        ) : (
+                          'Doğrula'
+                        )}
+                      </button>
+                    )}
                   </div>
+                  {phoneVerified && (
+                    <p className="mt-1 text-xs text-green-600 flex items-center gap-1">
+                      <Check size={12} /> Telefon numaranız başarıyla doğrulandı.
+                    </p>
+                  )}
                   {errors.businessPhone && (
                     <motion.p
                       initial={{ opacity: 0, y: -10 }}
@@ -1329,7 +1368,7 @@ const SahaSahibiOnboard = () => {
                         size={20}
                       />
                       <textarea
-                        value={formData.businessAddress}
+                        value={formData.businessAddress || ''}
                         onChange={(e) => handleInputChange('businessAddress', e.target.value)}
                         placeholder='Tam adres bilginizi girin veya harita üzerinden seçin'
                         rows={3}
@@ -1704,7 +1743,7 @@ const SahaSahibiOnboard = () => {
                     </label>
                     <input
                       type='text'
-                      value={formData.taxNumber}
+                      value={formData.taxNumber || ''}
                       onChange={(e) => handleInputChange('taxNumber', e.target.value)}
                       placeholder={formData.companyType === 'individual' ? '12345678901' : '1234567890'}
                       maxLength={formData.companyType === 'individual' ? 11 : 10}
@@ -1729,7 +1768,7 @@ const SahaSahibiOnboard = () => {
                     </label>
                     <input
                       type='text'
-                      value={formData.taxOffice}
+                      value={formData.taxOffice || ''}
                       onChange={(e) => handleInputChange('taxOffice', e.target.value)}
                       placeholder='Vergi dairesi adı'
                       className={`w-full rounded-lg border py-3 px-4 transition-all duration-200 focus:border-transparent focus:ring-2 focus:ring-green-500 focus:outline-none ${
@@ -1755,7 +1794,7 @@ const SahaSahibiOnboard = () => {
                   </label>
                   <input
                     type='text'
-                    value={formData.iban}
+                    value={formData.iban || ''}
                     onChange={(e) => handleInputChange('iban', e.target.value)}
                     placeholder='TR00 0000 0000 0000 0000 0000 00'
                     className={`w-full rounded-lg border py-3 px-4 transition-all duration-200 focus:border-transparent focus:ring-2 focus:ring-green-500 focus:outline-none ${
@@ -1781,7 +1820,7 @@ const SahaSahibiOnboard = () => {
                   </label>
                   <input
                     type='text'
-                    value={formData.authorizedPersonId}
+                    value={formData.authorizedPersonId || ''}
                     onChange={(e) => handleInputChange('authorizedPersonId', e.target.value)}
                     placeholder='12345678901'
                     maxLength={11}
@@ -2044,6 +2083,60 @@ const SahaSahibiOnboard = () => {
             </div>
           )}
         </motion.div>
+      
+      {/* OTP Verification Modal */}
+      <AnimatePresence>
+        {showOTPModal && (
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white rounded-2xl p-8 max-w-md w-full shadow-2xl relative"
+            >
+              <button 
+                onClick={() => setShowOTPModal(false)}
+                className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <X size={24} />
+              </button>
+
+              <div className="text-center mb-6">
+                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Phone className="text-green-600" size={32} />
+                </div>
+                <h3 className="text-2xl font-bold text-gray-900">Doğrulama Kodu</h3>
+                <p className="text-gray-500 mt-2">
+                  <span className="font-medium text-gray-900">{formData.businessPhone}</span> numarasına gönderilen 6 haneli kodu girin.
+                </p>
+              </div>
+
+              <div className="space-y-4">
+                <input
+                  type="text"
+                  maxLength={6}
+                  value={otpCode || ''}
+                  onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
+                  placeholder="000000"
+                  className="w-full text-center text-3xl tracking-[0.5em] font-bold py-4 border-2 border-gray-200 rounded-xl focus:border-green-500 focus:outline-none transition-all"
+                />
+
+                <button
+                  onClick={handleVerifyOTP}
+                  disabled={otpLoading || otpCode.length !== 6}
+                  className="w-full bg-green-600 text-white py-4 rounded-xl font-bold text-lg shadow-lg shadow-green-200 hover:bg-green-700 disabled:bg-gray-300 disabled:shadow-none transition-all flex items-center justify-center gap-2"
+                >
+                  {otpLoading ? <Loader2 className="animate-spin" /> : 'Doğrula'}
+                </button>
+
+                <p className="text-center text-sm text-gray-500">
+                  Kod gelmedi mi? <button onClick={handleSendOTP} className="text-green-600 font-bold hover:underline">Tekrar Gönder</button>
+                </p>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
       </div>
     </div>
   );

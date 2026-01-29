@@ -551,7 +551,7 @@ import AuthModal from '../components/AuthModal';
 // ... (existing imports and mock data)
 
 const Community = () => {
-  const { user: currentUser } = useAuth();
+  const { user: currentUser, userData } = useAuth();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('ALL');
   const [posts, setPosts] = useState([]); // Dynamic posts
@@ -867,131 +867,135 @@ const Community = () => {
     }
 
     setIsPosting(true);
-    let imageUrl = null;
-    let finalPostType = PostType.GENERAL;
-    let finalPollOptions = null;
-    let extraData = {};
+    try {
+        let imageUrl = null;
+        let finalPostType = PostType.GENERAL;
+        let finalPollOptions = null;
+        let extraData = {};
 
-    // 1. Upload Image
-    if (selectedImage) {
-        try {
-            const uploadResult = await uploadImage(selectedImage, 'community', currentUser.uid); 
-            if (uploadResult.success) {
-                imageUrl = uploadResult.data?.url || uploadResult.data; 
-            } else {
-                 console.error('Image upload failed:', uploadResult.error);
-                 imageUrl = URL.createObjectURL(selectedImage);
+        // 1. Upload Image
+        if (selectedImage) {
+            try {
+                const uploadResult = await uploadImage(selectedImage, 'community', currentUser.uid); 
+                if (uploadResult.success) {
+                    imageUrl = uploadResult.data?.url || uploadResult.data; 
+                } else {
+                    console.error('Image upload failed:', uploadResult.error);
+                    imageUrl = URL.createObjectURL(selectedImage);
+                }
+            } catch (error) {
+                console.error('Upload Error', error);
             }
-        } catch (error) {
-            console.error('Upload Error', error);
         }
-    }
 
-    // 2. Prepare Mode Data
-    if (isPollMode) {
-        const validOptions = pollOptions.filter(o => o.text.trim() !== '');
-        if (validOptions.length < 2) {
-            toast.error('Anket için en az 2 seçenek girmelisiniz.');
+        // 2. Prepare Mode Data
+        if (isPollMode) {
+            const validOptions = pollOptions.filter(o => o.text.trim() !== '');
+            if (validOptions.length < 2) {
+                toast.error('Anket için en az 2 seçenek girmelisiniz.');
+                playNotificationSound();
+                setIsPosting(false);
+                return;
+            }
+            finalPostType = PostType.POLL;
+            finalPollOptions = validOptions.map(o => ({ 
+                label: o.text, 
+                votes: 0, 
+                percentage: 0 
+            }));
+        } else if (isMatchMode) {
+            if (!matchDetails.homeTeam || !matchDetails.awayTeam || !matchDetails.homeScore || !matchDetails.awayScore) {
+                toast.error('Lütfen tüm maç bilgilerini giriniz.');
+                playNotificationSound();
+                setIsPosting(false);
+                return;
+            }
+            finalPostType = PostType.SCOREBOARD;
+            extraData = {
+                homeTeam: matchDetails.homeTeam,
+                awayTeam: matchDetails.awayTeam,
+                score: `${matchDetails.homeScore} - ${matchDetails.awayScore}`,
+                mvp: matchDetails.mvp || 'Belirtilmedi',
+                facilityName: locationText || 'Saha Belirtilmedi'
+            };
+        } else if (isReviewMode) {
+            if (!reviewDetails.facilityName || reviewDetails.rating === 0) {
+                toast.error('Lütfen bir saha seçin ve puan verin.');
+                playNotificationSound();
+                setIsPosting(false);
+                return;
+            }
+            finalPostType = PostType.REVIEW;
+            extraData = {
+                facilityName: reviewDetails.facilityName,
+                facilityId: reviewDetails.facilityId || null,
+                rating: reviewDetails.rating,
+                reviewText: newPostContent
+            };
+        } else if (isTournamentMode) {
+            finalPostType = PostType.TOURNAMENT;
+            extraData = {
+                tournamentName: newPostContent.split('\n')[0] || 'Yeni Turnuva',
+                tournamentType: 'Topluluk Turnuvası',
+                prizePool: 'Ödüllü',
+                matchDate: locationText ? 'Yakında' : new Date().toLocaleDateString('tr-TR'),
+            };
+        } else if (isNewsMode) {
+            finalPostType = PostType.NEWS;
+        }
+
+        const defaultTitle = isPollMode 
+            ? 'Anket: ' + (newPostContent.trim() || (finalPollOptions && finalPollOptions.length > 0 ? finalPollOptions[0].label : 'Yeni Anket')) 
+            : isMatchMode 
+                ? `Maç Sonucu: ${matchDetails.homeTeam} ${matchDetails.homeScore} - ${matchDetails.awayScore} ${matchDetails.awayTeam}`
+                : isReviewMode 
+                    ? 'Saha İncelemesi: ' + (newPostContent.trim() || reviewDetails.facilityName) 
+                    : isTournamentMode
+                        ? 'Turnuva Duyurusu: ' + (newPostContent.split('\n')[0] || 'Katılmak İsteyenler?')
+                        : isNewsMode
+                            ? 'Günün Haberi: ' + (newPostContent.split('\n')[0] || 'Son Dakika')
+                            : (newPostContent.length > 20 ? newPostContent.substring(0, 20) + '...' : 'Yeni Paylaşım');
+
+        const postData = {
+            type: finalPostType,
+            author: {
+                id: currentUser.uid,
+                name: (userData?.fullName || currentUser.displayName || 'Kullanıcı').replace(/\s+/g, ' ').trim(),
+                avatar: userData?.photoURL || currentUser.photoURL || `https://ui-avatars.com/api/?name=${currentUser.email}&background=random`,
+                slug: userData?.slug || null,
+                badges: ['Üye'] 
+            },
+            title: defaultTitle,
+            content: newPostContent,
+            image: imageUrl || (editingPostId ? posts.find(p => p.id === editingPostId)?.image : null),
+            pollOptions: finalPollOptions,
+            location: showLocationInput ? locationText : null,
+            ...extraData
+        };
+
+        let result;
+        if (editingPostId) {
+            result = await updatePost(editingPostId, postData);
+        } else {
+            result = await createPost(postData);
+        }
+
+        if (result.success) {
+            handleCancelEdit();
+            fetchPosts(); 
+            if (!editingPostId) setActiveTab('ALL');
+            toast.success(editingPostId ? 'Paylaşım güncellendi! ✨' : 'Paylaşım gönderildi! 🚀');
             playNotificationSound();
-            setIsPosting(false);
-            return;
-        }
-        finalPostType = PostType.POLL;
-        finalPollOptions = validOptions.map(o => ({ 
-            label: o.text, 
-            votes: 0, 
-            percentage: 0 
-        }));
-    } else if (isMatchMode) {
-        if (!matchDetails.homeTeam || !matchDetails.awayTeam || !matchDetails.homeScore || !matchDetails.awayScore) {
-            toast.error('Lütfen tüm maç bilgilerini giriniz.');
-             playNotificationSound();
-            setIsPosting(false);
-            return;
-        }
-        finalPostType = PostType.SCOREBOARD;
-        extraData = {
-            homeTeam: matchDetails.homeTeam,
-            awayTeam: matchDetails.awayTeam,
-            score: `${matchDetails.homeScore} - ${matchDetails.awayScore}`,
-            mvp: matchDetails.mvp || 'Belirtilmedi',
-            facilityName: locationText || 'Saha Belirtilmedi'
-        };
-    } else if (isReviewMode) {
-        if (!reviewDetails.facilityName || reviewDetails.rating === 0) {
-            toast.error('Lütfen bir saha seçin ve puan verin.');
+        } else {
+            toast.error('İşlem başarısız: ' + result.error);
             playNotificationSound();
-            setIsPosting(false);
-            return;
         }
-        finalPostType = PostType.REVIEW;
-        extraData = {
-            facilityName: reviewDetails.facilityName,
-            facilityId: reviewDetails.facilityId || null,
-            rating: reviewDetails.rating,
-            reviewText: newPostContent
-        };
-    } else if (isTournamentMode) {
-        finalPostType = PostType.TOURNAMENT;
-        extraData = {
-            tournamentName: newPostContent.split('\n')[0] || 'Yeni Turnuva',
-            tournamentType: 'Topluluk Turnuvası',
-            prizePool: 'Ödüllü',
-            matchDate: locationText ? 'Yakında' : new Date().toLocaleDateString('tr-TR'),
-        };
-    } else if (isNewsMode) {
-        finalPostType = PostType.NEWS;
+    } catch (error) {
+        console.error('Error in handlePostSubmit:', error);
+        toast.error('Bir hata oluştu. Lütfen tekrar deneyin.');
+    } finally {
+        setIsPosting(false);
     }
-
-    const defaultTitle = isPollMode 
-        ? 'Anket: ' + (newPostContent.trim() || (finalPollOptions && finalPollOptions.length > 0 ? finalPollOptions[0].label : 'Yeni Anket')) 
-        : isMatchMode 
-            ? `Maç Sonucu: ${matchDetails.homeTeam} ${matchDetails.homeScore} - ${matchDetails.awayScore} ${matchDetails.awayTeam}`
-            : isReviewMode 
-                ? 'Saha İncelemesi: ' + (newPostContent.trim() || reviewDetails.facilityName) 
-                : isTournamentMode
-                    ? 'Turnuva Duyurusu: ' + (newPostContent.split('\n')[0] || 'Katılmak İsteyenler?')
-                    : isNewsMode
-                        ? 'Günün Haberi: ' + (newPostContent.split('\n')[0] || 'Son Dakika')
-                        : (newPostContent.length > 20 ? newPostContent.substring(0, 20) + '...' : 'Yeni Paylaşım');
-
-    const postData = {
-        type: finalPostType,
-        author: {
-            id: currentUser.uid,
-            name: (userData?.fullName || currentUser.displayName || 'Kullanıcı').replace(/\s+/g, ' ').trim(),
-            avatar: userData?.photoURL || currentUser.photoURL || `https://ui-avatars.com/api/?name=${currentUser.email}&background=random`,
-            slug: userData?.slug || null,
-            badges: ['Üye'] 
-        },
-        title: defaultTitle,
-        content: newPostContent,
-        image: imageUrl || (editingPostId ? posts.find(p => p.id === editingPostId)?.image : null),
-        pollOptions: finalPollOptions,
-        location: showLocationInput ? locationText : null,
-        ...extraData
-    };
-
-    let result;
-    if (editingPostId) {
-        // If it's a poll and options changed, we might want to keep or reset votes. 
-        // For simplicity, we just update all.
-        result = await updatePost(editingPostId, postData);
-    } else {
-        result = await createPost(postData);
-    }
-
-    if (result.success) {
-        handleCancelEdit();
-        fetchPosts(); 
-        if (!editingPostId) setActiveTab('ALL');
-        toast.success(editingPostId ? 'Paylaşım güncellendi! ✨' : 'Paylaşım gönderildi! 🚀');
-        playNotificationSound();
-    } else {
-        toast.error('İşlem başarısız: ' + result.error);
-        playNotificationSound();
-    }
-    setIsPosting(false);
   };
 
   const handleDeletePost = async (postId) => {

@@ -1,20 +1,22 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { useParams, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { getOpenMatch, requestJoinMatch, getTesis, markMatchAsPaid } from '../services/firestoreService';
 import PaymentModal from '../components/PaymentModal';
+import MatchDetailModal from '../components/MatchDetailModal';
 import { useAuth } from '../contexts/AuthContext';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import toast from '../utils/toast';
 import { 
     Clock, Calendar, MapPin, Users, DollarSign, Trophy, ArrowLeft, 
-    Share2, AlertCircle, CheckCircle, UserPlus, Shield, Building2
+    Share2, AlertCircle, CheckCircle, UserPlus, Shield, Building2, CreditCard, MessageSquare
 } from 'lucide-react';
 
 const MacDetay = () => {
     const { id } = useParams();
     const navigate = useNavigate();
     const location = useLocation();
+    const [searchParams] = useSearchParams();
     const { user } = useAuth();
     const [match, setMatch] = useState(null);
     const [facility, setFacility] = useState(null);
@@ -22,6 +24,13 @@ const MacDetay = () => {
     const [joining, setJoining] = useState(false);
     const [showShareMenu, setShowShareMenu] = useState(false);
     const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+    const [isChatModalOpen, setIsChatModalOpen] = useState(false);
+
+    useEffect(() => {
+        if (searchParams.get('chat') === 'true') {
+            setIsChatModalOpen(true);
+        }
+    }, [searchParams]);
 
     useEffect(() => {
         loadMatch();
@@ -377,7 +386,16 @@ const MacDetay = () => {
                                                     </button>
                                                 </div>
                                             ) : (
-                                                <span className="text-xs text-center px-4">Maç kadrosuna dahil edildin. Sahada görüşürüz!</span>
+                                                <div className="flex flex-col items-center gap-3">
+                                                    <span className="text-xs text-center px-4">Maç kadrosuna dahil edildin. Sahada görüşürüz!</span>
+                                                    <button 
+                                                        onClick={() => setIsChatModalOpen(true)}
+                                                        className="w-full bg-green-600 text-white py-2.5 rounded-xl font-bold hover:bg-green-700 shadow-lg shadow-green-100 transition-all flex items-center justify-center gap-2"
+                                                    >
+                                                        <MessageSquare size={18} />
+                                                        Maç Sohbeti
+                                                    </button>
+                                                </div>
                                             )}
                                         </>
                                     ) : (
@@ -492,6 +510,13 @@ const MacDetay = () => {
                 onSuccess={handlePaymentSuccess}
                 title="Maç Katılım Ödemesi"
                 description={`${match.tesisName || 'Maç'} katılım ücreti`}
+            />
+
+            <MatchDetailModal
+                isOpen={isChatModalOpen}
+                onClose={() => setIsChatModalOpen(false)}
+                match={{...match, id}}
+                currentUser={user}
             />
         </div>
     );

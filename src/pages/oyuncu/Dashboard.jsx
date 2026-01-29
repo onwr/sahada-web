@@ -26,7 +26,8 @@ import {
   Target,
   Activity,
   FileText,
-  Building2
+  Building2,
+  CreditCard
 } from 'lucide-react';
 
 

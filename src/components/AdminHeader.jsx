@@ -212,7 +212,11 @@ const AdminHeader = ({ title, description, children, showSearch, onSearch, searc
                             {notifications.map((item, index) => (
                                 <div 
                                     key={item.id + index}
-                                    className="px-4 py-3 hover:bg-gray-50 border-b border-gray-100 transition-colors group relative"
+                                    onClick={() => {
+                                        navigate(getNotificationLink(item.type));
+                                        setIsNotificationsOpen(false);
+                                    }}
+                                    className="px-4 py-3 hover:bg-gray-50 border-b border-gray-100 transition-colors group relative cursor-pointer"
                                 >
                                     <div className="flex items-center gap-3">
                                         <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 bg-gray-50 border border-gray-100">
@@ -224,15 +228,11 @@ const AdminHeader = ({ title, description, children, showSearch, onSearch, searc
                                                 {item.date?.toLocaleString('tr-TR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
                                             </p>
                                             <div className="flex items-center gap-3 mt-2">
-                                                <button 
-                                                    onClick={() => {
-                                                        navigate(getNotificationLink(item.type));
-                                                        setIsNotificationsOpen(false);
-                                                    }}
+                                                <div 
                                                     className="text-[11px] font-bold text-green-600 hover:text-green-700 flex items-center gap-1"
                                                 >
                                                     <ExternalLink size={12} /> Detaya Git
-                                                </button>
+                                                </div>
                                             </div>
                                         </div>
                                         
@@ -241,7 +241,7 @@ const AdminHeader = ({ title, description, children, showSearch, onSearch, searc
                                                 e.stopPropagation();
                                                 markAsRead(item);
                                             }}
-                                            className="absolute right-4 top-4 p-1.5 text-gray-300 hover:text-green-600 hover:bg-green-50 rounded-lg transition-all"
+                                            className="absolute right-4 top-4 p-1.5 text-gray-300 hover:text-green-600 hover:bg-green-50 rounded-lg transition-all z-10"
                                             title="Okundu İşaretle"
                                         >
                                             <Check size={16} strokeWidth={3} />

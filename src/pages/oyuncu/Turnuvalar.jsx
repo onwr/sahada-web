@@ -27,6 +27,7 @@ const Turnuvalar = () => {
   const [selectedTournament, setSelectedTournament] = useState(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [activeParticipantId, setActiveParticipantId] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
@@ -114,9 +115,12 @@ const Turnuvalar = () => {
         for (const tournament of allResult.data) {
           const participantsResult = await getTournamentParticipants(tournament.id);
           if (participantsResult.success) {
-            const isRegistered = participantsResult.data.some(p => p.participantId === user.uid);
-            if (isRegistered) {
-              myTours.push(tournament);
+            const userPart = participantsResult.data.find(p => p.participantId === user.uid);
+            if (userPart) {
+              myTours.push({
+                ...tournament,
+                userParticipation: userPart
+              });
             }
           }
         }
@@ -143,6 +147,7 @@ const Turnuvalar = () => {
   };
 
   const handlePaymentRequest = (tournamentId, participantId) => {
+    setActiveParticipantId(participantId);
     setShowDetailModal(false);
     setShowPaymentModal(true);
   };
@@ -154,9 +159,13 @@ const Turnuvalar = () => {
     toast.success('Ödeme başarıyla tamamlandı!');
   };
 
+  const getRegistrationData = (tournament) => {
+    if (!tournament || !user) return null;
+    return myTournaments.find(t => t.id === tournament.id)?.userParticipation || null;
+  };
+
   const isRegistered = (tournament) => {
-    if (!tournament || !user) return false;
-    return myTournaments.some(t => t.id === tournament.id);
+    return !!getRegistrationData(tournament);
   };
 
   const filteredTournaments = (filter === 'my' ? myTournaments : tournaments).filter(tournament => {
@@ -347,10 +356,18 @@ const Turnuvalar = () => {
                       </button>
                     )}
                     {isRegistered(tournament) && (
-                      <div className="flex-1 flex items-center justify-center gap-2 text-green-600 bg-green-50 px-4 py-2.5 rounded-xl border border-green-100 transition-all">
-                        <CheckCircle className="w-4 h-4" />
-                        <span className="font-bold text-xs sm:text-sm">Kayıtlı</span>
-                      </div>
+                      getRegistrationData(tournament)?.status === 'pending_payment' && tournament.registrationFee > 0 ? (
+                        <div className="flex-1 flex items-center justify-center gap-2 text-yellow-600 bg-yellow-50 px-4 py-2.5 rounded-xl border border-yellow-100 transition-all cursor-pointer hover:bg-yellow-100"
+                             onClick={() => handleRegisterClick(tournament)}>
+                          <CreditCard className="w-4 h-4" />
+                          <span className="font-bold text-xs sm:text-sm">Ödeme Bekliyor</span>
+                        </div>
+                      ) : (
+                        <div className="flex-1 flex items-center justify-center gap-2 text-green-600 bg-green-50 px-4 py-2.5 rounded-xl border border-green-100 transition-all">
+                          <CheckCircle className="w-4 h-4" />
+                          <span className="font-bold text-xs sm:text-sm">Kayıtlı</span>
+                        </div>
+                      )
                     )}
                   </div>
                 </div>
@@ -392,9 +409,11 @@ const Turnuvalar = () => {
             <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
               <TournamentPayment
                 tournament={selectedTournament}
-                participantId={user?.uid}
+                participantId={activeParticipantId || user?.uid}
                 userId={user?.uid}
-                participantName={user?.displayName || 'Oyuncu'}
+                participantName={userData?.fullName || user?.displayName || 'Oyuncu'}
+                user={user}
+                userData={userData}
                 onPaymentSuccess={handlePaymentSuccess}
                 onCancel={() => {
                   setShowPaymentModal(false);
