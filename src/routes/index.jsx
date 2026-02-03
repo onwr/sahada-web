@@ -40,7 +40,7 @@ const AppRoutes = () => {
       <Route path="/rezervasyon/:id" element={<Rezervasyon />} />
       <Route path="/payment-callback" element={<PaymentCallback />} />
       <Route path="/oyuncu-bul" element={<OyuncuBul />} />
-      <Route path="/mac-detay/:id" element={<MacDetay />} />
+      <Route path="/mac-detay/:idOrSlug" element={<MacDetay />} />
       <Route path="/yakin-sahalar" element={<YakinSahalar />} />
       <Route path="/oyuncu-detay/:idOrSlug" element={<OyuncuDetay />} />
       <Route path="/blog" element={<Blog />} />

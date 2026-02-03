@@ -182,7 +182,7 @@ const Puanlarim = () => {
       <div className="flex-1 overflow-y-auto p-6 lg:p-8">
         <div className="max-w-5xl mx-auto space-y-6">
           {/* Header */}
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mt-12 md:mt-0">
             <div>
               <h1 className="text-2xl font-bold text-gray-900">Puanlarım</h1>
               <p className="text-sm text-gray-500 mt-1">Diğer oyunculardan aldığınız değerlendirmeler</p>

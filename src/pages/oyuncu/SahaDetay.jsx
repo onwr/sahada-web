@@ -200,7 +200,7 @@ const SahaDetay = () => {
   }
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex h-[100dvh] overflow-hidden bg-gray-50">
       <OyuncuSidebar />
 
       <div className="flex-1 flex flex-col">
@@ -248,37 +248,37 @@ const SahaDetay = () => {
             <div className="p-6">
               <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                 <div className="flex items-center space-x-3">
-                  <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                  <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center shrink-0">
                     <DollarSign className="w-6 h-6 text-green-600" />
                   </div>
-                  <div>
+                  <div className="flex flex-col min-w-0">
                     <p className="text-sm text-gray-600">Saatlik Ücret</p>
                     <p className="text-xl font-bold text-gray-900">₺{sahaData.price}</p>
                   </div>
                 </div>
                 <div className="flex items-center space-x-3">
-                  <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                  <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center shrink-0">
                     <Users className="w-6 h-6 text-blue-600" />
                   </div>
-                  <div>
+                  <div className="flex flex-col min-w-0">
                     <p className="text-sm text-gray-600">Kapasite</p>
                     <p className="text-xl font-bold text-gray-900">{sahaData.capacity} kişi</p>
                   </div>
                 </div>
                 <div className="flex items-center space-x-3">
-                  <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
+                  <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center shrink-0">
                     <Star className="w-6 h-6 text-yellow-600" />
                   </div>
-                  <div>
+                  <div className="flex flex-col min-w-0">
                     <p className="text-sm text-gray-600">Puan</p>
                     <p className="text-xl font-bold text-gray-900">{sahaData.rating || 0}/5</p>
                   </div>
                 </div>
                 <div className="flex items-center space-x-3">
-                  <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+                  <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center shrink-0">
                     <Clock className="w-6 h-6 text-purple-600" />
                   </div>
-                  <div>
+                  <div className="flex flex-col min-w-0">
                     <p className="text-sm text-gray-600">Çalışma Saatleri</p>
                     <p className="text-xl font-bold text-gray-900">{sahaData.workingHours}</p>
                   </div>

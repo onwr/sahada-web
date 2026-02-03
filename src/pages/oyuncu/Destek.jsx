@@ -331,7 +331,7 @@ const Destek = () => {
         <OyuncuSidebar />
         <div className="flex-1 p-4 sm:p-6 md:p-8">
           {/* Header */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6 mt-12 md:mt-0">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div>
                 <h1 className="text-3xl font-bold text-gray-900 mb-2">Destek Sistemi</h1>

@@ -288,7 +288,7 @@ const Bildirimler = () => {
         <div className="max-w-4xl mx-auto space-y-8">
           
           {/* Header */}
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mt-12 md:mt-0">
             <div>
               <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
                 Bildirimler

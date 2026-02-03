@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
-import { getOpenMatch, requestJoinMatch, getTesis, markMatchAsPaid } from '../services/firestoreService';
+import { getOpenMatch, requestJoinMatch, getTesis, markMatchAsPaid, slugify } from '../services/firestoreService';
 import PaymentModal from '../components/PaymentModal';
 import MatchDetailModal from '../components/MatchDetailModal';
 import { useAuth } from '../contexts/AuthContext';
@@ -13,7 +13,9 @@ import {
 } from 'lucide-react';
 
 const MacDetay = () => {
-    const { id } = useParams();
+    const { idOrSlug } = useParams();
+    // ID'yi slug'dan veya direkt parametreden al (son parça ID varsayımı)
+    const matchId = idOrSlug ? idOrSlug.split('-').pop() : '';
     const navigate = useNavigate();
     const location = useLocation();
     const [searchParams] = useSearchParams();
@@ -33,12 +35,12 @@ const MacDetay = () => {
     }, [searchParams]);
 
     useEffect(() => {
-        loadMatch();
-    }, [id]);
+        if (matchId) loadMatch();
+    }, [matchId]);
 
     const loadMatch = async () => {
         setLoading(true);
-        const result = await getOpenMatch(id);
+        const result = await getOpenMatch(matchId);
         if (result.success) {
             setMatch(result.data);
             
@@ -441,8 +443,9 @@ const MacDetay = () => {
                                         <div className="space-y-2">
                                             <button 
                                                 onClick={() => {
-                                                    const url = window.location.href;
-                                                    window.open(`https://wa.me/?text=${encodeURIComponent('Bu maça gelmelisin! ⚽ ' + url)}`, '_blank');
+                                                    const slug = slugify(match.tesisName || match.location || 'mac');
+                                                    const prettyUrl = `${window.location.origin}/mac-detay/${slug}-${match.id}`;
+                                                    window.open(`https://wa.me/?text=${encodeURIComponent('Bu maça gelmelisin! ⚽ ' + prettyUrl)}`, '_blank');
                                                 }}
                                                 className="w-full flex items-center gap-3 p-2 hover:bg-green-50 rounded-lg text-left text-sm font-medium text-gray-700 hover:text-green-700 transition-colors"
                                             >

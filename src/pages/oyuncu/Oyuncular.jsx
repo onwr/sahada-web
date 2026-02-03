@@ -108,7 +108,7 @@ const Oyuncular = () => {
       <OyuncuSidebar />
 
       <div className="flex-1 flex flex-col">
-        <header className="bg-white shadow-sm border-b px-6 py-4">
+        <header className="bg-white shadow-sm border-b px-6 py-4 mt-12 md:mt-0">
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-2xl font-bold text-gray-900">Oynadığım Oyuncular</h1>

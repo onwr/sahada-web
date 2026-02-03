@@ -1468,13 +1468,19 @@ const Rezervasyon = ({ inPanel = false }) => {
     invoiceDiv.style.margin = '0';
 
     invoiceDiv.innerHTML = `
-      <div style="width: 100%; background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%); color: #fff; padding: 40px 50px; border-radius: 12px 12px 0 0; box-shadow: 0 4px 6px rgba(0,0,0,0.1); display: flex; align-items: center; justify-content: space-between;">
-        <div>
-          <div style="font-size: 36px; font-weight: 700; letter-spacing: 2px; margin-bottom: 8px;">${siteTitle.toUpperCase()}</div>
-          <div style="font-size: 16px; opacity: 0.95; font-weight: 400;">Spor Tesisleri Rezervasyon Faturası</div>
+      <div style="width: 100%; height: 120px; background: linear-gradient(135deg, #16a34a 0%, #15803d 100%); color: #fff; padding: 0 50px; border-radius: 12px 12px 0 0; box-shadow: 0 4px 6px rgba(0,0,0,0.1); display: flex; align-items: center; justify-content: space-between;">
+        <div style="display: flex; align-items: center; gap: 20px;">
+           <div style="background: white; padding: 10px; border-radius: 12px; display: flex; align-items: center; justify-content: center; width: 80px; height: 80px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+             <img src="${logoUrl}" style="max-height: 60px; max-width: 60px; object-fit: contain;" crossorigin="anonymous" />
+           </div>
+           <div>
+             <div style="font-size: 28px; font-weight: 800; letter-spacing: 1px;">${siteTitle.toUpperCase()}</div>
+             <div style="font-size: 14px; opacity: 0.9; font-weight: 500;">Spor Tesisleri Rezervasyon Faturası</div>
+           </div>
         </div>
-        <div>
-           ${logoUrl ? `<img src="${logoUrl}" style="height: 60px; width: auto; background: white; padding: 5px; border-radius: 8px;" />` : ''}
+        <div style="text-align: right;">
+           <div style="font-size: 14px; opacity: 0.9;">Tarih: ${todayStr}</div>
+           <div style="font-size: 14px; opacity: 0.9; margin-top: 4px;">Fatura No: ${reservationId}</div>
         </div>
       </div>
       

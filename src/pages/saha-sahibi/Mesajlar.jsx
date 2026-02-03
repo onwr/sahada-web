@@ -413,7 +413,7 @@ const Mesajlar = () => {
   }
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex h-[100dvh] overflow-hidden bg-gray-50">
       <SahaSahibiSidebar />
       
       {/* Konuşma Listesi */}

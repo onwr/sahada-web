@@ -148,10 +148,7 @@ const YakinSahalar = () => {
     const normalizeSearchText = (text) => {
         if (!text) return '';
         return text
-            .toString()
-            .replace(/İ/g, 'i')
-            .replace(/I/g, 'i')
-            .toLowerCase()
+            .toLocaleLowerCase('tr-TR')
             .replace(/ı/g, 'i')
             .replace(/ğ/g, 'g')
             .replace(/ü/g, 'u')
@@ -326,6 +323,8 @@ const YakinSahalar = () => {
         });
       });
 
+
+
       const tesislerWithDistance = tesislerData.map(tesis => ({
         ...tesis,
         distance: calculateDistance(
@@ -446,17 +445,43 @@ const YakinSahalar = () => {
 
   const applyFilters = () => {
     let filtered = [...tesisler];
+    let isGeographicSearch = false;
 
     // Arama filtresi
     if (searchQuery) {
       const query = normalizeSearchText(searchQuery);
-      filtered = filtered.filter(tesis =>
+      
+      // İlk önce metin bazlı arama yap
+      const textFiltered = filtered.filter(tesis =>
         normalizeSearchText(tesis.name || '').includes(query) ||
         normalizeSearchText(tesis.location || '').includes(query) ||
         normalizeSearchText(tesis.address || '').includes(query) ||
         normalizeSearchText(tesis.city || '').includes(query) ||
         normalizeSearchText(tesis.district || '').includes(query)
       );
+
+      // Eğer metin bazlı sonuç yoksa, şehir bazlı coğrafi arama dene
+      if (textFiltered.length === 0) {
+        const cityData = getCityCoordinates(searchQuery);
+        if (cityData.success) {
+           isGeographicSearch = true;
+           // Şehir merkezine 50km çapındaki tesisleri getir
+           filtered = filtered.filter(tesis => {
+             if (!tesis.latitude || !tesis.longitude) return false;
+             const distCallback = calculateDistance(
+                 cityData.lat, 
+                 cityData.lng, 
+                 tesis.latitude, 
+                 tesis.longitude
+             );
+             return distCallback <= 50; // 50km çap
+           });
+        } else {
+           filtered = textFiltered;
+        }
+      } else {
+        filtered = textFiltered;
+      }
     }
 
     // Spor türü filtresi
@@ -476,6 +501,8 @@ const YakinSahalar = () => {
     }
 
     // Mesafe hesaplama
+    // Eğer coğrafi arama ise veya kullanıcı konumu varsa ona göre, yoksa undefined
+    // Ancak filteredTesisler state'inde distance her zaman kullanıcıya göre olmalı (listede gösterim için)
     filtered = filtered.map(tesis => ({
       ...tesis,
       distance: calculateDistance(
@@ -574,10 +601,21 @@ const YakinSahalar = () => {
 
   const handleMarkerClick = (tesis) => {
     handleTesisClick(tesis);
-    // Scroll to tesis in list
-    const element = document.getElementById(`tesis-${tesis.id}`);
-    if (element) {
-      element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    // Eğer mobildeysek, listeyi açmak için haritayı gizle
+    if (window.innerWidth < 1024) {
+         setShowMap(false);
+         // Scroll to tesis in list after layout update
+         setTimeout(() => {
+            const element = document.getElementById(`tesis-${tesis.id}`);
+            if (element) {
+              element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+         }, 100);
+    } else {
+        const element = document.getElementById(`tesis-${tesis.id}`);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
     }
   };
 
@@ -591,10 +629,20 @@ const YakinSahalar = () => {
 
   const handlePlayerMarkerClick = (oyuncu) => {
     handleOyuncuClick(oyuncu);
-    // Scroll to player in list
-    const element = document.getElementById(`oyuncu-${oyuncu.id}`);
-    if (element) {
-      element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    // Eğer mobildeysek, listeyi açmak için haritayı gizle
+    if (window.innerWidth < 1024) {
+         setShowMap(false);
+         setTimeout(() => {
+            const element = document.getElementById(`oyuncu-${oyuncu.id}`);
+            if (element) {
+              element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+         }, 100);
+    } else {
+        const element = document.getElementById(`oyuncu-${oyuncu.id}`);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
     }
   };
 
@@ -625,7 +673,7 @@ const YakinSahalar = () => {
       
       <div className="flex flex-col lg:flex-row h-[calc(100vh-64px)] overflow-hidden relative">
         {/* Sol Taraf - Harita */}
-        <div className={`relative transition-all duration-300 ${showMap ? 'h-[35vh]' : 'h-0'} lg:h-auto lg:flex-1 shrink-0 overflow-hidden`}>
+        <div className={`relative transition-all duration-300 ${showMap ? 'h-full flex-1' : 'h-0 lg:h-auto lg:flex-1'} shrink-0 overflow-hidden`}>
           <MapContainer
             center={mapCenter}
             zoom={mapZoom}
@@ -672,7 +720,7 @@ const YakinSahalar = () => {
                       <div className="relative h-24 bg-gray-100 flex-shrink-0">
                         {tesis.images && tesis.images.length > 0 ? (
                           <img 
-                            src={tesis.images[0]} 
+                            src={tesis.images[0]?.url || tesis.images[0]} 
                             alt={tesis.name} 
                             className="w-full h-full object-cover"
                             onError={(e) => {
@@ -905,16 +953,23 @@ const YakinSahalar = () => {
         {/* Mobilde Haritayı Açma/Kapama Butonu */}
         <button 
           onClick={() => setShowMap(!showMap)}
-          className={`lg:hidden absolute right-4 z-[1002] bg-green-600 text-white p-3 rounded-full shadow-2xl flex items-center justify-center hover:bg-green-700 active:scale-95 transition-all duration-300 ${
-            showMap ? 'top-[35vh] -translate-y-1/2' : 'top-4'
-          }`}
-          title={showMap ? "Haritayı Gizle" : "Haritayı Göster"}
+          className="lg:hidden absolute bottom-6 right-6 z-[1002] bg-white text-gray-800 px-4 py-3 rounded-full shadow-xl border border-gray-100 flex items-center gap-2 hover:bg-gray-50 active:scale-95 transition-all"
         >
-          {showMap ? <ChevronUp size={24} /> : <Map size={24} />}
+          {showMap ? (
+             <>
+               <Users size={20} className="text-green-600" />
+               <span className="text-sm font-bold">Listeyi Göster</span>
+             </>
+          ) : (
+             <>
+               <Map size={20} className="text-green-600" />
+               <span className="text-sm font-bold">Haritayı Göster</span>
+             </>
+          )}
         </button>
 
         {/* Sağ Taraf - Liste */}
-        <div className="w-full lg:w-96 bg-white border-t lg:border-t-0 lg:border-l border-gray-200 flex flex-col flex-1 lg:h-full min-h-0 overflow-hidden">
+        <div className={`w-full lg:w-[480px] bg-white border-t lg:border-t-0 lg:border-l border-gray-200 flex flex-col transition-all duration-300 ${showMap ? 'h-0 lg:h-full lg:flex-none' : 'h-full flex-1'} min-h-0 overflow-hidden`}>
           {/* Header */}
           <div className="p-4 border-b border-gray-200">
             <h1 className="text-xl font-bold text-gray-900 mb-3">Yakındakiler</h1>
@@ -1081,40 +1136,66 @@ const YakinSahalar = () => {
                         : 'hover:bg-gray-50'
                     }`}
                   >
-                    <div className="flex flex-col">
-                      <div className="flex justify-between items-start mb-1">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <span className="text-lg shrink-0">
-                            {tesis.type === 'Futbol' && '⚽'}
-                            {tesis.type === 'Basketbol' && '🏀'}
-                            {tesis.type === 'Tenis' && '🎾'}
-                            {tesis.type === 'Voleybol' && '🏐'}
-                            {tesis.type === 'Yüzme' && '🏊'}
-                          </span>
-                          <h3 className="font-bold text-gray-900 truncate">{tesis.name}</h3>
-                        </div>
-                        <div className="flex items-center gap-0.5 bg-yellow-50 px-1.5 py-0.5 rounded border border-yellow-100 shrink-0">
-                          <Star size={10} className="text-yellow-500" fill="currentColor" />
-                          <span className="text-yellow-700 text-[10px] font-bold">
-                            {tesis.rating ? Number(tesis.rating).toFixed(1) : '0'}
-                          </span>
-                        </div>
+                    <div className="flex gap-4">
+                      {/* Sol Taraf - Resim */}
+                      <div className="w-24 h-24 sm:w-28 sm:h-28 flex-shrink-0 bg-gray-100 rounded-lg overflow-hidden relative">
+                         {tesis.images && tesis.images.length > 0 ? (
+                           <img
+                             src={tesis.images[0]?.url || tesis.images[0]}
+                             alt={tesis.name}
+                             className="w-full h-full object-cover"
+                             onError={(e) => {
+                               e.target.onerror = null;
+                               e.target.style.display = 'none';
+                               e.target.nextSibling.style.display = 'flex';
+                             }}
+                           />
+                         ) : null}
+                         <div className={`w-full h-full absolute inset-0 flex items-center justify-center bg-gray-50 text-gray-300 ${tesis.images && tesis.images.length > 0 ? 'hidden' : 'flex'}`}>
+                             {tesis.type === 'Futbol' && '⚽'}
+                             {tesis.type === 'Basketbol' && '🏀'}
+                             {tesis.type === 'Tenis' && '🎾'}
+                             {tesis.type === 'Voleybol' && '🏐'}
+                             {tesis.type === 'Yüzme' && '🏊'}
+                         </div>
                       </div>
 
-                      <div className="flex items-center text-xs text-gray-500 mb-3 ml-7">
-                        <MapPin size={12} className="mr-0.5 shrink-0" />
-                        <span className="truncate">{tesis.location || 'Konum bilgisi yok'}</span>
-                      </div>
+                      {/* Sağ Taraf - İçerik */}
+                      <div className="flex flex-col flex-1 min-w-0">
+                          <div className="flex justify-between items-start mb-1">
+                            <h3 className="font-bold text-gray-900 truncate text-base leading-tight">{tesis.name}</h3>
+                            <div className="flex items-center gap-0.5 bg-yellow-50 px-1.5 py-0.5 rounded border border-yellow-100 shrink-0 ml-2">
+                              <Star size={10} className="text-yellow-500" fill="currentColor" />
+                              <span className="text-yellow-700 text-[10px] font-bold">
+                                {tesis.rating ? Number(tesis.rating).toFixed(1) : '0'}
+                              </span>
+                            </div>
+                          </div>
 
-                      <div className="flex items-center justify-between ml-7">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-bold text-green-600 bg-green-50 px-2 py-0.5 rounded border border-green-100">
-                            ₺{tesis.price}/sa
-                          </span>
-                          <span className="text-xs font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-100">
-                            {tesis.distance.toFixed(1)} km
-                          </span>
-                        </div>
+                          <div className="flex items-center text-xs text-gray-500 mb-2">
+                            <MapPin size={12} className="mr-1 shrink-0" />
+                            <span className="truncate">{tesis.location || 'Konum bilgisi yok'}</span>
+                          </div>
+
+                          {/* Özellikler */}
+                          {tesis.facilities && tesis.facilities.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mb-2">
+                              {tesis.facilities.slice(0, 4).map((feature, idx) => (
+                                <span key={idx} className="text-[10px] text-gray-600 bg-gray-100 px-1.5 py-0.5 rounded border border-gray-200 truncate max-w-[80px]">
+                                  {feature}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+
+                          <div className="flex items-center gap-2 mt-auto mb-1">
+                              <span className="text-xs font-bold text-green-600 bg-green-50 px-2 py-0.5 rounded border border-green-100 whitespace-nowrap">
+                                ₺{tesis.price}/sa
+                              </span>
+                              <span className="text-xs font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-100 whitespace-nowrap">
+                                {tesis.distance.toFixed(1)} km
+                              </span>
+                          </div>
                       </div>
                     </div>
 

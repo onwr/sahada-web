@@ -959,18 +959,25 @@ const Ayarlar = () => {
                                 </p>
                             </div>
                         </div>
-                        <button 
-                            onClick={handlePayment}
-                            disabled={loading || userData?.subscriptionStatus === 'active'}
-                            className={`w-full font-medium py-2 rounded-lg transition-colors flex items-center justify-center gap-2 ${
-                                userData?.subscriptionStatus === 'active' 
-                                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                                : 'bg-green-600 hover:bg-green-700 text-white'
-                            }`}
-                        >
-                            <CreditCard className="w-4 h-4" />
-                            {loading ? 'İşleniyor...' : (userData?.subscriptionStatus === 'active' ? 'Üyelik Aktif' : 'Şimdi Ödeme Yap')}
-                        </button>
+                        <div className="space-y-3 mt-4">
+                            <button 
+                                onClick={handlePayment}
+                                disabled={loading}
+                                className={`w-full font-bold py-3.5 rounded-xl transition-all flex items-center justify-center gap-2 shadow-sm hover:shadow-md ${
+                                    userData?.subscriptionStatus === 'active' 
+                                    ? 'bg-white border-2 border-green-600 text-green-600 hover:bg-green-50'
+                                    : 'bg-green-600 hover:bg-green-700 text-white'
+                                }`}
+                            >
+                                <CreditCard className="w-5 h-5" />
+                                {loading ? 'Ödeme Sayfası Açılıyor...' : (userData?.subscriptionStatus === 'active' ? 'Üyeliği Uzat / Ödeme Yap' : 'Şimdi Ödeme Yap')}
+                            </button>
+                            
+                            <div className="flex items-center justify-center gap-2 text-xs text-gray-400">
+                                <Shield className="w-3 h-3" />
+                                <span>Iyzico Altyapısı ile Güvenli Ödeme</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
 

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import jsPDF from 'jspdf';
 import { useAuth } from '../../contexts/AuthContext';
-import { getPlayerInvoices, getInvoice } from '../../services/firestoreService';
+import { getPlayerInvoices, getInvoice, getPlatformSettings } from '../../services/firestoreService';
 import { collection, query, onSnapshot, where } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import OyuncuSidebar from '../../components/OyuncuSidebar';
@@ -72,99 +72,214 @@ const Faturalar = () => {
     setShowDetailModal(true);
   };
 
-  const handleDownloadInvoice = (invoice) => {
-    const doc = new jsPDF();
+  const handleDownloadInvoice = async (invoice) => {
+    const toastId = toast.loading('Fatura hazırlanıyor...');
     
-    // Font ayarları (Türkçe karakter desteği için varsayılan fontu kullanıyoruz ama
-    // tam destek için özel font eklemek gerekebilir. Şimdilik standart ASCII karakterlerle idare edip
-    // Türkçe karakterleri normalize edebiliriz veya varsayılan fontun desteklediklerini kullanırız)
-    // Not: jsPDF varsayılan fontuyla Türkçe karakter sorunu olabilir.
-    
-    // Logo / Başlık
-    doc.setFillColor(22, 163, 74); // Green-600
-    doc.rect(0, 0, 210, 40, 'F');
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(24);
-    doc.text('SAHADA', 20, 25);
-    doc.setFontSize(12);
-    doc.text('Elektronik Rezervasyon Makbuzu', 20, 35);
+    try {
+      const doc = new jsPDF();
+      
+      // 1. Yazı Tipi Yükle (UTF-8 / Türkçe karakter desteği için)
+      // Google Fonts veya CDN'den Roboto fontunu çekiyoruz
+      try {
+        const fontResponse = await fetch('https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.66/fonts/Roboto/Roboto-Regular.ttf');
+        const fontBlob = await fontResponse.blob();
+        const reader = new FileReader();
+        
+        await new Promise((resolve) => {
+          reader.onloadend = () => {
+            const fontBase64 = reader.result.split(',')[1];
+            doc.addFileToVFS('Roboto-Regular.ttf', fontBase64);
+            doc.addFont('Roboto-Regular.ttf', 'Roboto', 'normal');
+            doc.setFont('Roboto');
+            resolve();
+          };
+          reader.readAsDataURL(fontBlob);
+        });
+      } catch (fontError) {
+        console.error('Font yükleme hatası:', fontError);
+        // Fallback: Standart font
+        doc.setFont('helvetica'); 
+      }
 
-    // Fatura Bilgileri (Sağ Üst)
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(10);
-    doc.text(`Tarih: ${invoice.date.toLocaleDateString('tr-TR')}`, 150, 25);
-    doc.text(`No: ${invoice.reservationNumber}`, 150, 32);
+      // 2. Logo Yükle
+      let logoDataUrl = null;
+      let logoWidth = 40;
+      let logoHeight = 40; // Aspect ratio'ya göre ayarlanacak
 
-    // İçerik Başlangıcı
-    doc.setTextColor(0, 0, 0);
-    let yPos = 60;
+      try {
+        // Logoyu bul: Settings > LocalStorage > Default
+        let logoUrl = localStorage.getItem('platform_logo');
+        if (!logoUrl) {
+           const settings = await getPlatformSettings();
+           if (settings.success && settings.data?.logoUrl) {
+             logoUrl = settings.data.logoUrl;
+           }
+        }
+        logoUrl = logoUrl || '/images/logo.png';
 
-    // Müşteri ve Saha Bilgileri
-    doc.setFontSize(12);
-    doc.setFont(undefined, 'bold');
-    doc.text('REZERVASYON BILGILERI', 20, yPos);
-    doc.text('SAHA BILGILERI', 120, yPos);
-    
-    yPos += 10;
-    doc.setFontSize(10);
-    doc.setFont(undefined, 'normal');
-    
-    // Müşteri (Şu anki kullanıcı)
-    const customerName = user?.displayName || user?.email || 'Sayin Musteri';
-    doc.text(customerName, 20, yPos);
-    // doc.text(user?.email || '', 20, yPos + 5);
+        // Resmi base64'e çevir
+        const imgResponse = await fetch(logoUrl);
+        const imgBlob = await imgResponse.blob();
+        const imgReader = new FileReader();
+        
+        await new Promise((resolve) => {
+          imgReader.onloadend = () => {
+            logoDataUrl = imgReader.result;
+            // Basit aspect ratio kontrolü (opsiyonel, şimdilik kare varsayalım veya sabit genişlik)
+            resolve();
+          };
+          imgReader.readAsDataURL(imgBlob);
+        });
 
-    // Saha
-    doc.text(invoice.tesisName, 120, yPos);
-    if (invoice.tesisAddress) {
-        const addressLines = doc.splitTextToSize(invoice.tesisAddress, 80);
-        doc.text(addressLines, 120, yPos + 5);
+      } catch (imgError) {
+        console.error('Logo yükleme hatası:', imgError);
+      }
+
+      // 3. PDF İçeriği Oluşturma
+      
+      // Header Arka Planı
+      doc.setFillColor(245, 245, 245); // Açık gri header arka planı
+      doc.rect(0, 0, 210, 50, 'F');
+
+      // Logo çizimi
+      if (logoDataUrl) {
+        try {
+           // Uzantı tahmini
+           const format = logoDataUrl.startsWith('data:image/png') ? 'PNG' : 'JPEG';
+           // Logoyu oranlı sığdır (Max W: 50, Max H: 30)
+           doc.addImage(logoDataUrl, format, 15, 10, 40, 0); // Height 0 yapılırsa orantılı ölçekler (jspdf)
+        } catch (e) {
+           doc.setFontSize(20);
+           doc.setTextColor(22, 163, 74);
+           doc.text('SAHADA', 20, 25);
+        }
+      } else {
+         doc.setFontSize(20);
+         doc.setTextColor(22, 163, 74);
+         doc.text('SAHADA', 20, 25);
+      }
+
+      // Başlık (Logo'nun sağına veya altına)
+      // Eğer logo sol üstteyse, başlığı biraz sağa veya header'ın sağına alabiliriz
+      // Ancak orijinal tasarımda başlık sol taraftaydı.
+      // Logo varsa başlığı biraz aşağı öteleyelim veya sağ tarafta "Makbuz" yazalım.
+      
+      // Sağ üst köşe bilgiler
+      doc.setTextColor(80, 80, 80);
+      doc.setFontSize(20);
+      doc.setFont(undefined, 'bold');
+      doc.text('REZERVASYON FİŞİ', 200, 20, { align: 'right' });
+      
+      doc.setFontSize(10);
+      doc.setFont(undefined, 'normal');
+      doc.text(`Tarih: ${invoice.date.toLocaleDateString('tr-TR')}`, 200, 30, { align: 'right' });
+      doc.text(`No: ${invoice.reservationNumber}`, 200, 35, { align: 'right' });
+
+      // İçerik Başlangıcı
+      doc.setTextColor(0, 0, 0);
+      let yPos = 70;
+
+      // Müşteri ve Saha Bilgileri
+      doc.setFontSize(11);
+      doc.setTextColor(100, 100, 100);
+      doc.setFont(undefined, 'bold');
+      doc.text('MÜŞTERİ BİLGİLERİ', 20, yPos);
+      doc.text('TESİS BİLGİLERİ', 110, yPos); // Aralığı açtık
+      
+      yPos += 8;
+      doc.setDrawColor(200, 200, 200);
+      doc.setLineWidth(0.1);
+      doc.line(20, yPos - 5, 90, yPos - 5); // Alt çizgi
+      doc.line(110, yPos - 5, 190, yPos - 5);
+
+      doc.setFontSize(10);
+      doc.setTextColor(0, 0, 0);
+      doc.setFont(undefined, 'normal');
+      
+      // Müşteri (Şu anki kullanıcı)
+      const customerName = user?.displayName || user?.email || 'Sayın Müşteri';
+      doc.text(customerName, 20, yPos);
+      // doc.text(user?.email || '', 20, yPos + 5);
+
+      // Saha Adı ve Adresi
+      // Adres uzun olabilir, splitTextToSize kullanalım
+      const tesisAdi = invoice.tesisName;
+      doc.text(tesisAdi, 110, yPos);
+      
+      if (invoice.tesisAddress) {
+          const addressLines = doc.splitTextToSize(invoice.tesisAddress, 80); // 80 birim genişlik
+          doc.setFontSize(9);
+          doc.setTextColor(80, 80, 80);
+          doc.text(addressLines, 110, yPos + 5);
+      }
+
+      yPos += 40;
+
+      // Tablo Başlıkları
+      doc.setFillColor(240, 240, 240);
+      doc.rect(20, yPos - 6, 175, 10, 'F'); // Genişliği artırdık
+      doc.setFont(undefined, 'bold');
+      doc.setFontSize(10);
+      doc.setTextColor(0, 0, 0);
+      
+      // Sütun X koordinatları
+      const col1 = 25;  // Hizmet
+      const col2 = 95;  // Tarih / Saat (80 -> 95)
+      const col3 = 145; // Kişi (130 -> 145)
+      const col4 = 175; // Tutar (170 -> 175)
+
+      doc.text('Hizmet', col1, yPos);
+      doc.text('Tarih / Saat', col2, yPos);
+      doc.text('Kişi', col3, yPos);
+      doc.text('Tutar', col4, yPos);
+
+      yPos += 15;
+      
+      // Tablo İçeriği
+      doc.setFont(undefined, 'normal');
+      doc.setFontSize(10);
+
+      // Hizmet Metni (Uzun olabilir, saralım)
+      const serviceText = `Saha Kullanım Bedeli (${invoice.paymentMethod})`;
+      const serviceLines = doc.splitTextToSize(serviceText, 65); // 65 birim genişlik
+      doc.text(serviceLines, col1, yPos);
+
+      // Diğer sütunlar (Hizmet satır sayısına göre ortalamayalım, üstten hizalayalım)
+      doc.text(`${invoice.date.toLocaleDateString('tr-TR')} ${invoice.timeSlot}`, col2, yPos);
+      doc.text(`${invoice.playerCount} Kişi`, col3, yPos);
+      doc.text(`${invoice.totalAmount.toLocaleString('tr-TR')} TL`, col4, yPos);
+
+      // Çizgi (Satır yüksekliğine göre ayarla)
+      const rowHeight = Math.max(serviceLines.length * 5, 10);
+      yPos += rowHeight + 5;
+      
+      doc.setDrawColor(220, 220, 220);
+      doc.line(20, yPos, 195, yPos);
+
+      // Toplam
+      yPos += 15;
+      doc.setFontSize(12);
+      doc.setFont(undefined, 'bold');
+      doc.text('GENEL TOPLAM:', 145, yPos, { align: 'right' }); // Hizalamayı sağa yasla veya kooordinatla
+      doc.setTextColor(22, 163, 74);
+      doc.text(`₺${invoice.totalAmount.toLocaleString('tr-TR')}`, 175, yPos);
+
+      // Alt Bilgi
+      yPos = 270;
+      doc.setTextColor(150, 150, 150);
+      doc.setFontSize(8);
+      doc.setFont(undefined, 'normal');
+      doc.text('Bu belge resmi fatura yerine geçmez, bilgi fişidir.', 105, yPos, { align: 'center' });
+      doc.text('Sahada Rezervasyon Sistemleri', 105, yPos + 5, { align: 'center' });
+
+      // Kaydet
+      doc.save(`Fatura-${invoice.reservationNumber}.pdf`);
+      toast.success('Fatura PDF olarak indirildi', { id: toastId });
+      
+    } catch (err) {
+      console.error('PDF oluşturma hatası:', err);
+      toast.error('PDF oluşturulurken bir hata meydana geldi', { id: toastId });
     }
-
-    yPos += 40;
-
-    // Tablo Başlıkları
-    doc.setFillColor(240, 240, 240);
-    doc.rect(20, yPos - 5, 170, 10, 'F');
-    doc.setFont(undefined, 'bold');
-    doc.text('Hizmet', 25, yPos);
-    doc.text('Tarih / Saat', 80, yPos);
-    doc.text('Kisi', 130, yPos);
-    doc.text('Tutar', 170, yPos);
-
-    yPos += 15;
-    
-    // Tablo İçeriği
-    doc.setFont(undefined, 'normal');
-    doc.text(`Saha Kullanim Bedeli (${invoice.paymentMethod})`, 25, yPos);
-    doc.text(`${invoice.date.toLocaleDateString('tr-TR')} ${invoice.timeSlot}`, 80, yPos);
-    doc.text(`${invoice.playerCount} Kisi`, 130, yPos);
-    doc.text(`${invoice.totalAmount.toLocaleString('tr-TR')} TL`, 170, yPos);
-
-    // Çizgi
-    yPos += 10;
-    doc.setDrawColor(200, 200, 200);
-    doc.line(20, yPos, 190, yPos);
-
-    // Toplam
-    yPos += 15;
-    doc.setFontSize(12);
-    doc.setFont(undefined, 'bold');
-    doc.text('GENEL TOPLAM:', 130, yPos);
-    doc.setTextColor(22, 163, 74);
-    doc.text(`${invoice.totalAmount.toLocaleString('tr-TR')} TL`, 170, yPos);
-
-    // Alt Bilgi
-    yPos = 250;
-    doc.setTextColor(150, 150, 150);
-    doc.setFontSize(8);
-    doc.setFont(undefined, 'normal');
-    doc.text('Bu belge resmi fatura yerine gecmez, bilgi fisidir.', 105, yPos, { align: 'center' });
-    doc.text('Sahada Rezervasyon Sistemleri', 105, yPos + 5, { align: 'center' });
-
-    // Kaydet
-    doc.save(`Fatura-${invoice.reservationNumber}.pdf`);
-    toast.success('Fatura PDF olarak indirildi');
   };
 
   const filteredInvoices = invoices.filter(invoice => {
@@ -216,7 +331,7 @@ const Faturalar = () => {
       <OyuncuSidebar />
 
       <div className="flex-1 flex flex-col">
-        <header className="bg-white shadow-sm border-b px-6 py-4">
+        <header className="bg-white shadow-sm border-b px-6 py-4 mt-12 md:mt-0">
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-2xl font-bold text-gray-900">Fatura Geçmişi</h1>

@@ -3,7 +3,7 @@ import {
   MessageSquare, ThumbsUp, UserPlus, MapPin, Calendar, Activity,
   TrendingUp, Rocket, Trophy, Share2, ImageIcon, BarChart2, Star,
   Send, MoreHorizontal, Heart, Search, Edit, Loader2, ChevronDown,
-  Globe, X, Plus, Trash2, Check
+  Globe, X, Plus, Trash2, Check, Smile, Camera
 } from 'lucide-react';
 import { uploadImage } from '../services/cdnService';
 import { PostType } from '../utils/communityTypes';
@@ -477,67 +477,89 @@ const PostSkeleton = () => (
         {/* Comment Section (Collapsible) */}
         {commentsOpen && (
           <div className="mt-4 pt-4 border-t border-gray-50 bg-gray-50/50 rounded-b-xl -mx-5 -mb-5 px-5 pb-5">
-            <div className="flex gap-3 mb-4">
-              <div className="w-8 h-8 rounded-full bg-gray-200 overflow-hidden flex-shrink-0">
-                {currentUser?.photoURL ? (
-                  <img src={currentUser.photoURL} className="w-full h-full object-cover" />
-                ) : (<UserPlus className="p-1.5" />)}
-              </div>
-              <div className="flex-1 flex gap-2">
-                <input
-                  type="text"
-                  className="flex-1 bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-green-500 outline-none"
-                  placeholder="Bir yorum yaz..."
-                  value={commentInputs[post.id] || ''}
-                  onChange={(e) => setCommentInputs(prev => ({ ...prev, [post.id]: e.target.value }))}
-                  onKeyDown={(e) => e.key === 'Enter' && handleCreateComment(post.id)}
-                />
-                <button
-                  onClick={() => handleCreateComment(post.id)}
-                  className="p-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
-                >
-                  <Send size={16} />
-                </button>
-              </div>
-            </div>
             {/* Real Comments */}
-            <div className="space-y-3 pl-11">
+            <div className="space-y-4 mb-4">
               {postComments[post.id]?.slice(0, 10).map(comment => {
                   const canDelete = currentUser?.uid === comment.authorId || currentUser?.uid === post.author.id;
                   return (
-                <div key={comment.id} className="flex items-start justify-between group/comment text-sm">
-                  <div className="flex items-start gap-2">
-                      <Link to={`/oyuncu-detay/${comment.authorSlug || comment.authorId || comment.authorUid}`} className="flex-shrink-0">
-                        <img src={comment.authorAvatar || `https://ui-avatars.com/api/?name=${comment.authorName}&background=random`} alt={comment.authorName} className="w-6 h-6 rounded-full object-cover" />
-                      </Link>
-                      <div>
-                        <Link to={`/oyuncu-detay/${comment.authorSlug || comment.authorId || comment.authorUid}`} className="font-bold text-gray-900 mr-2 hover:text-green-600 transition-colors">
-                          {comment.authorName}
-                        </Link>
-                        <span className="text-gray-600">{comment.text}</span>
-                        <p className="text-xs text-gray-400 mt-0.5">{formatTimestamp(comment.createdAt)}</p>
-                      </div>
-                  </div>
-                  {canDelete && (
-                    <button 
-                        onClick={() => handleDeleteComment(post.id, comment.id)} 
-                        className="text-gray-400 hover:text-red-500 opacity-0 group-hover/comment:opacity-100 transition-opacity p-1"
-                        title="Yorumu sil"
-                    >
-                        <Trash2 size={14} />
-                    </button>
-                  )}
+                <div key={comment.id} className="flex gap-2.5 group/comment">
+                    <Link to={`/oyuncu-detay/${comment.authorSlug || comment.authorId || comment.authorUid}`} className="flex-shrink-0 mt-0.5">
+                      <img src={comment.authorAvatar || `https://ui-avatars.com/api/?name=${comment.authorName}&background=random`} alt={comment.authorName} className="w-8 h-8 rounded-full object-cover border border-gray-200" />
+                    </Link>
+                    <div className="flex-1 min-w-0">
+                        <div className="bg-gray-100 rounded-2xl px-3 py-2 inline-block min-w-[120px]">
+                            <Link to={`/oyuncu-detay/${comment.authorSlug || comment.authorId || comment.authorUid}`} className="font-bold text-gray-900 text-sm hover:underline block mb-0.5">
+                                {comment.authorName}
+                            </Link>
+                            <span className="text-gray-800 text-sm whitespace-pre-wrap leading-relaxed block">{comment.text}</span>
+                        </div>
+                        
+                        <div className="flex items-center gap-3 mt-1 ml-1 text-xs font-semibold text-gray-500">
+                             <span>{formatTimestamp(comment.createdAt).replace(' önce', '')}</span>
+                             <button className="hover:text-gray-800 hover:underline">Beğen</button>
+                             <button className="hover:text-gray-800 hover:underline">Yanıtla</button>
+                             
+                             {canDelete && (
+                                <button 
+                                    onClick={() => handleDeleteComment(post.id, comment.id)} 
+                                    className="text-red-400 hover:text-red-600 hover:underline ml-2"
+                                >
+                                    Sil
+                                </button>
+                             )}
+                        </div>
+                    </div>
                 </div>
               )})}
               {postComments[post.id]?.length > 10 && (
-                  <Link to={`/meydan?post=${post.id}`} className="block text-center text-sm text-green-600 font-bold mt-2 hover:underline">
+                  <Link to={`/meydan?post=${post.id}`} className="block text-sm text-gray-500 font-bold mt-2 hover:underline ml-11">
                       Tüm {postComments[post.id].length} yorumu gör...
                   </Link>
               )}
               {postComments[post.id]?.length === 0 && (
-                <p className="text-sm text-gray-500 text-center">Henüz yorum yok. İlk yorumu sen yap!</p>
+                <div className="text-center py-4 opacity-50">
+                    <MessageSquare size={24} className="mx-auto mb-1 opacity-50" />
+                    <p className="text-xs">Henüz yorum yok. İlk yorumu sen yap!</p>
+                </div>
               )}
-          </div>
+            </div>
+
+            {/* Comment Input Area */}
+            <div className="flex gap-2 items-end">
+              <div className="w-8 h-8 rounded-full bg-gray-200 overflow-hidden flex-shrink-0 mb-1">
+                {currentUser?.photoURL ? (
+                  <img src={currentUser.photoURL} className="w-full h-full object-cover" />
+                ) : (<UserPlus className="p-1.5 w-full h-full text-gray-500" />)}
+              </div>
+              <div className="flex-1 bg-gray-100 rounded-3xl px-4 py-2 flex items-center gap-2 border border-transparent focus-within:border-gray-300 focus-within:bg-white transition-all">
+                <input
+                  type="text"
+                  className="flex-1 bg-transparent border-none outline-none text-sm placeholder-gray-500 min-w-0"
+                  placeholder={`Yorum yap...`}
+                  value={commentInputs[post.id] || ''}
+                  onChange={(e) => setCommentInputs(prev => ({ ...prev, [post.id]: e.target.value }))}
+                  onKeyDown={(e) => e.key === 'Enter' && handleCreateComment(post.id)}
+                />
+                <div className="flex items-center gap-1 text-gray-400">
+                    <button className="p-1 hover:bg-gray-200 rounded-full transition-colors" title="Emoji Ekle">
+                        <Smile size={20} />
+                    </button>
+                    <button className="p-1 hover:bg-gray-200 rounded-full transition-colors mobile-hidden" title="Fotoğraf Ekle">
+                        <Camera size={20} />
+                    </button>
+                    <button className="p-1 hover:bg-gray-200 rounded-full transition-colors mobile-hidden" title="GIF Ekle">
+                        <div className="border-2 border-current rounded-md w-5 h-5 flex items-center justify-center text-[8px] font-black">GIF</div>
+                    </button>
+                    <button
+                      onClick={() => handleCreateComment(post.id)}
+                      disabled={!commentInputs[post.id]?.trim()}
+                      className={`p-1 ml-1 rounded-full transition-all ${commentInputs[post.id]?.trim() ? 'text-green-600 hover:bg-green-50 rotate-0 scale-100' : 'text-gray-300 rotate-90 scale-90'}`}
+                    >
+                      <Send size={20} fill={commentInputs[post.id]?.trim() ? "currentColor" : "none"} />
+                    </button>
+                </div>
+              </div>
+            </div>
         </div>
       )}
     </div>
@@ -818,6 +840,9 @@ const Community = () => {
             awayScore: aScore,
             mvp: post.mvp
         });
+        if (post.facilityName && post.facilityName !== 'Saha Belirtilmedi') {
+            setLocationText(post.facilityName);
+        }
     } else if (post.type === PostType.REVIEW) {
         setIsReviewMode(true);
         setReviewDetails({
@@ -1456,31 +1481,31 @@ const Community = () => {
                             <span className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1"><Trophy size={14}/> Maç Skoru</span>
                             <button onClick={toggleMatchMode} className="text-gray-400 hover:text-red-500"><X size={16}/></button>
                           </div>
-                          <div className="flex flex-col sm:flex-row items-center gap-3">
-                              <div className="flex items-center gap-2 w-full sm:flex-1">
+                          <div className="flex flex-col sm:flex-row items-center gap-3 w-full">
+                              <div className="flex items-center gap-2 w-full sm:flex-1 min-w-0">
                                 <input 
                                   type="text" placeholder="Ev Sahibi" 
-                                  className="flex-1 text-center bg-white border border-gray-200 rounded px-2 py-2 text-sm font-bold placeholder:font-normal outline-none focus:border-green-500"
+                                  className="flex-1 min-w-0 text-center bg-white border border-gray-200 rounded px-2 py-2 text-sm font-bold placeholder:font-normal outline-none focus:border-green-500"
                                   value={matchDetails.homeTeam} onChange={e => setMatchDetails({...matchDetails, homeTeam: e.target.value})}
                                 />
                                 <input 
                                   type="number" placeholder="0" 
-                                  className="w-12 text-center bg-white border border-gray-200 rounded px-1 py-2 font-black text-lg outline-none focus:border-green-500"
+                                  className="w-12 text-center bg-white border border-gray-200 rounded px-1 py-2 font-black text-lg outline-none focus:border-green-500 shrink-0"
                                   value={matchDetails.homeScore} onChange={e => setMatchDetails({...matchDetails, homeScore: e.target.value})}
                                 />
                               </div>
                               
-                              <span className="hidden sm:block text-gray-400 font-bold">-</span>
+                              <span className="hidden sm:block text-gray-400 font-bold shrink-0">-</span>
                               
-                              <div className="flex items-center gap-2 w-full sm:flex-1">
+                              <div className="flex items-center gap-2 w-full sm:flex-1 min-w-0">
                                 <input 
                                   type="number" placeholder="0" 
-                                  className="w-12 text-center bg-white border border-gray-200 rounded px-1 py-2 font-black text-lg outline-none focus:border-green-500"
+                                  className="w-12 text-center bg-white border border-gray-200 rounded px-1 py-2 font-black text-lg outline-none focus:border-green-500 shrink-0"
                                   value={matchDetails.awayScore} onChange={e => setMatchDetails({...matchDetails, awayScore: e.target.value})}
                                 />
                                 <input 
                                   type="text" placeholder="Deplasman" 
-                                  className="flex-1 text-center bg-white border border-gray-200 rounded px-2 py-2 text-sm font-bold placeholder:font-normal outline-none focus:border-green-500"
+                                  className="flex-1 min-w-0 text-center bg-white border border-gray-200 rounded px-2 py-2 text-sm font-bold placeholder:font-normal outline-none focus:border-green-500"
                                   value={matchDetails.awayTeam} onChange={e => setMatchDetails({...matchDetails, awayTeam: e.target.value})}
                                 />
                               </div>
@@ -1490,6 +1515,56 @@ const Community = () => {
                             className="w-full bg-white border border-gray-200 rounded px-3 py-1.5 text-sm"
                             value={matchDetails.mvp} onChange={e => setMatchDetails({...matchDetails, mvp: e.target.value})}
                           />
+                          
+                          {/* Facility Selector for Match */}
+                          <div className="relative">
+                             <div className="relative">
+                              <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                              <input 
+                                type="text"
+                                placeholder="Saha ara... (İsteğe bağlı)"
+                                className="w-full bg-white border border-gray-200 rounded px-3 py-1.5 pl-10 text-sm focus:border-green-500 outline-none"
+                                value={locationText}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setLocationText(val);
+                                  setTesisSearchQuery(val);
+                                  setShowTesisDropdown(val.length >= 3);
+                                }}
+                                onFocus={() => locationText && locationText.length >= 3 && setShowTesisDropdown(true)}
+                              />
+                             </div>
+
+                            {showTesisDropdown && tesisSearchQuery.length >= 3 && (
+                                <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-xl max-h-60 overflow-y-auto">
+                                {allTesisler
+                                    .filter(t => t.name?.toLowerCase().includes(tesisSearchQuery.toLowerCase()))
+                                    .map(tesis => (
+                                    <button
+                                        key={tesis.id}
+                                        type="button"
+                                        className="w-full text-left px-4 py-3 hover:bg-gray-50 flex items-center justify-between border-b border-gray-50 last:border-0"
+                                        onClick={() => {
+                                        setLocationText(tesis.name);
+                                        setTesisSearchQuery('');
+                                        setShowTesisDropdown(false);
+                                        }}
+                                    >
+                                        <div>
+                                        <p className="font-bold text-gray-900 text-sm">{tesis.name}</p>
+                                        <p className="text-xs text-gray-500">{tesis.location || tesis.address}</p>
+                                        </div>
+                                        <span className="text-[10px] font-bold bg-gray-100 text-gray-700 px-2 py-1 rounded uppercase">
+                                            {tesis.type || 'Saha'}
+                                        </span>
+                                    </button>
+                                    ))}
+                                {allTesisler.filter(t => t.name?.toLowerCase().includes(tesisSearchQuery.toLowerCase())).length === 0 && (
+                                    <div className="p-4 text-center text-gray-500 text-sm">Saha bulunamadı.</div>
+                                )}
+                                </div>
+                            )}
+                          </div>
                       </div>
                   )}
 
