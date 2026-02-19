@@ -552,7 +552,13 @@ const Turnuvalar = () => {
               <p className="text-gray-600 mt-1">Aktif turnuvaları yönetin ve takip edin</p>
             </div>
             <div className="flex items-center space-x-4">
-              <button className="flex items-center space-x-2 px-4 py-2 text-gray-600 hover:bg-gray-50 rounded-lg">
+              <button 
+                onClick={() => {
+                  toast.info('Takvim indirme özelliği yakında eklenecektir.'); // Placeholder functionality
+                  console.log('Takvim indir tıklandı');
+                }}
+                className="flex items-center space-x-2 px-4 py-2 text-gray-600 hover:bg-gray-50 rounded-lg"
+              >
                 <Calendar className="w-4 h-4" />
                 <span>📅 Takvimi İndir</span>
               </button>

@@ -36,7 +36,7 @@ import {
   MoreVertical,
   Clock // New icon
 } from 'lucide-react';
-import { updateDoc, doc, serverTimestamp } from 'firebase/firestore'; // Import direct firestore utils handling accept without notification id
+import { updateDoc, doc, serverTimestamp, deleteDoc } from 'firebase/firestore'; // Import direct firestore utils handling accept without notification id
 import toast from '../../utils/toast';
 
 const Mesajlar = () => {
@@ -741,20 +741,36 @@ const Mesajlar = () => {
                         <div className="flex gap-3 justify-center">
                             <button 
                                 onClick={async () => {
-                                    toast.loading('İşleniyor...');
+                                    const toastId = toast.loading('İşleniyor...');
                                     try {
                                         const convRef = doc(db, 'conversations', selectedConversation.id);
                                         await updateDoc(convRef, { status: 'accepted', updatedAt: serverTimestamp() });
                                         
+                                        // İlgili bildirimleri temizle (Best effort)
+                                        try {
+                                            const notificationsRef = collection(db, 'notifications');
+                                            const q = query(
+                                                notificationsRef, 
+                                                where('relatedId', '==', selectedConversation.id),
+                                                where('type', '==', 'message_request')
+                                            );
+                                            const snapshot = await getDocs(q);
+                                            // Silme işlemleri paralel
+                                            const deletePromises = snapshot.docs.map(d => deleteDoc(d.ref));
+                                            await Promise.all(deletePromises);
+                                        } catch (notifError) {
+                                            console.warn('Bildirim temizleme hatası:', notifError);
+                                        }
+
                                         // Arayüzü anında güncelle
                                         setSelectedConversation(prev => ({ ...prev, status: 'accepted' }));
                                         
-                                        toast.dismiss();
+                                        toast.dismiss(toastId);
                                         toast.success('Davet kabul edildi');
                                     } catch (error) {
                                         console.error('Kabul hatası:', error);
-                                        toast.dismiss();
-                                        toast.error('İşlem başarısız');
+                                        toast.dismiss(toastId);
+                                        toast.error('İşlem başarısız: ' + error.message);
                                     }
                                 }}
                                 className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium"

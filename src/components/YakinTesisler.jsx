@@ -335,9 +335,12 @@ const YakinTesisler = () => {
                               {/* Title & Rating */}
                               <div className="flex justify-between items-start mb-3">
                                   <h2 className="text-lg font-bold text-gray-900 leading-tight line-clamp-1 group-hover:text-green-600 transition-colors">{facility.name}</h2>
-                                  <div className="bg-yellow-400 text-white text-xs font-bold px-2 py-1 rounded flex items-center gap-1 shrink-0 shadow-sm">
-                                      <Star size={12} fill="currentColor" /> {facility.rating}
-                                  </div>
+                                  {facility.ratingCount > 0 && (
+                                    <div className="bg-yellow-400 text-white text-[10px] sm:text-xs font-bold px-2 py-1 rounded flex items-center gap-1 shrink-0 shadow-sm">
+                                        <Star size={12} fill="currentColor" /> {facility.rating}
+                                        <span className="opacity-80 font-normal">({facility.ratingCount})</span>
+                                    </div>
+                                  )}
                               </div>
 
                               {/* Location */}

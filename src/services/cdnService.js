@@ -19,7 +19,7 @@ const handleError = (error) => {
   };
 };
 
-// Resim yükleme
+// Resim yükleme (ImgBB API kullanarak)
 export const uploadImage = async (file, category, userId) => {
   try {
     // Dosya validasyonu
@@ -27,50 +27,39 @@ export const uploadImage = async (file, category, userId) => {
       throw new Error('Dosya seçilmedi');
     }
 
-    if (!file.type.startsWith('image/') && file.type !== 'application/pdf') {
-      throw new Error('Sadece resim dosyaları ve PDF yüklenebilir');
+    if (!file.type.startsWith('image/')) {
+      throw new Error('Sadece resim dosyaları yüklenebilir');
     }
 
     if (file.size > 10 * 1024 * 1024) { // 10MB
       throw new Error('Dosya boyutu 10MB\'dan küçük olmalıdır');
     }
 
+    // ImgBB API key - env'den al, yoksa varsayılan kullan
+    const IMGBB_API_KEY = import.meta.env.VITE_IMGBB_API_KEY || '2e2c6f6a7e4b8a9d3f1e5c7b0a4d6e8f';
+
     const formData = new FormData();
     formData.append('image', file);
-    formData.append('category', category);
-    formData.append('user_id', userId);
+    formData.append('name', `${category}_${userId}_${Date.now()}`);
 
-    console.log('CDN Upload URL:', `${CDN_CONFIG.baseUrl}`);
-    console.log('API Key:', getApiKey());
-    console.log('Form Data:', {
-      category,
-      userId,
-      fileName: file.name,
-      fileSize: file.size,
-      fileType: file.type
-    });
-
-    const response = await fetch(`${CDN_CONFIG.baseUrl}`, {
+    const response = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${getApiKey()}`
-      },
       body: formData
     });
 
-    console.log('Response status:', response.status);
-    console.log('Response headers:', response.headers);
-
     const result = await response.json();
-    console.log('Response data:', result);
 
-    if (!response.ok) {
-      throw new Error(result.message || 'Resim yüklenemedi');
+    if (!response.ok || !result.success) {
+      throw new Error(result.error?.message || 'Resim yüklenemedi');
     }
 
     return {
       success: true,
-      data: result.data
+      data: {
+        url: result.data.url,
+        display_url: result.data.display_url,
+        thumb: result.data.thumb?.url
+      }
     };
   } catch (error) {
     console.error('Upload error details:', error);

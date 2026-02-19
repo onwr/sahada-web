@@ -752,12 +752,15 @@ const YakinSahalar = () => {
                         {/* Başlık */}
                         <div className="flex justify-between items-start mb-1 gap-2">
                            <h3 className="font-bold text-gray-900 text-sm leading-snug line-clamp-2">{tesis.name}</h3>
-                           <div className="flex items-center gap-0.5 bg-yellow-50 px-1.5 py-0.5 rounded border border-yellow-100 shrink-0">
-                              <Star size={10} className="text-yellow-500" fill="currentColor" />
-                              <span className="text-yellow-700 text-[10px] font-bold">
-                                {tesis.rating ? Number(tesis.rating).toFixed(1) : 'Yeni'}
-                              </span>
-                           </div>
+                           {tesis.ratingCount > 0 && (
+                             <div className="flex items-center gap-0.5 bg-yellow-50 px-1.5 py-0.5 rounded border border-yellow-100 shrink-0">
+                               <Star size={10} className="text-yellow-500" fill="currentColor" />
+                               <span className="text-yellow-700 text-[10px] font-bold">
+                                 {Number(tesis.rating).toFixed(1)}
+                                 <span className="text-[8px] font-normal text-yellow-600/70 ml-0.5">({tesis.ratingCount})</span>
+                               </span>
+                             </div>
+                           )}
                         </div>
 
                         {/* Konum ve Navigasyon */}
@@ -1164,12 +1167,15 @@ const YakinSahalar = () => {
                       <div className="flex flex-col flex-1 min-w-0">
                           <div className="flex justify-between items-start mb-1">
                             <h3 className="font-bold text-gray-900 truncate text-base leading-tight">{tesis.name}</h3>
-                            <div className="flex items-center gap-0.5 bg-yellow-50 px-1.5 py-0.5 rounded border border-yellow-100 shrink-0 ml-2">
-                              <Star size={10} className="text-yellow-500" fill="currentColor" />
-                              <span className="text-yellow-700 text-[10px] font-bold">
-                                {tesis.rating ? Number(tesis.rating).toFixed(1) : '0'}
-                              </span>
-                            </div>
+                            {tesis.ratingCount > 0 && (
+                              <div className="flex items-center gap-0.5 bg-yellow-50 px-1.5 py-0.5 rounded border border-yellow-100 shrink-0 ml-2">
+                                <Star size={10} className="text-yellow-500" fill="currentColor" />
+                                <span className="text-yellow-700 text-[10px] font-bold">
+                                  {Number(tesis.rating).toFixed(1)}
+                                  <span className="text-[8px] font-normal text-yellow-600/70 ml-0.5">({tesis.ratingCount})</span>
+                                </span>
+                              </div>
+                            )}
                           </div>
 
                           <div className="flex items-center text-xs text-gray-500 mb-2">

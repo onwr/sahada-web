@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import SahaSahibiSidebar from '../../components/SahaSahibiSidebar';
 import { 
@@ -39,6 +40,7 @@ import {
 } from 'lucide-react';
 
 const Marketing = () => {
+  const navigate = useNavigate();
   const { user, userData } = useAuth();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [loading, setLoading] = useState(false);
@@ -468,7 +470,10 @@ const Marketing = () => {
               <p className="text-gray-600 mt-1">Kampanyalar, müşteri segmentleri ve mesaj yönetimi</p>
             </div>
             <div className="flex items-center space-x-4">
-              <button className="flex items-center space-x-2 px-4 py-2 text-gray-600 hover:bg-gray-50 rounded-lg">
+              <button
+                onClick={() => navigate('/saha-sahibi/raporlar')}
+                className="flex items-center space-x-2 px-4 py-2 text-gray-600 hover:bg-gray-50 rounded-lg"
+              >
                 <BarChart3 className="w-4 h-4" />
                 <span>📊 Raporları Gör</span>
               </button>

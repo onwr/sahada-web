@@ -220,7 +220,11 @@ const Mesajlar = () => {
     try {
       const result = await createOrGetConversation(user.uid, otherUserId);
       if (result.success) {
-        const conversation = result.data;
+        const conversation = {
+          ...result.data,
+          otherUserId,
+          otherUser: null // Listener güncelleyene kadar placeholder (veya aşağıda çekilen userResult.data)
+        };
         setSelectedConversation(conversation);
         setShowMobileConversationList(false);
         setSearchParams({ conversationId: conversation.id });

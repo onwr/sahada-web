@@ -518,7 +518,7 @@ const MacDetay = () => {
             <MatchDetailModal
                 isOpen={isChatModalOpen}
                 onClose={() => setIsChatModalOpen(false)}
-                match={{...match, id}}
+                match={{...match, id: matchId}}
                 currentUser={user}
             />
         </div>

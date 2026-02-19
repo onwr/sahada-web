@@ -9,7 +9,7 @@ import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { Timestamp } from 'firebase/firestore';
 import 'react-datepicker/dist/react-datepicker.css';
-import { ChevronLeft, ChevronRight, MapPin, Clock, Users, ArrowLeft, Plus, Trash2, Check, CreditCard, Download, Shield, MessageSquare, Phone, Globe, Info, X, Wallet, Zap } from 'lucide-react';
+import { ChevronLeft, ChevronRight, MapPin, Clock, Users, ArrowLeft, Plus, Trash2, Check, CreditCard, Download, Shield, MessageSquare, Phone, Globe, Info, X, Wallet, Zap, AlertCircle } from 'lucide-react';
 import Header from '../components/Header';
 import AuthModal from '../components/AuthModal';
 
@@ -415,6 +415,11 @@ const Rezervasyon = ({ inPanel = false }) => {
       fetchUserTeams();
     }
   }, [user, userData]);
+
+  // Sayfa adımı değiştiğinde veya sayfa yüklendiğinde en yukarı kaydır
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [currentStep]);
 
   const addTeamMembers = async (team) => {
     if (!team || !team.members) return;
@@ -1470,8 +1475,8 @@ const Rezervasyon = ({ inPanel = false }) => {
     invoiceDiv.innerHTML = `
       <div style="width: 100%; height: 120px; background: linear-gradient(135deg, #16a34a 0%, #15803d 100%); color: #fff; padding: 0 50px; border-radius: 12px 12px 0 0; box-shadow: 0 4px 6px rgba(0,0,0,0.1); display: flex; align-items: center; justify-content: space-between;">
         <div style="display: flex; align-items: center; gap: 20px;">
-           <div style="background: white; padding: 10px; border-radius: 12px; display: flex; align-items: center; justify-content: center; width: 80px; height: 80px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-             <img src="${logoUrl}" style="max-height: 60px; max-width: 60px; object-fit: contain;" crossorigin="anonymous" />
+           <div style="background: white; padding: 10px; border-radius: 12px; display: flex; align-items: center; justify-content: center; width: 80px; height: 80px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); overflow: hidden;">
+             <img src="${logoUrl}" style="max-height: 100%; max-width: 100%; object-fit: contain;" crossorigin="anonymous" onerror="this.style.display='none'" />
            </div>
            <div>
              <div style="font-size: 28px; font-weight: 800; letter-spacing: 1px;">${siteTitle.toUpperCase()}</div>
@@ -1522,7 +1527,7 @@ const Rezervasyon = ({ inPanel = false }) => {
         </div>
 
         <!-- Ödeme Bilgileri -->
-        <div style="background: #f8fafc; padding: 20px; border-radius: 12px; margin-bottom: 30px; border-left: 4px solid #0ea5e9;">
+        <div style="background: #f8fafc; padding: 20px; border-radius: 12px; margin-bottom: 30px; border-left: 4px solid #16a34a;">
           <div style="font-size: 13px; color: #64748b; margin-bottom: 8px;">Ödeme Durumu</div>
           <div style="font-size: 16px; font-weight: 600; color: #0f172a;">
             ${paymentStatus === 'completed' ? 'Ödeme Tamamlandı' : paymentStatus === 'partial_payment' ? 'Kısmi Ödeme' : 'Beklemede'}
@@ -1551,9 +1556,9 @@ const Rezervasyon = ({ inPanel = false }) => {
             ` : ''}
           </tbody>
           <tfoot>
-            <tr style="background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%); color: #fff;">
-              <td style="padding: 20px; font-weight: 700; font-size: 16px; border: 1px solid #0284c7;">TOPLAM</td>
-              <td style="text-align: right; padding: 20px; font-weight: 700; font-size: 16px; border: 1px solid #0284c7;">₺${commissionData.totalAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+            <tr style="background: linear-gradient(135deg, #16a34a 0%, #15803d 100%); color: #fff;">
+              <td style="padding: 20px; font-weight: 700; font-size: 16px; border: 1px solid #15803d;">TOPLAM</td>
+              <td style="text-align: right; padding: 20px; font-weight: 700; font-size: 16px; border: 1px solid #15803d;">₺${commissionData.totalAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
             </tr>
           </tfoot>
         </table>
@@ -1581,7 +1586,7 @@ const Rezervasyon = ({ inPanel = false }) => {
         <div style="margin-top: 40px; padding-top: 30px; border-top: 2px solid #e2e8f0; text-align: center;">
           <div style="font-size: 11px; color: #64748b; line-height: 1.6;">
             Bu fatura otomatik olarak oluşturulmuştur.<br>
-            Herhangi bir sorunuz için <strong style="color: #0ea5e9;">destek@sahada.com</strong> adresinden bizimle iletişime geçebilirsiniz.
+            Herhangi bir sorunuz için <strong style="color: #16a34a;">destek@sahada.com</strong> adresinden bizimle iletişime geçebilirsiniz.
           </div>
           <div style="font-size: 10px; color: #94a3b8; margin-top: 12px;">
             Â© ${new Date().getFullYear()} Sahada - Tüm hakları saklıdır.
@@ -1597,7 +1602,8 @@ const Rezervasyon = ({ inPanel = false }) => {
       const canvas = await html2canvas(invoiceDiv, {
         scale: 2,
         useCORS: true,
-        logging: false,
+        allowTaint: true,
+        logging: true,
         backgroundColor: '#ffffff',
         width: invoiceDiv.offsetWidth,
         height: invoiceDiv.scrollHeight
@@ -2207,6 +2213,11 @@ const Rezervasyon = ({ inPanel = false }) => {
                         </div>
                         <h3 className="font-bold text-gray-900">Bölünmüş Ödeme</h3>
                         <p className="text-xs text-gray-500 mt-1">Sadece kendi payınızı ödeyin, kalanını arkadaşlarınız ödesin.</p>
+                        {oyuncular.length <= 1 && (
+                            <div className="mt-2 text-[10px] text-red-500 font-bold bg-red-50 p-1.5 rounded-lg border border-red-100 animate-pulse">
+                                ⚠ Bu özellik için kadroda en az 2 oyuncu olmalıdır.
+                            </div>
+                        )}
                         {selectedPaymentMethod === 'kredi-karti' && splitPaymentEnabled && (
                             <div className="absolute top-4 right-4">
                                 <div className="w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center">
@@ -2451,45 +2462,50 @@ const Rezervasyon = ({ inPanel = false }) => {
                   </button>
                   <button
                     onClick={() => {
-                        // Invoice Validation Check
-                        if (acceptTerms) {
-                             const isCorporate = invoiceData.type === 'kurumsal';
-                             const isIndividual = !invoiceData.type || invoiceData.type === 'bireysel';
-                             
-                             if (!invoiceData.name || !invoiceData.address || !invoiceData.city || !invoiceData.district) {
-                                 toast.error('Lütfen fatura bilgilerini eksiksiz doldurunuz.');
-                                 // Highlight invoice section
-                                 document.querySelector('.bg-green-100')?.scrollIntoView({ behavior: 'smooth' });
+                         if (!acceptTerms) {
+                             toast.error('Lütfen devam etmeden önce kullanım koşullarını ve iptal politikasını onaylayın.');
+                             // Onay kutusuna odaklan/kaydır
+                             const checkboxEl = document.querySelector('input[type="checkbox"]');
+                             checkboxEl?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                             return;
+                         }
+
+                         const isCorporate = invoiceData.type === 'kurumsal';
+                         const isIndividual = !invoiceData.type || invoiceData.type === 'bireysel';
+                         
+                         if (!invoiceData.name || !invoiceData.address || !invoiceData.city || !invoiceData.district) {
+                             toast.error('Lütfen fatura bilgilerini eksiksiz doldurunuz.');
+                             // Highlight invoice section
+                             document.querySelector('.bg-green-100')?.scrollIntoView({ behavior: 'smooth' });
+                             return;
+                         }
+                         
+                         if (isIndividual && (invoiceData.taxNumber?.length !== 11)) {
+                             toast.error('Bireysel fatura için 11 haneli TC Kimlik Numarası gereklidir.');
+                             return;
+                         }
+                         
+                         if (isCorporate) {
+                             if (!invoiceData.taxOffice) {
+                                 toast.error('Kurumsal fatura için Vergi Dairesi boş bırakılamaz.');
                                  return;
                              }
-                             
-                             if (isIndividual && (invoiceData.taxNumber?.length !== 11)) {
-                                 toast.error('Bireysel fatura için 11 haneli TC Kimlik Numarası gereklidir.');
+                             if (invoiceData.taxNumber?.length !== 10) {
+                                 toast.error('Kurumsal fatura için 10 haneli Vergi Numarası gereklidir.');
                                  return;
                              }
-                             
-                             if (isCorporate) {
-                                 if (!invoiceData.taxOffice) {
-                                     toast.error('Kurumsal fatura için Vergi Dairesi boş bırakılamaz.');
-                                     return;
-                                 }
-                                 if (invoiceData.taxNumber?.length !== 10) {
-                                     toast.error('Kurumsal fatura için 10 haneli Vergi Numarası gereklidir.');
-                                     return;
-                                 }
-                             }
-                        }
+                         }
                         
                         handlePaymentSubmit();
                     }}
-                    disabled={!acceptTerms || isPaymentProcessing}
+                    disabled={isPaymentProcessing}
                     className={`flex-1 md:flex-none px-12 py-3 rounded-xl font-bold transition-all shadow-lg active:scale-95 flex items-center justify-center gap-2 ${
-                      acceptTerms && !isPaymentProcessing
+                      !isPaymentProcessing
                         ? selectedPaymentMethod === 'sahada-odeme'
                           ? 'bg-orange-500 text-white hover:bg-orange-600 shadow-orange-100'
                           : 'bg-blue-600 text-white hover:bg-blue-700 shadow-blue-100'
                         : 'bg-gray-200 text-gray-400 cursor-not-allowed shadow-none'
-                    }`}
+                    } ${!acceptTerms && !isPaymentProcessing ? 'ring-2 ring-red-500/20' : ''}`}
                   >
                     {isPaymentProcessing ? (
                         <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -2746,15 +2762,16 @@ const Rezervasyon = ({ inPanel = false }) => {
                   {/* Ödeme Butonu */}
                   <button
                     onClick={handlePaymentSubmit}
-                    disabled={!acceptTerms || isPaymentProcessing}
+                    disabled={isPaymentProcessing}
                     className={`w-full py-4 rounded-xl font-black transition-all shadow-xl active:scale-95 flex items-center justify-center gap-2 uppercase tracking-tighter text-sm ${
-                      acceptTerms && !isPaymentProcessing
+                      !isPaymentProcessing
                         ? selectedPaymentMethod === 'sahada-odeme'
                           ? 'bg-gradient-to-r from-orange-500 to-orange-600 text-white hover:shadow-orange-200'
                           : 'bg-gradient-to-r from-blue-600 to-blue-700 text-white hover:shadow-blue-200'
                         : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                    }`}
+                    } ${!acceptTerms && !isPaymentProcessing ? 'opacity-80' : ''}`}
                   >
+                    {!acceptTerms && !isPaymentProcessing && <AlertCircle size={18} className="text-white animate-pulse" />}
                     {isPaymentProcessing ? (
                         <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                     ) : (

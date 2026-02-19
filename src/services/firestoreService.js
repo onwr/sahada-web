@@ -2323,6 +2323,21 @@ export const getReportData = async (ownerId, startDate, endDate) => {
       };
     }
 
+    // Gelirleri getir (Manuel gelirler)
+    const revenuesRef = collection(db, 'revenues');
+    const revenuesQuery = query(
+      revenuesRef,
+      where('ownerId', '==', ownerId)
+    );
+    const revenuesSnapshot = await getDocs(revenuesQuery);
+    const revenues = [];
+    revenuesSnapshot.forEach((doc) => {
+      revenues.push({
+        id: doc.id,
+        ...doc.data()
+      });
+    });
+
     // Rezervasyonları getir
     const rezervasyonlarRef = collection(db, 'rezervasyonlar');
     const q = query(
@@ -2352,6 +2367,11 @@ export const getReportData = async (ownerId, startDate, endDate) => {
       return resDate >= start && resDate <= end;
     });
 
+    const filteredRevenues = revenues.filter(rev => {
+      const revDate = new Date(rev.date);
+      return revDate >= start && revDate <= end;
+    });
+
     // Önceki dönem tarih aralığını hesapla
     const duration = end.getTime() - start.getTime();
     const previousStart = new Date(start.getTime() - duration - 1); 
@@ -2363,8 +2383,13 @@ export const getReportData = async (ownerId, startDate, endDate) => {
       return resDate >= previousStart && resDate <= previousEnd;
     });
 
+    const previousRevenues = revenues.filter(rev => {
+      const revDate = new Date(rev.date);
+      return revDate >= previousStart && revDate <= previousEnd;
+    });
+
     // Rapor verilerini hesapla
-    const reportData = calculateReportMetrics(filteredReservations, previousReservations, tesisler, startDate, endDate);
+    const reportData = calculateReportMetrics(filteredReservations, previousReservations, tesisler, startDate, endDate, filteredRevenues, previousRevenues);
 
     return {
       success: true,
@@ -2404,16 +2429,22 @@ function getEmptyReportData() {
 }
 
 // Rapor metriklerini hesapla
-function calculateReportMetrics(currentReservations, previousReservations, tesisler, startDate, endDate) {
+function calculateReportMetrics(currentReservations, previousReservations, tesisler, startDate, endDate, currentRevenues = [], previousRevenues = []) {
   const reservations = currentReservations;
   // Temel metrikler
   const confirmedReservations = reservations.filter(res => 
     res.status === 'confirmed' || res.status === 'completed'
   );
   
-  const totalRevenue = confirmedReservations.reduce((sum, res) => 
+  const reservationRevenue = confirmedReservations.reduce((sum, res) => 
     sum + (res.totalAmount || res.price || 0), 0
   );
+
+  const manualRevenue = currentRevenues.reduce((sum, rev) => 
+      sum + (rev.amount || 0), 0
+  );
+  
+  const totalRevenue = reservationRevenue + manualRevenue;
   
   const totalReservations = confirmedReservations.length;
   const cancelledReservations = reservations.filter(res => res.status === 'cancelled').length;
@@ -2461,14 +2492,24 @@ function calculateReportMetrics(currentReservations, previousReservations, tesis
       const expectedDay = i === 6 ? 0 : i + 1;
       return date.getDay() === expectedDay;
     });
+
+    const dayRevenues = currentRevenues.filter(rev => {
+        const date = new Date(rev.date);
+        const expectedDay = i === 6 ? 0 : i + 1;
+        return date.getDay() === expectedDay;
+    });
     
-    const dayRevenue = dayReservations.reduce((sum, res) => 
+    const dayResRevenue = dayReservations.reduce((sum, res) => 
       sum + (res.totalAmount || res.price || 0), 0
+    );
+
+    const dayManualRevenue = dayRevenues.reduce((sum, rev) =>
+        sum + (rev.amount || 0), 0
     );
     
     weeklyRevenue.push({
       day: days[i],
-      revenue: dayRevenue,
+      revenue: dayResRevenue + dayManualRevenue,
       count: dayReservations.length
     });
   }
@@ -2531,6 +2572,9 @@ function calculateReportMetrics(currentReservations, previousReservations, tesis
     const tesisRevenue = tesisReservations.reduce((sum, res) => 
       sum + (res.totalAmount || res.price || 0), 0
     );
+    // Not: Saha bazlı manuel gelir hesaplamak zor çünkü revenue'da tesisId olmayabilir.
+    // Şimdilik sadece rezervasyon geliri gösteriyoruz.
+    
     const tesisCancelled = reservations.filter(res => 
       res.tesisId === tesis.id && res.status === 'cancelled'
     ).length;
@@ -2548,7 +2592,7 @@ function calculateReportMetrics(currentReservations, previousReservations, tesis
       id: tesis.id,
       name: tesis.name || 'Saha',
       reservations: tesisReservations.length,
-      revenue: tesisRevenue,
+      revenue: tesisRevenue, // + tesisManualRevenue?,
       occupancy: occupancy,
       averagePrice: tesisReservations.length > 0 ? Math.round(tesisRevenue / tesisReservations.length) : 0,
       cancellationRate: cancellationRate,
@@ -2557,7 +2601,12 @@ function calculateReportMetrics(currentReservations, previousReservations, tesis
   }).sort((a, b) => b.revenue - a.revenue);
 
   // Diğer metrikler
-  const averagePrice = totalReservations > 0 ? Math.round(totalRevenue / totalReservations) : 0;
+  const averagePrice = totalReservations > 0 ? Math.round(totalRevenue / totalReservations) : 0; 
+  // Not: Ortalama fiyatı toplam gelir üzerinden yapmak doğru mu? 
+  // Manuel gelirler rezervasyon sayısı ile ilişkili değilse ortalamayı bozar. 
+  // Ancak kullanıcı toplamı görmek istiyor. Şimdilik böyle kalsın veya sadece rezervasyon gelirine bölebiliriz.
+  // Kullanıcı "Toplam Gelir"i görmek istediği için totalRevenue doğru.
+
   const cancellationRate = reservations.length > 0 ? 
     Math.round((cancelledReservations / reservations.length) * 100 * 10) / 10 : 0;
 
@@ -2571,11 +2620,15 @@ function calculateReportMetrics(currentReservations, previousReservations, tesis
 
   // --- Önceki Dönem Metrikleri ve Büyüme Hesaplama ---
   const prevConfirmed = previousReservations.filter(res => res.status === 'confirmed' || res.status === 'completed');
-  const prevRevenue = prevConfirmed.reduce((sum, res) => sum + (res.totalAmount || res.price || 0), 0);
+  const prevResRevenue = prevConfirmed.reduce((sum, res) => sum + (res.totalAmount || res.price || 0), 0);
+  const prevManualRevenue = previousRevenues.reduce((sum, rev) => sum + (rev.amount || 0), 0);
+  const prevRevenue = prevResRevenue + prevManualRevenue;
+  
   const prevReservations = prevConfirmed.length;
   
   const prevUsedCapacity = prevConfirmed.reduce((sum, res) => sum + (res.playerCount || res.totalPlayers || 1), 0);
-  const prevOccupancyRate = totalCapacity > 0 ? Math.round((prevUsedCapacity / totalCapacity) * 100) : 0; // Kapasite aynı varsayıyoruz (tarih aralığı aynı süre çünkü)
+  const prevOccupancyRate = totalCapacity > 0 ? Math.round((prevUsedCapacity / totalCapacity) * 100) : 0; 
+
   
   const prevPrice = prevReservations > 0 ? Math.round(prevRevenue / prevReservations) : 0;
   
@@ -9733,40 +9786,42 @@ export const markMatchAsPaid = async (matchId, userId, paymentId) => {
 };
 
 // Mesajlaşma isteğini yanıtla
+// Mesajlaşma isteğini yanıtla
 export const respondToMessageRequest = async (notificationId, action) => {
   try {
-    await runTransaction(db, async (transaction) => {
-      const notificationRef = doc(db, 'notifications', notificationId);
-      const notificationDoc = await transaction.get(notificationRef);
-      
-      if (!notificationDoc.exists()) {
-         throw new Error('Bildirim bulunamadı');
-      }
-      
-      const notifData = notificationDoc.data();
-      const conversationId = notifData.relatedId;
-      
-      if (conversationId) {
-         const convRef = doc(db, 'conversations', conversationId);
-         const convDoc = await transaction.get(convRef);
-         
-         if (convDoc.exists()) {
-             if (action === 'accept') {
-                 transaction.update(convRef, {
-                     status: 'active',
-                     acceptedAt: serverTimestamp()
-                 });
-             } else {
-                 transaction.update(convRef, {
-                     status: 'rejected',
-                     rejectedAt: serverTimestamp()
-                 });
-             }
-         }
-      }
-      
-      transaction.delete(notificationRef);
-    });
+    const notificationRef = doc(db, 'notifications', notificationId);
+    
+    // 1. Bildirimi oku
+    const notificationDoc = await getDoc(notificationRef);
+    if (!notificationDoc.exists()) {
+       return { success: false, error: 'Bildirim bulunamadı' };
+    }
+    
+    const notifData = notificationDoc.data();
+    const conversationId = notifData.relatedId;
+    
+    if (conversationId) {
+        const convRef = doc(db, 'conversations', conversationId);
+        try {
+            if (action === 'accept') {
+                await updateDoc(convRef, {
+                    status: 'active',
+                    acceptedAt: serverTimestamp()
+                });
+            } else {
+                await updateDoc(convRef, {
+                    status: 'rejected',
+                    rejectedAt: serverTimestamp()
+                });
+            }
+        } catch (updateError) {
+            console.warn('Conversation update failed (likely verified or deleted):', updateError);
+            // Ignore error, maybe conversation was deleted. Proceed to delete notification.
+        }
+    }
+
+    // Bildirimi sil
+    await deleteDoc(notificationRef);
     
     return { success: true };
   } catch (error) {

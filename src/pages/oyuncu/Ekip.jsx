@@ -59,6 +59,7 @@ const Ekip = () => {
   const [teamImageFile, setTeamImageFile] = useState(null);
   const [invitations, setInvitations] = useState([]);
   const [inviteLoading, setInviteLoading] = useState(null);
+  const [addingMember, setAddingMember] = useState(false);
 
   const cleanMessage = (msg) => {
     if (!msg || typeof msg !== 'string') return '';
@@ -151,17 +152,12 @@ const Ekip = () => {
          return;
     }
 
-    if (!teamImageFile) {
-        toast.error("Lütfen bir takım fotoğrafı seçiniz.");
-        return;
-    }
-
     if (creating) return;
     setCreating(true);
     
+    const toastId = toast.loading('Ekip oluşturuluyor...');
     try {
       const result = await createTeam({
-        // ... (same content)
         name: teamForm.name,
         description: teamForm.description,
         captainId: user.uid,
@@ -177,33 +173,38 @@ const Ekip = () => {
       });
       
       if (result.success) {
-        let photoURL = 'https://via.placeholder.com/200x200?text=TEAM'; 
+        let photoURL = `https://ui-avatars.com/api/?name=${encodeURIComponent(teamForm.name)}&background=10b981&color=fff&size=200`;
         
         if (teamImageFile) {
-            toast.loading('Takım resmi yükleniyor...');
-            const uploadResult = await uploadTeamImage(teamImageFile, result.id);
-            if (uploadResult.success) {
-                const imageUrl = uploadResult.data?.url || uploadResult.data;
-                photoURL = imageUrl;
-                await updateDoc(doc(db, 'teams', result.id), { photoURL: imageUrl });
-            } else {
-                 toast.error("Resim yüklenemedi: " + uploadResult.error);
+            try {
+                const uploadResult = await uploadTeamImage(teamImageFile, result.id);
+                if (uploadResult.success) {
+                    photoURL = uploadResult.data?.url || uploadResult.data?.display_url || uploadResult.data;
+                } else {
+                    console.warn('Resim yüklenemedi:', uploadResult.error);
+                    toast.error('Resim yüklenemedi, varsayılan görsel kullanılacak');
+                }
+            } catch (uploadErr) {
+                console.error('Resim yükleme hatası:', uploadErr);
             }
-            toast.dismiss();
         }
         
         await updateDoc(doc(db, 'teams', result.id), { photoURL });
-        toast.dismiss();
+        toast.dismiss(toastId);
         
         toast.success('Takım başarıyla oluşturuldu');
         setShowCreateModal(false);
         setTeamForm({ name: '', description: '', sport: 'football', maxMembers: 22 });
         setTeamImageFile(null);
         loadTeams();
+      } else {
+        toast.dismiss(toastId);
+        toast.error(result.error || 'Ekip oluşturulamadı');
       }
     } catch (err) {
       console.error('Ekip oluşturma hatası:', err);
-      toast.error('Ekip oluşturulurken hata oluştu');
+      toast.dismiss(toastId);
+      toast.error('Ekip oluşturulurken hata oluştu: ' + err.message);
     } finally {
         setCreating(false);
     }
@@ -308,10 +309,14 @@ const Ekip = () => {
   }, [selectedTeam]);
 
   const handleAddMember = async () => {
-    if (!selectedTeam || !memberEmail) {
+    if (!selectedTeam || !memberEmail.trim()) {
       toast.error('Lütfen email, telefon veya kullanıcı adı girin');
       return;
     }
+
+    if (addingMember) return;
+    setAddingMember(true);
+    const toastId = toast.loading('Kullanıcı aranıyor...');
 
     try {
       let invitedUser = selectedInvitee;
@@ -333,6 +338,7 @@ const Ekip = () => {
         }
 
         if (!userResult.success) {
+          toast.dismiss(toastId);
           toast.error(userResult.error || 'Kullanıcı bulunamadı');
           return;
         }
@@ -341,6 +347,7 @@ const Ekip = () => {
       
       // Zaten ekipte mi kontrol et
       if (selectedTeam.members && selectedTeam.members.includes(invitedUser.id)) {
+        toast.dismiss(toastId);
         toast.error('Bu kullanıcı zaten ekipte');
         return;
       }
@@ -348,8 +355,9 @@ const Ekip = () => {
       // Davet gönder
       const result = await sendTeamInvitation(selectedTeam.id, user.uid, invitedUser.id);
       
+      toast.dismiss(toastId);
       if (result.success) {
-        toast.success('Davet gönderildi');
+        toast.success(`${invitedUser.fullName || invitedUser.displayName || 'Kullanıcı'} adlı kişiye davet gönderildi`);
         setShowAddMemberModal(false);
         setMemberEmail('');
         setSelectedInvitee(null);
@@ -360,7 +368,10 @@ const Ekip = () => {
       }
     } catch (err) {
       console.error('Üye ekleme hatası:', err);
-      toast.error('Hata oluştu');
+      toast.dismiss(toastId);
+      toast.error('Hata oluştu: ' + err.message);
+    } finally {
+      setAddingMember(false);
     }
   };
 
@@ -652,9 +663,9 @@ const Ekip = () => {
             </div>
           ) : (
             /* Ekip Detay Sayfası */
-            <div className="flex-1 flex overflow-hidden">
+            <div className="flex-1 flex flex-col md:flex-row overflow-y-auto md:overflow-hidden">
               {/* Sol Panel - Üye Listesi */}
-              <div className="w-80 bg-white border-r border-gray-200 p-6 overflow-y-auto">
+              <div className="w-full md:w-80 bg-white border-b md:border-b-0 md:border-r border-gray-200 p-6 shrink-0 md:h-full md:overflow-y-auto">
                 <div className="flex items-center justify-between mb-6">
                   <button 
                     onClick={() => setSelectedTeam(null)}
@@ -772,7 +783,7 @@ const Ekip = () => {
               </div>
 
               {/* Sağ Panel - İstatistikler ve Geçmiş */}
-              <div className="flex-1 overflow-y-auto p-6">
+              <div className="flex-1 p-6 w-full md:h-full md:overflow-y-auto">
                 {/* İstatistik Kartları */}
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
                   <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
@@ -1167,9 +1178,12 @@ const Ekip = () => {
                 <div className="flex space-x-3">
                   <button
                     onClick={handleAddMember}
-                    className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                    disabled={addingMember}
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-60 disabled:cursor-not-allowed"
                   >
-                    Ekle
+                    {addingMember ? (
+                      <><div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div><span>İşleniyor...</span></>
+                    ) : 'Ekle'}
                   </button>
                   <button
                     onClick={() => setShowAddMemberModal(false)}
